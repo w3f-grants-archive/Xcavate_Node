@@ -53,6 +53,8 @@ pub use sp_runtime::{Perbill, Permill};
 
 /// Import the template pallet.
 pub use pallet_template;
+/// Import the user pallet
+pub use pallet_user;
 
 /// Import the nft pallet
 use pallet_nfts::PalletFeatures;
@@ -287,6 +289,12 @@ impl pallet_template::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 }
 
+/// Configure the pallet-user in pallets/user.
+impl pallet_user::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type StringLimit = UserStringLimit;
+}
+
 parameter_types! {
 	pub Features: PalletFeatures = PalletFeatures::all_enabled();
 	pub const MaxAttributesPerCall: u32 = 10;
@@ -301,6 +309,9 @@ parameter_types! {
 	pub const ItemAttributesApprovalsLimit: u32 = 20;
 	pub const MaxTips: u32 = 10;
 	pub const MaxDeadlineDuration: BlockNumber = 12 * 30 * DAYS;
+
+	pub const UserStringLimit: u32 = 5;
+
 }
 
 impl pallet_nfts::Config for Runtime {
@@ -386,6 +397,7 @@ construct_runtime!(
 		Sudo: pallet_sudo,
 		// Include the custom logic from the pallet-template in the runtime.
 		TemplateModule: pallet_template,
+		User: pallet_user,
 		Nfts: pallet_nfts,
 		Contracts: pallet_contracts,
 		RandomnessCollectiveFlip: pallet_insecure_randomness_collective_flip,
