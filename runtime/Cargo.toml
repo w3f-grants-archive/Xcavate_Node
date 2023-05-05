@@ -46,6 +46,7 @@ node-primitives = { version = "2.0.0", default-features = false, git = "https://
 pallet-contracts = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.40" }
 pallet-contracts-primitives = { version = "7.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.40" }
 pallet-insecure-randomness-collective-flip = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.40" }
+pallet-assets = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.40" }
 
 # Used for the node template's RPCs
 frame-system-rpc-runtime-api = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.40" }
@@ -104,7 +105,8 @@ std = [
 	"node-primitives/std",
 	"pallet-contracts/std",
 	"pallet-contracts-primitives/std",
-	"pallet-insecure-randomness-collective-flip/std"
+	"pallet-insecure-randomness-collective-flip/std",
+	"pallet-assets/std",
 ]
 runtime-benchmarks = [
 	"frame-benchmarking/runtime-benchmarks",
@@ -119,6 +121,7 @@ runtime-benchmarks = [
 
 	"pallet-nfts/runtime-benchmarks",
 	"pallet-contracts/runtime-benchmarks",
+	"pallet-assets/runtime-benchmarks",
 ]
 try-runtime = [
 	"frame-try-runtime/try-runtime",
@@ -136,4 +139,5 @@ try-runtime = [
 	"pallet-nfts/try-runtime",
 	"pallet-contracts/try-runtime",
 	"pallet-insecure-randomness-collective-flip/try-runtime",
+	"pallet-assets/try-runtime",
 ]
