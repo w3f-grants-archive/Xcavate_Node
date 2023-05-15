@@ -41,6 +41,7 @@ sp-version = { version = "5.0.0", default-features = false, git = "https://githu
 
 # Extra added frame & pallet
 pallet-nfts = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.40" }
+pallet-uniques = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.40" }
 pallet-nfts-runtime-api = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.40" }
 node-primitives = { version = "2.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.40" }
 pallet-contracts = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.40" }
@@ -101,6 +102,7 @@ std = [
 
 	# Extra added pallet & frame features
 	"pallet-nfts/std",
+	"pallet-uniques/std",
 	"pallet-nfts-runtime-api/std",
 	"node-primitives/std",
 	"pallet-contracts/std",
@@ -120,6 +122,7 @@ runtime-benchmarks = [
 	"sp-runtime/runtime-benchmarks",
 
 	"pallet-nfts/runtime-benchmarks",
+	"pallet-uniques/runtime-benchmarks",
 	"pallet-contracts/runtime-benchmarks",
 	"pallet-assets/runtime-benchmarks",
 ]
@@ -140,4 +143,5 @@ try-runtime = [
 	"pallet-contracts/try-runtime",
 	"pallet-insecure-randomness-collective-flip/try-runtime",
 	"pallet-assets/try-runtime",
+	"pallet-uniques/try-runtime",
 ]
