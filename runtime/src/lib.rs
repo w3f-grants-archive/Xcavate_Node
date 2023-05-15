@@ -11,7 +11,7 @@ pub mod constants;
 use constants::currency::*;
 
 use frame_support::traits::{tokens::nonfungibles_v2::Inspect, AsEnsureOriginWithArg, Nothing};
-use frame_system::{EnsureSigned, EnsureRoot};
+use frame_system::{EnsureRoot, EnsureSigned};
 use pallet_grandpa::AuthorityId as GrandpaId;
 use sp_api::impl_runtime_apis;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
@@ -343,6 +343,27 @@ impl pallet_nfts::Config for Runtime {
 	type Locker = ();
 }
 
+impl pallet_uniques::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type CollectionId = u32;
+	type ItemId = u32;
+	type Currency = Balances;
+	type ForceOrigin = frame_system::EnsureRoot<AccountId>;
+	type CollectionDeposit = CollectionDeposit;
+	type ItemDeposit = ItemDeposit;
+	type MetadataDepositBase = MetadataDepositBase;
+	type AttributeDepositBase = MetadataDepositBase;
+	type DepositPerByte = MetadataDepositPerByte;
+	type StringLimit = StringLimit;
+	type KeyLimit = KeyLimit;
+	type ValueLimit = ValueLimit;
+	type WeightInfo = pallet_uniques::weights::SubstrateWeight<Runtime>;
+	#[cfg(feature = "runtime-benchmarks")]
+	type Helper = ();
+	type CreateOrigin = AsEnsureOriginWithArg<EnsureSigned<AccountId>>;
+	type Locker = ();
+}
+
 parameter_types! {
 	pub const DepositPerItem: Balance = deposit(1, 0);
 	pub const DepositPerByte: Balance = deposit(0, 1);
@@ -427,6 +448,7 @@ construct_runtime!(
 		TemplateModule: pallet_template,
 		User: pallet_user,
 		Nfts: pallet_nfts,
+		Uniques: pallet_uniques,
 		Contracts: pallet_contracts,
 		RandomnessCollectiveFlip: pallet_insecure_randomness_collective_flip,
 		Assets: pallet_assets,
@@ -482,6 +504,7 @@ mod benches {
 		[pallet_timestamp, Timestamp]
 		[pallet_template, TemplateModule]
 		[pallet_nfts, Nfts]
+		[pallet_uniques, Uniques]
 		[pallet_contracts, Contracts]
 		[pallet_assets, Assets]
 	);
