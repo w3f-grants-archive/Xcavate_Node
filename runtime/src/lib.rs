@@ -429,6 +429,13 @@ impl pallet_assets::Config for Runtime {
 	type BenchmarkHelper = ();
 }
 
+impl pallet_utility::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeCall = RuntimeCall;
+	type PalletsOrigin = OriginCaller;
+	type WeightInfo = pallet_utility::weights::SubstrateWeight<Runtime>;
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub struct Runtime
@@ -452,6 +459,7 @@ construct_runtime!(
 		Contracts: pallet_contracts,
 		RandomnessCollectiveFlip: pallet_insecure_randomness_collective_flip,
 		Assets: pallet_assets,
+		Utility: pallet_utility,
 	}
 );
 
@@ -507,6 +515,7 @@ mod benches {
 		[pallet_uniques, Uniques]
 		[pallet_contracts, Contracts]
 		[pallet_assets, Assets]
+		[pallet_utility, Utility]
 	);
 }
 
