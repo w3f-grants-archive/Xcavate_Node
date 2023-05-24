@@ -53,8 +53,7 @@ pub use sp_runtime::{Perbill, Permill};
 
 /// Import the template pallet.
 pub use pallet_template;
-/// Import the user pallet
-pub use pallet_user;
+
 
 /// Import the nft pallet
 use pallet_nfts::PalletFeatures;
@@ -289,11 +288,7 @@ impl pallet_template::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 }
 
-/// Configure the pallet-user in pallets/user.
-impl pallet_user::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type StringLimit = UserStringLimit;
-}
+
 
 parameter_types! {
 	pub Features: PalletFeatures = PalletFeatures::all_enabled();
@@ -453,7 +448,6 @@ construct_runtime!(
 		Sudo: pallet_sudo,
 		// Include the custom logic from the pallet-template in the runtime.
 		TemplateModule: pallet_template,
-		User: pallet_user,
 		Nfts: pallet_nfts,
 		Uniques: pallet_uniques,
 		Contracts: pallet_contracts,
@@ -497,7 +491,7 @@ pub type Executive = frame_executive::Executive<
 
 // All migrations executed on runtime upgrade as a nested tuple of types implementing
 // `OnRuntimeUpgrade`.
-type Migrations = (pallet_contracts::Migration<Runtime>,);
+// type Migrations = (pallet_contracts::Migration<Runtime>,);
 
 #[cfg(feature = "runtime-benchmarks")]
 #[macro_use]
