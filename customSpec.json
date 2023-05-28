@@ -18,18 +18,13 @@
       },
       "aura": {
         "authorities": [
-          "5DsxHMB2G4csPv9YUuNxHN5bp7gUKxfegi1RCqPt5irtsZgZ",
-          "5CcsmrQUeuRxhRLsdy46vnNmD42kKML3NejtyGazGu5K38X6"
+          "5FLYSUpKNUPJX6WSv1cciPiVEpEARKuKVjapyFQ5Hmiw5fUv"
         ]
       },
       "grandpa": {
         "authorities": [
           [
-            "5DxdLqim7q2CfVFjHuyGA543nEk4939DWFxejhxUfHPj1BzR",
-            1
-          ],
-          [
-            "5EqCsS6immXZHMX3ht5pN4kUh345kMveJy2KGfcywkZjTuuQ",
+            "5H6G2kesoHt9vNha9WZXkzQHp81z9WxHYFbHr8Lxuieedhk5",
             1
           ]
         ]

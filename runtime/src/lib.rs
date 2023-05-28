@@ -431,6 +431,23 @@ impl pallet_utility::Config for Runtime {
 	type WeightInfo = pallet_utility::weights::SubstrateWeight<Runtime>;
 }
 
+parameter_types! {
+	// One storage item; key size is 32; value is size 4+4+16+32 bytes = 56 bytes.
+	pub const DepositBase: Balance = deposit(1, 88);
+	// Additional storage item size of 32 bytes.
+	pub const DepositFactor: Balance = deposit(0, 32);
+}
+
+impl pallet_multisig::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeCall = RuntimeCall;
+	type Currency = Balances;
+	type DepositBase = DepositBase;
+	type DepositFactor = DepositFactor;
+	type MaxSignatories = ConstU32<100>;
+	type WeightInfo = pallet_multisig::weights::SubstrateWeight<Runtime>;
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub struct Runtime
@@ -454,6 +471,7 @@ construct_runtime!(
 		RandomnessCollectiveFlip: pallet_insecure_randomness_collective_flip,
 		Assets: pallet_assets,
 		Utility: pallet_utility,
+		Multisig: pallet_multisig,
 	}
 );
 
@@ -510,6 +528,7 @@ mod benches {
 		[pallet_contracts, Contracts]
 		[pallet_assets, Assets]
 		[pallet_utility, Utility]
+		[pallet_multisig, Multisig]
 	);
 }
 
