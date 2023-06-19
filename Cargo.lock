@@ -4361,6 +4361,7 @@ dependencies = [
  "node-primitives",
  "pallet-assets",
  "pallet-aura",
+ "pallet-authorship",
  "pallet-babe",
  "pallet-bags-list",
  "pallet-balances",
@@ -4371,6 +4372,7 @@ dependencies = [
  "pallet-contracts-primitives",
  "pallet-election-provider-multi-phase",
  "pallet-grandpa",
+ "pallet-im-online",
  "pallet-insecure-randomness-collective-flip",
  "pallet-multisig",
  "pallet-nfts",
@@ -4861,6 +4863,26 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-session",
+ "sp-staking",
+ "sp-std",
+]
+
+[[package]]
+name = "pallet-im-online"
+version = "4.0.0-dev"
+source = "git+https://github.com/paritytech/substrate.git?branch=polkadot-v0.9.40#98f2e3451c9143278ec53c6718940aeabcd3b68a"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "log",
+ "pallet-authorship",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-application-crypto",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
  "sp-staking",
  "sp-std",
 ]

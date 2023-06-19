@@ -1,6 +1,6 @@
 use node_template_runtime::{
 	AccountId, AssetsConfig, AuraConfig, BalancesConfig, GenesisConfig, GrandpaConfig, Signature,
-	SudoConfig, SystemConfig, WASM_BINARY,
+	SudoConfig, SystemConfig, WASM_BINARY, CouncilConfig
 };
 use sc_service::{ChainType, Properties};
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
@@ -156,5 +156,11 @@ fn testnet_genesis(
 		},
 		transaction_payment: Default::default(),
 		assets: AssetsConfig::default(),
+		im_online: Default::default(),
+		council: CouncilConfig { members: vec![], phantom: Default::default() },
+		staking: Default::default(),
+		babe: Default::default(),
+		session: Default::default(),
+		treasury: Default::default(), 
 	}
 }
