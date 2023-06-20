@@ -8,38 +8,44 @@ include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
 /// Constant values used within the runtime
 pub mod constants;
-use codec::{Decode, Encode};
+use codec::Decode;
 mod voter_bags;
-use constants::currency::*;
-use constants::time::*;
-use node_primitives::Moment;
-use crate::opaque::SessionKeys;
-use frame_support::pallet_prelude::{DispatchClass, Get};
-use frame_support::PalletId;
-use frame_support::traits::{ConstU16,tokens::nonfungibles_v2::Inspect, AsEnsureOriginWithArg, Nothing, U128CurrencyToVote, EitherOfDiverse};
-use frame_system::{EnsureRoot, EnsureSigned, EnsureWithSuccess};
+use constants::{currency::*, time::*};
 use frame_election_provider_support::{onchain, ExtendedBalance, SequentialPhragmen, VoteWeight};
+use frame_support::{
+	pallet_prelude::{DispatchClass, Get},
+	traits::{
+		tokens::nonfungibles_v2::Inspect, AsEnsureOriginWithArg, ConstU16, EitherOfDiverse,
+		Nothing, U128CurrencyToVote,
+	},
+	PalletId,
+};
+use frame_system::{EnsureRoot, EnsureSigned, EnsureWithSuccess};
+use node_primitives::Moment;
 use pallet_grandpa::AuthorityId as GrandpaId;
+pub type BabeId = sp_consensus_babe::AuthorityId;
+
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use pallet_session::historical as pallet_session_historical;
 use sp_api::impl_runtime_apis;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::{crypto::KeyTypeId, ConstBool, OpaqueMetadata};
-use sp_runtime::FixedU128;
-use sp_runtime::traits::Convert;
-use sp_runtime::traits::OpaqueKeys;
 use sp_runtime::{
-	create_runtime_str, generic, impl_opaque_keys, curve::PiecewiseLinear,
+	create_runtime_str,
+	curve::PiecewiseLinear,
+	generic, impl_opaque_keys,
 	traits::{
-		AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, NumberFor, One, Verify,
+		AccountIdLookup, BlakeTwo256, Block as BlockT, Convert, IdentifyAccount, NumberFor, One,
+		OpaqueKeys, Verify,
 	},
-	transaction_validity::{TransactionSource, TransactionValidity, TransactionPriority},
-	ApplyExtrinsicResult, MultiSignature, Percent,
+	transaction_validity::{TransactionPriority, TransactionSource, TransactionValidity},
+	ApplyExtrinsicResult, FixedU128, MultiSignature, Percent,
 };
 use sp_std::prelude::*;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
+use crate::opaque::SessionKeys;
 
 // A few exports that help ease life for downstream crates.
 pub use frame_support::{
@@ -57,18 +63,17 @@ pub use frame_support::{
 };
 pub use frame_system::Call as SystemCall;
 pub use pallet_balances::Call as BalancesCall;
+use pallet_election_provider_multi_phase::SolutionAccuracyOf;
+#[cfg(any(feature = "std", test))]
+pub use pallet_staking::StakerStatus;
 pub use pallet_timestamp::Call as TimestampCall;
 use pallet_transaction_payment::{ConstFeeMultiplier, CurrencyAdapter, Multiplier};
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
-#[cfg(any(feature = "std", test))]
-pub use pallet_staking::StakerStatus;
-use pallet_election_provider_multi_phase::SolutionAccuracyOf;
 pub use sp_runtime::{Perbill, Permill};
 
 /// Import the template pallet.
 pub use pallet_template;
-
 
 /// Import the nft pallet
 use pallet_nfts::PalletFeatures;
@@ -110,11 +115,20 @@ pub mod opaque {
 
 	impl_opaque_keys! {
 		pub struct SessionKeys {
-			pub aura: Aura,
+			// pub aura: Aura,
 			pub grandpa: Grandpa,
+			pub babe: Babe,
+			pub im_online: ImOnline,
 		}
 	}
 }
+
+/// The BABE epoch configuration at genesis.
+pub const BABE_GENESIS_EPOCH_CONFIG: sp_consensus_babe::BabeEpochConfiguration =
+	sp_consensus_babe::BabeEpochConfiguration {
+		c: PRIMARY_PROBABILITY,
+		allowed_slots: sp_consensus_babe::AllowedSlots::PrimaryAndSecondaryPlainSlots,
+	};
 
 // To learn more about runtime versioning, see:
 // https://docs.substrate.io/main-docs/build/upgrade#runtime-versioning
@@ -332,8 +346,6 @@ impl pallet_sudo::Config for Runtime {
 impl pallet_template::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 }
-
-
 
 parameter_types! {
 	pub Features: PalletFeatures = PalletFeatures::all_enabled();
@@ -721,7 +733,6 @@ impl pallet_bounties::Config for Runtime {
 	type ChildBountyManager = ChildBounties;
 }
 
-
 parameter_types! {
 	pub const ChildBountyValueMinimum: Balance = DOLLARS;
 	pub const EpochDuration: u64 = EPOCH_DURATION_IN_SLOTS;
@@ -920,40 +931,40 @@ impl pallet_bags_list::Config for Runtime {
 }
 
 parameter_types! {
-	pub const PostUnbondPoolsWindow: u32 = 4;
-	pub const NominationPoolsPalletId: PalletId = PalletId(*b"py/nopls");
-	pub const MaxPointsToBalance: u8 = 10;
-  }
-  
-  pub struct BalanceToU256;
-  impl Convert<Balance, sp_core::U256> for BalanceToU256 {
-	  fn convert(balance: Balance) -> sp_core::U256 {
-		  sp_core::U256::from(balance)
-	  }
-  }
-  pub struct U256ToBalance;
-  impl Convert<sp_core::U256, Balance> for U256ToBalance {
-	  fn convert(n: sp_core::U256) -> Balance {
-		  n.try_into().unwrap_or(Balance::max_value())
-	  }
-  }
-  
-  impl pallet_nomination_pools::Config for Runtime {
-	  type WeightInfo = ();
-	  type RuntimeEvent = RuntimeEvent;
-	  type Currency = Balances;
-	  type RewardCounter = FixedU128;
-	  type BalanceToU256 = BalanceToU256;
-	  type U256ToBalance = U256ToBalance;
-	  type Staking = Staking;
-	  type PostUnbondingPoolsWindow = PostUnbondPoolsWindow;
-	  type MaxMetadataLen = ConstU32<256>;
-	  type MaxUnbonding = ConstU32<8>;
-	  type PalletId = NominationPoolsPalletId;
-	  type MaxPointsToBalance = MaxPointsToBalance;
-  }
+  pub const PostUnbondPoolsWindow: u32 = 4;
+  pub const NominationPoolsPalletId: PalletId = PalletId(*b"py/nopls");
+  pub const MaxPointsToBalance: u8 = 10;
+}
 
-  impl pallet_offences::Config for Runtime {
+pub struct BalanceToU256;
+impl Convert<Balance, sp_core::U256> for BalanceToU256 {
+	fn convert(balance: Balance) -> sp_core::U256 {
+		sp_core::U256::from(balance)
+	}
+}
+pub struct U256ToBalance;
+impl Convert<sp_core::U256, Balance> for U256ToBalance {
+	fn convert(n: sp_core::U256) -> Balance {
+		n.try_into().unwrap_or(Balance::max_value())
+	}
+}
+
+impl pallet_nomination_pools::Config for Runtime {
+	type WeightInfo = ();
+	type RuntimeEvent = RuntimeEvent;
+	type Currency = Balances;
+	type RewardCounter = FixedU128;
+	type BalanceToU256 = BalanceToU256;
+	type U256ToBalance = U256ToBalance;
+	type Staking = Staking;
+	type PostUnbondingPoolsWindow = PostUnbondPoolsWindow;
+	type MaxMetadataLen = ConstU32<256>;
+	type MaxUnbonding = ConstU32<8>;
+	type PalletId = NominationPoolsPalletId;
+	type MaxPointsToBalance = MaxPointsToBalance;
+}
+
+impl pallet_offences::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type IdentificationTuple = pallet_session::historical::IdentificationTuple<Self>;
 	type OnOffenceHandler = Staking;
@@ -961,12 +972,11 @@ parameter_types! {
 
 impl<C> frame_system::offchain::SendTransactionTypes<C> for Runtime
 where
-    RuntimeCall: From<C>,
+	RuntimeCall: From<C>,
 {
-    type Extrinsic = UncheckedExtrinsic;
-    type OverarchingCall = RuntimeCall;
+	type Extrinsic = UncheckedExtrinsic;
+	type OverarchingCall = RuntimeCall;
 }
-
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
@@ -1248,6 +1258,59 @@ impl_runtime_apis! {
 
 		fn authorities() -> Vec<AuraId> {
 			Aura::authorities().into_inner()
+		}
+	}
+
+	impl sp_consensus_babe::BabeApi<Block> for Runtime {
+		fn configuration() -> sp_consensus_babe::BabeConfiguration {
+			// The choice of `c` parameter (where `1 - c` represents the
+			// probability of a slot being empty), is done in accordance to the
+			// slot duration and expected target block time, for safely
+			// resisting network delays of maximum two seconds.
+			// <https://research.web3.foundation/en/latest/polkadot/BABE/Babe/#6-practical-results>
+			sp_consensus_babe::BabeConfiguration {
+				slot_duration: Babe::slot_duration(),
+				epoch_length: EpochDuration::get(),
+				c: BABE_GENESIS_EPOCH_CONFIG.c,
+				authorities: Babe::authorities().to_vec(),
+				randomness: Babe::randomness(),
+				allowed_slots: BABE_GENESIS_EPOCH_CONFIG.allowed_slots,
+			}
+		}
+
+		fn current_epoch_start() -> sp_consensus_babe::Slot {
+			Babe::current_epoch_start()
+		}
+
+		fn current_epoch() -> sp_consensus_babe::Epoch {
+			Babe::current_epoch()
+		}
+
+		fn next_epoch() -> sp_consensus_babe::Epoch {
+			Babe::next_epoch()
+		}
+
+		fn generate_key_ownership_proof(
+			_slot: sp_consensus_babe::Slot,
+			authority_id: sp_consensus_babe::AuthorityId,
+		) -> Option<sp_consensus_babe::OpaqueKeyOwnershipProof> {
+			use codec::Encode;
+
+			Historical::prove((sp_consensus_babe::KEY_TYPE, authority_id))
+				.map(|p| p.encode())
+				.map(sp_consensus_babe::OpaqueKeyOwnershipProof::new)
+		}
+
+		fn submit_report_equivocation_unsigned_extrinsic(
+			equivocation_proof: sp_consensus_babe::EquivocationProof<<Block as BlockT>::Header>,
+			key_owner_proof: sp_consensus_babe::OpaqueKeyOwnershipProof,
+		) -> Option<()> {
+			let key_owner_proof = key_owner_proof.decode()?;
+
+			Babe::submit_unsigned_equivocation_report(
+				equivocation_proof,
+				key_owner_proof,
+			)
 		}
 	}
 

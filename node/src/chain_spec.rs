@@ -1,11 +1,12 @@
 use node_template_runtime::{
-	AccountId, AssetsConfig, AuraConfig, BalancesConfig, GenesisConfig, GrandpaConfig, Signature,
-	SudoConfig, SystemConfig, WASM_BINARY, CouncilConfig
+	AccountId, AssetsConfig, BalancesConfig, GenesisConfig, Signature,
+	SudoConfig, SystemConfig, WASM_BINARY, CouncilConfig, SessionConfig, opaque::SessionKeys, BabeConfig, BABE_GENESIS_EPOCH_CONFIG,
 };
 use sc_service::{ChainType, Properties};
-use sp_consensus_aura::sr25519::AuthorityId as AuraId;
+use sp_consensus_babe::AuthorityId as BabeId;
+use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
-use sp_core::{sr25519, Pair, Public};
+use sp_core::{ecdsa, sr25519, Pair, Public};
 use sp_runtime::traits::{IdentifyAccount, Verify};
 
 // The URL for the telemetry server.
@@ -32,8 +33,13 @@ where
 }
 
 /// Generate an Aura authority key.
-pub fn authority_keys_from_seed(s: &str) -> (AuraId, GrandpaId) {
-	(get_from_seed::<AuraId>(s), get_from_seed::<GrandpaId>(s))
+pub fn authority_keys_from_seed(s: &str) -> (AccountId, BabeId, ImOnlineId, GrandpaId) {
+	(
+		get_account_id_from_seed::<ecdsa::Public>(s), 
+		get_from_seed::<BabeId>(s), 
+		get_from_seed::<ImOnlineId>(s), 
+		get_from_seed::<GrandpaId>(s),
+	)
 }
 
 pub fn development_config() -> Result<ChainSpec, String> {
@@ -55,7 +61,12 @@ pub fn development_config() -> Result<ChainSpec, String> {
 			testnet_genesis(
 				wasm_binary,
 				// Initial PoA authorities
-				vec![authority_keys_from_seed("Alice")],
+				vec![
+					authority_keys_from_seed("Alice"),
+					authority_keys_from_seed("Bob"),
+					authority_keys_from_seed("Charlie"),
+					authority_keys_from_seed("Dave"),
+				],
 				// Sudo account
 				get_account_id_from_seed::<sr25519::Public>("Alice"),
 				// Pre-funded accounts
@@ -98,7 +109,12 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 			testnet_genesis(
 				wasm_binary,
 				// Initial PoA authorities
-				vec![authority_keys_from_seed("Alice"), authority_keys_from_seed("Bob")],
+				vec![
+					authority_keys_from_seed("Alice"),
+					authority_keys_from_seed("Bob"),
+					authority_keys_from_seed("Charlie"),
+					authority_keys_from_seed("Dave"),
+				],
 				// Sudo account
 				get_account_id_from_seed::<sr25519::Public>("Alice"),
 				// Pre-funded accounts
@@ -130,7 +146,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 /// Configure initial storage state for FRAME modules.
 fn testnet_genesis(
 	wasm_binary: &[u8],
-	initial_authorities: Vec<(AuraId, GrandpaId)>,
+	initial_authorities: Vec<(AccountId, BabeId, ImOnlineId, GrandpaId)>,
 	root_key: AccountId,
 	endowed_accounts: Vec<AccountId>,
 	_enable_println: bool,
@@ -144,12 +160,15 @@ fn testnet_genesis(
 			// Configure endowed accounts with initial balance of 1 << 60.
 			balances: endowed_accounts.iter().cloned().map(|k| (k, 1 << 60)).collect(),
 		},
-		aura: AuraConfig {
-			authorities: initial_authorities.iter().map(|x| (x.0.clone())).collect(),
-		},
-		grandpa: GrandpaConfig {
-			authorities: initial_authorities.iter().map(|x| (x.1.clone(), 1)).collect(),
-		},
+		// aura: AuraConfig {
+		// 	authorities: initial_authorities.iter().map(|x| (x.0.clone())).collect(),
+		// },
+		aura:  Default::default(),
+		// grandpa: GrandpaConfig {
+		// 	authorities: initial_authorities.iter().map(|x| (x.1.clone(), 1)).collect(),
+		// },
+		grandpa:  Default::default(),
+
 		sudo: SudoConfig {
 			// Assign network admin rights.
 			key: Some(root_key),
@@ -159,8 +178,25 @@ fn testnet_genesis(
 		im_online: Default::default(),
 		council: CouncilConfig { members: vec![], phantom: Default::default() },
 		staking: Default::default(),
-		babe: Default::default(),
-		session: Default::default(),
+		// babe: Default::default(),
+		babe: BabeConfig {
+			authorities: Default::default(),
+			epoch_config: Some(BABE_GENESIS_EPOCH_CONFIG),
+		},
+		// session: Default::default(),
+		session: SessionConfig {
+			keys: initial_authorities
+				.iter()
+				.cloned()
+				.map(|(acc, babe, im_online, grandpa)| {
+					(
+						acc.clone(),                              /* validator stash id */
+						acc,                                      /* validator controller id */
+						SessionKeys { babe, im_online, grandpa }, /* session keys */
+					)
+				})
+				.collect(),
+		},
 		treasury: Default::default(), 
 	}
 }
