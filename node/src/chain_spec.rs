@@ -1,13 +1,13 @@
 use node_template_runtime::{
-	AccountId, AssetsConfig, BalancesConfig, GenesisConfig, Signature,
-	SudoConfig, SystemConfig, WASM_BINARY, CouncilConfig, SessionConfig, opaque::SessionKeys, BabeConfig, BABE_GENESIS_EPOCH_CONFIG,
+	AccountId, AssetsConfig, BalancesConfig, GenesisConfig, Signature, Balance,
+	SudoConfig, SystemConfig, WASM_BINARY, CouncilConfig, SessionConfig, opaque::SessionKeys, BabeConfig, BABE_GENESIS_EPOCH_CONFIG, StakingConfig, StakerStatus, constants::currency::DOLLARS,
 };
 use sc_service::{ChainType, Properties};
 use sp_consensus_babe::AuthorityId as BabeId;
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_core::{ecdsa, sr25519, Pair, Public};
-use sp_runtime::traits::{IdentifyAccount, Verify};
+use sp_runtime::{traits::{IdentifyAccount, Verify}, Perbill};
 
 // The URL for the telemetry server.
 // const STAGING_TELEMETRY_URL: &str = "wss://telemetry.polkadot.io/submit/";
@@ -151,24 +151,23 @@ fn testnet_genesis(
 	endowed_accounts: Vec<AccountId>,
 	_enable_println: bool,
 ) -> GenesisConfig {
+
+	const VALIDATOR_BOND: Balance = 10_000_000 * DOLLARS;
+	
+	const ENDOWMENT: Balance = 10_000_000 * DOLLARS;
+
 	GenesisConfig {
 		system: SystemConfig {
 			// Add Wasm runtime to storage.
 			code: wasm_binary.to_vec(),
 		},
+		
 		balances: BalancesConfig {
-			// Configure endowed accounts with initial balance of 1 << 60.
-			balances: endowed_accounts.iter().cloned().map(|k| (k, 1 << 60)).collect(),
+			balances: endowed_accounts.iter().cloned().map(|x| (x, ENDOWMENT)).collect(),
 		},
-		// aura: AuraConfig {
-		// 	authorities: initial_authorities.iter().map(|x| (x.0.clone())).collect(),
-		// },
+		
 		aura:  Default::default(),
-		// grandpa: GrandpaConfig {
-		// 	authorities: initial_authorities.iter().map(|x| (x.1.clone(), 1)).collect(),
-		// },
 		grandpa:  Default::default(),
-
 		sudo: SudoConfig {
 			// Assign network admin rights.
 			key: Some(root_key),
@@ -177,13 +176,25 @@ fn testnet_genesis(
 		assets: AssetsConfig::default(),
 		im_online: Default::default(),
 		council: CouncilConfig { members: vec![], phantom: Default::default() },
-		staking: Default::default(),
-		// babe: Default::default(),
+		// staking: Default::default(),
+		staking: StakingConfig {
+			validator_count: initial_authorities.len() as u32,
+			minimum_validator_count: initial_authorities.len() as u32,
+			stakers: initial_authorities
+				.iter()
+				// stash == controller
+				.map(|x| (x.0.clone(), x.0.clone(), VALIDATOR_BOND, StakerStatus::Validator))
+				.collect(),
+			invulnerables: initial_authorities.iter().map(|x| x.0.clone()).collect(),
+			force_era: Default::default(),
+			slash_reward_fraction: Perbill::from_percent(10),
+			..Default::default()
+
+		},
 		babe: BabeConfig {
 			authorities: Default::default(),
 			epoch_config: Some(BABE_GENESIS_EPOCH_CONFIG),
 		},
-		// session: Default::default(),
 		session: SessionConfig {
 			keys: initial_authorities
 				.iter()
