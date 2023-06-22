@@ -68,6 +68,7 @@ pallet-nomination-pools = { version = "1.0.0-dev", default-features = false, git
 pallet-election-provider-multi-phase = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.40" }
 pallet-staking-reward-curve = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.40" }
 pallet-offences = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.40" }
+pallet-authority-discovery = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.40" }
 
 # Used for the node template's RPCs
 frame-system-rpc-runtime-api = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.40" }
@@ -146,6 +147,7 @@ std = [
 	"pallet-nomination-pools/std",
 	"pallet-offences/std",
 	"sp-consensus-babe/std",
+	"pallet-authority-discovery/std"
 ]
 runtime-benchmarks = [
 	"frame-benchmarking/runtime-benchmarks",
@@ -205,4 +207,5 @@ try-runtime = [
 	"pallet-bags-list/try-runtime",
 	"pallet-nomination-pools/try-runtime",
 	"pallet-offences/try-runtime",
+	"pallet-authority-discovery/try-runtime",
 ]

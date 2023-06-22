@@ -4365,6 +4365,7 @@ dependencies = [
  "node-primitives",
  "pallet-assets",
  "pallet-aura",
+ "pallet-authority-discovery",
  "pallet-authorship",
  "pallet-babe",
  "pallet-bags-list",
@@ -4629,6 +4630,22 @@ dependencies = [
  "scale-info",
  "sp-application-crypto",
  "sp-consensus-aura",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
+name = "pallet-authority-discovery"
+version = "4.0.0-dev"
+source = "git+https://github.com/paritytech/substrate.git?branch=polkadot-v0.9.40#98f2e3451c9143278ec53c6718940aeabcd3b68a"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "pallet-session",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-application-crypto",
+ "sp-authority-discovery",
  "sp-runtime",
  "sp-std",
 ]
