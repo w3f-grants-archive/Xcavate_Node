@@ -1,6 +1,6 @@
 use node_template_runtime::{
 	AccountId, AssetsConfig, BalancesConfig, GenesisConfig, Signature, Balance,
-	SudoConfig, SystemConfig, WASM_BINARY, CouncilConfig, SessionConfig, opaque::SessionKeys, BabeConfig, BABE_GENESIS_EPOCH_CONFIG, StakingConfig, StakerStatus, constants::currency::DOLLARS,
+	SudoConfig, SystemConfig, WASM_BINARY, CouncilConfig, SessionConfig, opaque::SessionKeys, BabeConfig, BABE_GENESIS_EPOCH_CONFIG, StakingConfig, StakerStatus, constants::currency::DOLLARS, MaxNominations,
 };
 use sc_service::{ChainType, Properties};
 use sp_consensus_babe::AuthorityId as BabeId;
@@ -73,6 +73,8 @@ pub fn development_config() -> Result<ChainSpec, String> {
 				vec![
 					get_account_id_from_seed::<sr25519::Public>("Alice"),
 					get_account_id_from_seed::<sr25519::Public>("Bob"),
+					get_account_id_from_seed::<sr25519::Public>("Charlie"),
+					get_account_id_from_seed::<sr25519::Public>("Dave"),
 				],
 				true,
 			)
@@ -123,8 +125,6 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 					get_account_id_from_seed::<sr25519::Public>("Bob"),
 					get_account_id_from_seed::<sr25519::Public>("Charlie"),
 					get_account_id_from_seed::<sr25519::Public>("Dave"),
-					get_account_id_from_seed::<sr25519::Public>("Eve"),
-					get_account_id_from_seed::<sr25519::Public>("Ferdie"),
 				],
 				true,
 			)
@@ -152,9 +152,27 @@ fn testnet_genesis(
 	_enable_println: bool,
 ) -> GenesisConfig {
 
-	const VALIDATOR_BOND: Balance = 10_000_000 * DOLLARS;
-	
-	const ENDOWMENT: Balance = 10_000_000 * DOLLARS;
+	// stakers: all validators and nominators.
+	let mut rng = rand::thread_rng();
+	let stakers = initial_authorities
+		.iter()
+		.map(|x| (x.0.clone(), x.0.clone(), STASH, StakerStatus::Validator))
+		.chain(endowed_accounts.iter().map(|x| {
+			use rand::{seq::SliceRandom, Rng};
+			let limit = (MaxNominations::get() as usize).min(initial_authorities.len());
+			let count = rng.gen::<usize>() % limit;
+			let nominations = initial_authorities
+				.as_slice()
+				.choose_multiple(&mut rng, count)
+				.into_iter()
+				.map(|choice| choice.0.clone())
+				.collect::<Vec<_>>();
+			(x.clone(), x.clone(), STASH, StakerStatus::Nominator(nominations))
+		}))
+		.collect::<Vec<_>>();
+
+		const ENDOWMENT: Balance = 10_000_000 * DOLLARS;
+		const STASH: Balance = ENDOWMENT / 1000;
 
 	GenesisConfig {
 		system: SystemConfig {
@@ -180,16 +198,10 @@ fn testnet_genesis(
 		staking: StakingConfig {
 			validator_count: initial_authorities.len() as u32,
 			minimum_validator_count: initial_authorities.len() as u32,
-			stakers: initial_authorities
-				.iter()
-				// stash == controller
-				.map(|x| (x.0.clone(), x.0.clone(), VALIDATOR_BOND, StakerStatus::Validator))
-				.collect(),
 			invulnerables: initial_authorities.iter().map(|x| x.0.clone()).collect(),
-			force_era: Default::default(),
 			slash_reward_fraction: Perbill::from_percent(10),
+			stakers,
 			..Default::default()
-
 		},
 		babe: BabeConfig {
 			authorities: Default::default(),
