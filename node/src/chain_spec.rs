@@ -182,7 +182,7 @@ fn testnet_genesis(
 	let stakers = initial_authorities
 		.iter()
 		.map(|x| (x.0.clone(), x.0.clone(), STASH, StakerStatus::Validator))
-		.chain(endowed_accounts.iter().map(|x| {
+		.chain(initial_nominators.iter().map(|x| {
 			use rand::{seq::SliceRandom, Rng};
 			let limit = (MaxNominations::get() as usize).min(initial_authorities.len());
 			let count = rng.gen::<usize>() % limit;
