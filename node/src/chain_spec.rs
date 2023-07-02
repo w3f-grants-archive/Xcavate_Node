@@ -2,7 +2,7 @@ use node_template_runtime::{
 	constants::currency::DOLLARS, opaque::SessionKeys, AccountId, AssetsConfig, BabeConfig,
 	Balance, BalancesConfig, CouncilConfig, GenesisConfig, MaxNominations, SessionConfig,
 	Signature, StakerStatus, StakingConfig, SudoConfig, SystemConfig, BABE_GENESIS_EPOCH_CONFIG,
-	wasm_binary_unwrap,
+	wasm_binary_unwrap, GrandpaConfig, WASM_BINARY,
 };
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use sc_service::{ChainType, Properties};
@@ -62,7 +62,7 @@ fn session_keys(
 }
 
 pub fn development_config() -> Result<ChainSpec, String> {
-	// let wasm_binary = WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?;
+	let wasm_binary = WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?;
 
 	// Give your base currency a unit name and decimal places
 	let mut properties = Properties::new();
@@ -78,10 +78,12 @@ pub fn development_config() -> Result<ChainSpec, String> {
 		ChainType::Development,
 		move || {
 			testnet_genesis(
+				wasm_binary,
 				vec![authority_keys_from_seed("Alice")],
 				vec![],
 				get_account_id_from_seed::<sr25519::Public>("Alice"),
 				None,
+				true,
 			)
 		},
 		// Bootnodes
@@ -99,7 +101,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 }
 
 pub fn local_testnet_config() -> Result<ChainSpec, String> {
-	// let wasm_binary = WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?;
+	let wasm_binary = WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?;
 
 	let mut properties = Properties::new();
 	properties.insert("tokenSymbol".into(), "XCAV".into());
@@ -114,10 +116,12 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 		ChainType::Local,
 		move || {
 			testnet_genesis(
+				wasm_binary,
 				vec![authority_keys_from_seed("Alice"), authority_keys_from_seed("Bob")],
 				vec![],
 				get_account_id_from_seed::<sr25519::Public>("Alice"),
 				None,
+				true,
 			)
 		},
 		// Bootnodes
@@ -136,6 +140,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 
 /// Configure initial storage state for FRAME modules.
 fn testnet_genesis(
+	_wasm_binary: &[u8],
 	initial_authorities: Vec<(
 		AccountId,
 		AccountId,
@@ -147,6 +152,7 @@ fn testnet_genesis(
 	initial_nominators: Vec<AccountId>,
 	root_key: AccountId,
 	endowed_accounts: Option<Vec<AccountId>>,
+	_enable_println: bool,
 ) -> GenesisConfig {
 
 	let mut endowed_accounts: Vec<AccountId> = endowed_accounts.unwrap_or_else(|| {
@@ -205,7 +211,13 @@ fn testnet_genesis(
 			balances: endowed_accounts.iter().cloned().map(|x| (x, ENDOWMENT)).collect(),
 		},
 		aura: Default::default(),
-		grandpa: Default::default(),
+		// aura: AuraConfig {
+		// 	authorities: initial_authorities.iter().map(|x| (x.0.clone())).collect(),
+		// },
+		// grandpa: GrandpaConfig {
+		// 	authorities: initial_authorities.iter().map(|x| (x.2.clone(), 1)).collect(),
+		// },
+		grandpa: GrandpaConfig { authorities: vec![] },
 		sudo: SudoConfig {
 			// Assign network admin rights.
 			key: Some(root_key),
