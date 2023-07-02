@@ -1,14 +1,14 @@
 use node_template_runtime::{
-	constants::currency::DOLLARS, opaque::SessionKeys, AccountId, AssetsConfig, BabeConfig,
+	constants::currency::DOLLARS, opaque::SessionKeys, AccountId, AssetsConfig,
 	Balance, BalancesConfig, CouncilConfig, GenesisConfig, MaxNominations, SessionConfig,
-	Signature, StakerStatus, StakingConfig, SudoConfig, SystemConfig, BABE_GENESIS_EPOCH_CONFIG,
-	wasm_binary_unwrap, GrandpaConfig, WASM_BINARY,
+	Signature, StakerStatus, StakingConfig, SudoConfig, SystemConfig,
+	wasm_binary_unwrap, GrandpaConfig, WASM_BINARY, BabeConfig, BABE_GENESIS_EPOCH_CONFIG,
 };
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use sc_service::{ChainType, Properties};
-use sp_consensus_babe::AuthorityId as BabeId;
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_authority_discovery::AuthorityId as AuthorityDiscoveryId;
+use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::{sr25519, Pair, Public};
 use sp_runtime::{
 	traits::{IdentifyAccount, Verify},
@@ -41,12 +41,12 @@ where
 /// Helper function to generate stash, controller and session key from seed
 pub fn authority_keys_from_seed(
 	seed: &str,
-) -> (AccountId, AccountId, GrandpaId, BabeId, ImOnlineId, AuthorityDiscoveryId) {
+) -> (AccountId, AccountId, GrandpaId, AuraId, ImOnlineId, AuthorityDiscoveryId) {
 	(
 		get_account_id_from_seed::<sr25519::Public>(&format!("{}//stash", seed)),
 		get_account_id_from_seed::<sr25519::Public>(seed),
 		get_from_seed::<GrandpaId>(seed),
-		get_from_seed::<BabeId>(seed),
+		get_from_seed::<AuraId>(seed),
 		get_from_seed::<ImOnlineId>(seed),
 		get_from_seed::<AuthorityDiscoveryId>(seed),
 	)
@@ -54,11 +54,11 @@ pub fn authority_keys_from_seed(
 
 fn session_keys(
 	grandpa: GrandpaId,
-	babe: BabeId,
+	aura: AuraId,
 	im_online: ImOnlineId,
 	authority_discovery: AuthorityDiscoveryId,
 ) -> SessionKeys {
-	SessionKeys { grandpa, babe, im_online, authority_discovery }
+	SessionKeys { grandpa, aura, im_online, authority_discovery }
 }
 
 pub fn development_config() -> Result<ChainSpec, String> {
@@ -145,7 +145,7 @@ fn testnet_genesis(
 		AccountId,
 		AccountId,
 		GrandpaId,
-		BabeId,
+		AuraId,
 		ImOnlineId,
 		AuthorityDiscoveryId,
 	)>,
@@ -211,12 +211,6 @@ fn testnet_genesis(
 			balances: endowed_accounts.iter().cloned().map(|x| (x, ENDOWMENT)).collect(),
 		},
 		aura: Default::default(),
-		// aura: AuraConfig {
-		// 	authorities: initial_authorities.iter().map(|x| (x.0.clone())).collect(),
-		// },
-		// grandpa: GrandpaConfig {
-		// 	authorities: initial_authorities.iter().map(|x| (x.2.clone(), 1)).collect(),
-		// },
 		grandpa: GrandpaConfig { authorities: vec![] },
 		sudo: SudoConfig {
 			// Assign network admin rights.
@@ -226,7 +220,6 @@ fn testnet_genesis(
 		assets: AssetsConfig::default(),
 		im_online: Default::default(),
 		council: CouncilConfig { members: vec![], phantom: Default::default() },
-		// staking: Default::default(),
 		staking: StakingConfig {
 			validator_count: initial_authorities.len() as u32,
 			minimum_validator_count: initial_authorities.len() as u32,

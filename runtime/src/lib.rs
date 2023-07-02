@@ -23,7 +23,7 @@ use frame_support::{
 use frame_system::{EnsureRoot, EnsureSigned, EnsureWithSuccess};
 use node_primitives::Moment;
 use pallet_grandpa::AuthorityId as GrandpaId;
-pub type BabeId = sp_consensus_babe::AuthorityId;
+// pub type BabeId = sp_consensus_babe::AuthorityId;
 
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use pallet_session::historical as pallet_session_historical;
@@ -117,7 +117,7 @@ pub mod opaque {
 		pub struct SessionKeys {
 			// pub aura: Aura,
 			pub grandpa: Grandpa,
-			pub babe: Babe,
+			pub aura: Aura,
 			pub im_online: ImOnline,
 			pub authority_discovery: AuthorityDiscovery,
 		}
@@ -1250,58 +1250,58 @@ impl_runtime_apis! {
 		}
 	}
 
-	impl sp_consensus_babe::BabeApi<Block> for Runtime {
-		fn configuration() -> sp_consensus_babe::BabeConfiguration {
-			// The choice of `c` parameter (where `1 - c` represents the
-			// probability of a slot being empty), is done in accordance to the
-			// slot duration and expected target block time, for safely
-			// resisting network delays of maximum two seconds.
-			// <https://research.web3.foundation/en/latest/polkadot/BABE/Babe/#6-practical-results>
-			sp_consensus_babe::BabeConfiguration {
-				slot_duration: Babe::slot_duration(),
-				epoch_length: EpochDuration::get(),
-				c: BABE_GENESIS_EPOCH_CONFIG.c,
-				authorities: Babe::authorities().to_vec(),
-				randomness: Babe::randomness(),
-				allowed_slots: BABE_GENESIS_EPOCH_CONFIG.allowed_slots,
-			}
-		}
+	// impl sp_consensus_babe::BabeApi<Block> for Runtime {
+	// 	fn configuration() -> sp_consensus_babe::BabeConfiguration {
+	// 		// The choice of `c` parameter (where `1 - c` represents the
+	// 		// probability of a slot being empty), is done in accordance to the
+	// 		// slot duration and expected target block time, for safely
+	// 		// resisting network delays of maximum two seconds.
+	// 		// <https://research.web3.foundation/en/latest/polkadot/BABE/Babe/#6-practical-results>
+	// 		sp_consensus_babe::BabeConfiguration {
+	// 			slot_duration: Babe::slot_duration(),
+	// 			epoch_length: EpochDuration::get(),
+	// 			c: BABE_GENESIS_EPOCH_CONFIG.c,
+	// 			authorities: Babe::authorities().to_vec(),
+	// 			randomness: Babe::randomness(),
+	// 			allowed_slots: BABE_GENESIS_EPOCH_CONFIG.allowed_slots,
+	// 		}
+	// 	}
 
-		fn current_epoch_start() -> sp_consensus_babe::Slot {
-			Babe::current_epoch_start()
-		}
+	// 	fn current_epoch_start() -> sp_consensus_babe::Slot {
+	// 		Babe::current_epoch_start()
+	// 	}
 
-		fn current_epoch() -> sp_consensus_babe::Epoch {
-			Babe::current_epoch()
-		}
+	// 	fn current_epoch() -> sp_consensus_babe::Epoch {
+	// 		Babe::current_epoch()
+	// 	}
 
-		fn next_epoch() -> sp_consensus_babe::Epoch {
-			Babe::next_epoch()
-		}
+	// 	fn next_epoch() -> sp_consensus_babe::Epoch {
+	// 		Babe::next_epoch()
+	// 	}
 
-		fn generate_key_ownership_proof(
-			_slot: sp_consensus_babe::Slot,
-			authority_id: sp_consensus_babe::AuthorityId,
-		) -> Option<sp_consensus_babe::OpaqueKeyOwnershipProof> {
-			use codec::Encode;
+	// 	fn generate_key_ownership_proof(
+	// 		_slot: sp_consensus_babe::Slot,
+	// 		authority_id: sp_consensus_babe::AuthorityId,
+	// 	) -> Option<sp_consensus_babe::OpaqueKeyOwnershipProof> {
+	// 		use codec::Encode;
 
-			Historical::prove((sp_consensus_babe::KEY_TYPE, authority_id))
-				.map(|p| p.encode())
-				.map(sp_consensus_babe::OpaqueKeyOwnershipProof::new)
-		}
+	// 		Historical::prove((sp_consensus_babe::KEY_TYPE, authority_id))
+	// 			.map(|p| p.encode())
+	// 			.map(sp_consensus_babe::OpaqueKeyOwnershipProof::new)
+	// 	}
 
-		fn submit_report_equivocation_unsigned_extrinsic(
-			equivocation_proof: sp_consensus_babe::EquivocationProof<<Block as BlockT>::Header>,
-			key_owner_proof: sp_consensus_babe::OpaqueKeyOwnershipProof,
-		) -> Option<()> {
-			let key_owner_proof = key_owner_proof.decode()?;
+	// 	fn submit_report_equivocation_unsigned_extrinsic(
+	// 		equivocation_proof: sp_consensus_babe::EquivocationProof<<Block as BlockT>::Header>,
+	// 		key_owner_proof: sp_consensus_babe::OpaqueKeyOwnershipProof,
+	// 	) -> Option<()> {
+	// 		let key_owner_proof = key_owner_proof.decode()?;
 
-			Babe::submit_unsigned_equivocation_report(
-				equivocation_proof,
-				key_owner_proof,
-			)
-		}
-	}
+	// 		Babe::submit_unsigned_equivocation_report(
+	// 			equivocation_proof,
+	// 			key_owner_proof,
+	// 		)
+	// 	}
+	// }
 
 	impl sp_session::SessionKeys<Block> for Runtime {
 		fn generate_session_keys(seed: Option<Vec<u8>>) -> Vec<u8> {
