@@ -218,6 +218,7 @@ fn testnet_genesis(
 		},
 		transaction_payment: Default::default(),
 		assets: AssetsConfig::default(),
+		pool_assets: Default::default(),
 		im_online: Default::default(),
 		council: CouncilConfig { members: vec![], phantom: Default::default() },
 		staking: StakingConfig {

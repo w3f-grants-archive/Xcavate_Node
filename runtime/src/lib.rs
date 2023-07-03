@@ -13,6 +13,8 @@ mod voter_bags;
 use constants::{currency::*, time::*};
 use frame_election_provider_support::{onchain, ExtendedBalance, SequentialPhragmen, VoteWeight};
 use frame_support::{
+	instances::{Instance1, Instance2},
+	ord_parameter_types,
 	pallet_prelude::{DispatchClass, Get},
 	traits::{
 		tokens::nonfungibles_v2::Inspect, AsEnsureOriginWithArg, ConstU16, EitherOfDiverse,
@@ -20,13 +22,14 @@ use frame_support::{
 	},
 	PalletId,
 };
-use frame_system::{EnsureRoot, EnsureSigned, EnsureWithSuccess};
+use frame_system::{EnsureRoot, EnsureSigned, EnsureWithSuccess, EnsureSignedBy};
 use node_primitives::Moment;
 use pallet_grandpa::AuthorityId as GrandpaId;
 // pub type BabeId = sp_consensus_babe::AuthorityId;
 
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use pallet_session::historical as pallet_session_historical;
+// use pallet_asset_conversion::{NativeOrAssetId, NativeOrAssetIdConverter};
 use sp_api::impl_runtime_apis;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::{crypto::KeyTypeId, ConstBool, OpaqueMetadata};
@@ -36,7 +39,7 @@ use sp_runtime::{
 	generic, impl_opaque_keys,
 	traits::{
 		AccountIdLookup, BlakeTwo256, Block as BlockT, Convert, IdentifyAccount, NumberFor, One,
-		OpaqueKeys, Verify,
+		OpaqueKeys, Verify, ConvertInto, AccountIdConversion,
 	},
 	transaction_validity::{TransactionPriority, TransactionSource, TransactionValidity},
 	ApplyExtrinsicResult, FixedU128, MultiSignature, Percent,
@@ -46,6 +49,10 @@ use sp_std::prelude::*;
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 use crate::opaque::SessionKeys;
+
+/// Implementations of some helper traits passed into runtime modules as associated types.
+pub mod impls;
+use impls::CreditToBlockAuthor;
 
 // A few exports that help ease life for downstream crates.
 pub use frame_support::{
@@ -348,6 +355,55 @@ impl pallet_transaction_payment::Config for Runtime {
 	type FeeMultiplierUpdate = ConstFeeMultiplier<FeeMultiplier>;
 }
 
+impl pallet_asset_tx_payment::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type Fungibles = Assets;
+	type OnChargeAssetTransaction = pallet_asset_tx_payment::FungiblesAdapter<
+		pallet_assets::BalanceToAssetBalance<Balances, Runtime, ConvertInto, Instance1>,
+		CreditToBlockAuthor,
+	>;
+}
+
+// impl pallet_asset_conversion_tx_payment::Config for Runtime {
+// 	type RuntimeEvent = RuntimeEvent;
+// 	type Fungibles = Assets;
+// 	type OnChargeAssetTransaction =
+// 		pallet_asset_conversion_tx_payment::AssetConversionAdapter<Balances, AssetConversion>;
+// }
+
+// parameter_types! {
+// 	pub const AssetConversionPalletId: PalletId = PalletId(*b"py/ascon");
+// 	pub AllowMultiAssetPools: bool = true;
+// 	pub const PoolSetupFee: Balance = 1 * DOLLARS; // should be more or equal to the existential deposit
+// 	pub const MintMinLiquidity: Balance = 100;  // 100 is good enough when the main currency has 10-12 decimals.
+// 	pub const LiquidityWithdrawalFee: Permill = Permill::from_percent(0);  // should be non-zero if AllowMultiAssetPools is true, otherwise can be zero.
+// }
+
+// impl pallet_asset_conversion::Config for Runtime {
+// 	type RuntimeEvent = RuntimeEvent;
+// 	type Currency = Balances;
+// 	type AssetBalance = <Self as pallet_balances::Config>::Balance;
+// 	type HigherPrecisionBalance = sp_core::U256;
+// 	type Assets = Assets;
+// 	type Balance = u128;
+// 	type PoolAssets = PoolAssets; // TODO:
+// 	type AssetId = <Self as pallet_assets::Config<Instance1>>::AssetId;
+// 	type MultiAssetId = NativeOrAssetId<u32>;
+// 	type PoolAssetId = <Self as pallet_assets::Config<Instance2>>::AssetId;
+// 	type PalletId = AssetConversionPalletId;
+// 	type LPFee = ConstU32<3>; // means 0.3%
+// 	type PoolSetupFee = PoolSetupFee;
+// 	type PoolSetupFeeReceiver = AssetConversionOrigin;
+// 	type LiquidityWithdrawalFee = LiquidityWithdrawalFee;
+// 	type WeightInfo = pallet_asset_conversion::weights::SubstrateWeight<Runtime>;
+// 	type AllowMultiAssetPools = AllowMultiAssetPools;
+// 	type MaxSwapPathLength = ConstU32<4>;
+// 	type MintMinLiquidity = MintMinLiquidity;
+// 	type MultiAssetIdConverter = NativeOrAssetIdConverter<u32>;
+// 	#[cfg(feature = "runtime-benchmarks")]
+// 	type BenchmarkHelper = ();
+// }
+
 impl pallet_sudo::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeCall = RuntimeCall;
@@ -464,12 +520,15 @@ impl pallet_contracts::Config for Runtime {
 	type MaxDebugBufferLen = ConstU32<{ 2 * 1024 * 1024 }>;
 }
 
+
 parameter_types! {
+	pub const AssetConversionPalletId: PalletId = PalletId(*b"py/ascon");
 	pub const AssetDeposit: Balance = 100 * DOLLARS;
 	pub const ApprovalDeposit: Balance = 1 * DOLLARS;
+
 }
 
-impl pallet_assets::Config for Runtime {
+impl pallet_assets::Config<Instance1> for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type Balance = u128;
 	type AssetId = u32;
@@ -488,6 +547,34 @@ impl pallet_assets::Config for Runtime {
 	type CallbackHandle = ();
 	type WeightInfo = pallet_assets::weights::SubstrateWeight<Runtime>;
 	type RemoveItemsLimit = ConstU32<1000>;
+	#[cfg(feature = "runtime-benchmarks")]
+	type BenchmarkHelper = ();
+}
+
+ord_parameter_types! {
+	pub const AssetConversionOrigin: AccountId = AccountIdConversion::<AccountId>::into_account_truncating(&AssetConversionPalletId::get());
+}
+
+
+impl pallet_assets::Config<Instance2> for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type Balance = u128;
+	type AssetId = u32;
+	type AssetIdParameter = codec::Compact<u32>;
+	type Currency = Balances;
+	type CreateOrigin = AsEnsureOriginWithArg<EnsureSignedBy<AssetConversionOrigin, AccountId>>;
+	type ForceOrigin = EnsureRoot<AccountId>;
+	type AssetDeposit = AssetDeposit;
+	type AssetAccountDeposit = ConstU128<DOLLARS>;
+	type MetadataDepositBase = MetadataDepositBase;
+	type MetadataDepositPerByte = MetadataDepositPerByte;
+	type ApprovalDeposit = ApprovalDeposit;
+	type StringLimit = StringLimit;
+	type Freezer = ();
+	type Extra = ();
+	type WeightInfo = pallet_assets::weights::SubstrateWeight<Runtime>;
+	type RemoveItemsLimit = ConstU32<1000>;
+	type CallbackHandle = ();
 	#[cfg(feature = "runtime-benchmarks")]
 	type BenchmarkHelper = ();
 }
@@ -654,20 +741,6 @@ parameter_types! {
 	pub const TechnicalMaxProposals: u32 = 100;
 	pub const TechnicalMaxMembers: u32 = 100;
 }
-
-/* type TechnicalCollective = pallet_collective::Instance2;
-impl pallet_collective::Config<TechnicalCollective> for Runtime {
-	type RuntimeOrigin = RuntimeOrigin;
-	type Proposal = RuntimeCall;
-	type RuntimeEvent = RuntimeEvent;
-	type MotionDuration = TechnicalMotionDuration;
-	type MaxProposals = TechnicalMaxProposals;
-	type MaxMembers = TechnicalMaxMembers;
-	type DefaultVote = pallet_collective::PrimeDefaultVote;
-	type WeightInfo = pallet_collective::weights::SubstrateWeight<Runtime>;
-	type SetMembersOrigin = EnsureRoot<Self::AccountId>;
-	// type MaxProposalWeight = MaxCollectivesProposalWeight;
-} */
 
 const ALLIANCE_MOTION_DURATION_IN_BLOCKS: BlockNumber = 5 * DAYS;
 
@@ -987,7 +1060,8 @@ construct_runtime!(
 		Uniques: pallet_uniques,
 		Contracts: pallet_contracts,
 		RandomnessCollectiveFlip: pallet_insecure_randomness_collective_flip,
-		Assets: pallet_assets,
+		Assets: pallet_assets::<Instance1>,
+		PoolAssets: pallet_assets::<Instance2>,
 		Utility: pallet_utility,
 		Multisig: pallet_multisig,
 		Authorship: pallet_authorship::{Pallet, Storage},
@@ -1005,6 +1079,9 @@ construct_runtime!(
 		ImOnline: pallet_im_online::{Pallet, Call, Storage, Event<T>, ValidateUnsigned, Config<T>},
 		Council: pallet_collective::<Instance1>,
 		AuthorityDiscovery: pallet_authority_discovery,
+		AssetTxPayment: pallet_asset_tx_payment,
+		// AssetConversionTxPayment: pallet_asset_conversion_tx_payment,
+		// AssetConversion: pallet_asset_conversion,
 
 	}
 );
@@ -1024,7 +1101,8 @@ pub type SignedExtra = (
 	frame_system::CheckEra<Runtime>,
 	frame_system::CheckNonce<Runtime>,
 	frame_system::CheckWeight<Runtime>,
-	pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
+	// pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
+	pallet_asset_tx_payment::ChargeAssetTxPayment<Runtime>,
 );
 
 /// Unchecked extrinsic type as expected by this runtime.
