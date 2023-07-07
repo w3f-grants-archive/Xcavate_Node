@@ -1,14 +1,14 @@
 use node_template_runtime::{
-	constants::currency::DOLLARS, opaque::SessionKeys, AccountId, AssetsConfig,
-	Balance, BalancesConfig, CouncilConfig, GenesisConfig, MaxNominations, SessionConfig,
-	Signature, StakerStatus, StakingConfig, SudoConfig, SystemConfig,
-	wasm_binary_unwrap, GrandpaConfig, WASM_BINARY, BabeConfig, BABE_GENESIS_EPOCH_CONFIG,
+	constants::currency::DOLLARS, opaque::SessionKeys, wasm_binary_unwrap, AccountId, AssetsConfig,
+	BabeConfig, Balance, BalancesConfig, CouncilConfig, DemocracyConfig, GenesisConfig,
+	GrandpaConfig, MaxNominations, SessionConfig, Signature, StakerStatus, StakingConfig,
+	SudoConfig, SystemConfig, TechnicalCommitteeConfig, BABE_GENESIS_EPOCH_CONFIG, WASM_BINARY,
 };
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use sc_service::{ChainType, Properties};
-use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_authority_discovery::AuthorityId as AuthorityDiscoveryId;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
+use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_core::{sr25519, Pair, Public};
 use sp_runtime::{
 	traits::{IdentifyAccount, Verify},
@@ -154,7 +154,6 @@ fn testnet_genesis(
 	endowed_accounts: Option<Vec<AccountId>>,
 	_enable_println: bool,
 ) -> GenesisConfig {
-
 	let mut endowed_accounts: Vec<AccountId> = endowed_accounts.unwrap_or_else(|| {
 		vec![
 			get_account_id_from_seed::<sr25519::Public>("Alice"),
@@ -182,7 +181,7 @@ fn testnet_genesis(
 				endowed_accounts.push(x.clone())
 			}
 		});
-	
+
 	// stakers: all validators and nominators.
 	let mut rng = rand::thread_rng();
 	let stakers = initial_authorities
@@ -202,6 +201,8 @@ fn testnet_genesis(
 		}))
 		.collect::<Vec<_>>();
 
+	let num_endowed_accounts = endowed_accounts.len();
+
 	const ENDOWMENT: Balance = 10_000_000 * DOLLARS;
 	const STASH: Balance = ENDOWMENT / 1000;
 
@@ -211,7 +212,7 @@ fn testnet_genesis(
 			balances: endowed_accounts.iter().cloned().map(|x| (x, ENDOWMENT)).collect(),
 		},
 		aura: Default::default(),
-		grandpa: GrandpaConfig { authorities: vec![] },
+		grandpa: Default::default(),
 		sudo: SudoConfig {
 			// Assign network admin rights.
 			key: Some(root_key),
@@ -247,5 +248,15 @@ fn testnet_genesis(
 		},
 		authority_discovery: Default::default(),
 		treasury: Default::default(),
+		alliance_motion: Default::default(),
+		democracy: DemocracyConfig::default(),
+		technical_committee: TechnicalCommitteeConfig {
+			members: endowed_accounts
+				.iter()
+				.take((num_endowed_accounts + 1) / 2)
+				.cloned()
+				.collect(),
+			phantom: Default::default(),
+		},
 	}
 }
