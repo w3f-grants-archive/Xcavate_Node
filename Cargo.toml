@@ -3,6 +3,7 @@ members = [
     "node",
     "pallets/template",
     "runtime",
+    "pallets/community-loan-pool",
 ]
 [profile.release]
 panic = "unwind"

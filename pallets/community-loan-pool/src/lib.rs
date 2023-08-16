@@ -16,18 +16,27 @@ mod tests;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
+use sp_runtime::{
+	traits::{AccountIdConversion, CheckedAdd, Saturating, StaticLookup, Zero},
+	Permill, RuntimeDebug,
+};
+
+use frame_support::{
+	pallet_prelude::*,
+	traits::{Currency, ExistenceRequirement::KeepAlive, Get, Imbalance, OnUnbalanced,
+		ReservableCurrency, WithdrawReasons},
+};
+
+
+type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
+
 #[frame_support::pallet]
 pub mod pallet {
     use super::*;
-    use frame_support::{
-        pallet_prelude::*,
-        traits::{Currency, ExistenceRequirement::KeepAlive, Get, Imbalance, OnUnbalanced,
-			ReservableCurrency, WithdrawReasons},
-    };
+    
+	use frame_support::traits::Uniques;
     use frame_system::pallet_prelude::*;
     use scale_info::TypeInfo;
-    use sp_io::hashing::blake2_128;
-    use sp_runtime::ArithmeticError;
 
     #[cfg(feature = "std")]
     use frame_support::serde::{Deserialize, Serialize};
@@ -56,43 +65,61 @@ pub mod pallet {
         /// Because this pallet emits events, it depends on the runtime's definition of an event.
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
-        /// The Currency handler for the kitties pallet.
-        type Currency: Currency<Self::AccountId>;
+		/// The staking balance.
+		type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
+
+		/// Origin from which rejections must come.
+		type RejectOrigin: EnsureOrigin<Self::RuntimeOrigin>;
+
+		/// Origin from which approves must come.
+		type ApproveOrigin: EnsureOrigin<Self::RuntimeOrigin>;
+
+
+		/// Fraction of a proposal's value that should be bonded in order to place the proposal.
+		/// An accepted proposal gets these back. A rejected proposal does not.
+		#[pallet::constant]
+		type ProposalBond: Get<Permill>;
+
+		/// The maximum number of approvals that can wait in the spending queue.
+		///
+		/// NOTE: This parameter is also used within the Bounties Pallet extension if enabled.
+		#[pallet::constant]
+		type MaxApprovals: Get<u32>;
 
     }
 
 	#[pallet::storage]
 	#[pallet::getter(fn proposal_count)]
-	pub(crate) type ProposalCount<T, I = ()> = StorageValue<_, ProposalIndex, ValueQuery>;
+	pub(super) type ProposalCount<T> = StorageValue<_, ProposalIndex, ValueQuery>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn proposals)]
-	pub type Proposals<T: Config>, I: 'static = ()> = StorageMap<
+	pub(super) type Proposals<T: Config> = StorageMap<
 		_, 
 		Twox64Concat,
 		ProposalIndex,
-		Proposal<T::AccountId, BalanceOf<T,I>>,
+		Proposal<T::AccountId, BalanceOf<T>>,
 		OptionQuery,
 		>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn approvals)]
-	pub type Approvals<T: Config<I>, I: 'static = ()> = 
+	pub(super) type Approvals<T: Config> = 
 		StorageValue<_, BoundedVec<ProposalIndex, T::MaxApprovals>, ValueQuery>;
 
 
     #[pallet::error]
     pub enum Error<T> {
 		/// Proposer's balance is too low
-		InsufficientProposerBalance
+		InsufficientProposerBalance,
 		/// Loan pool's balance is too low
-		InsufficientLoanPoolBalance
+		InsufficientLoanPoolBalance,
 		/// No proposal index
-		InvalidIndex
+		InvalidIndex,
 		/// There are too many loan proposals
-		TooManyProposals
+		TooManyProposals,
 		/// The person has no permission to call the function
-		InsufficientPermission
+		InsufficientPermission,
     }
 
 
@@ -119,22 +146,22 @@ pub mod pallet {
 		#[pallet::weight(0)]
 		pub fn propose(
 			origin: OriginFor<T>,
-			amount: BalanceOf<T, I>,
-			beneficiary: AccountIdLookup<T>,
+			amount: BalanceOf<T>,
+			beneficiary: AccountIdLookupOf<T>,
 		) -> DispatchResult {
-			let origin = ensure_origin(origin)?;
+			let origin = ensure_signed(origin)?;
 			let beneficiary = T::Lookup::lookup(beneficiary)?;
 			let proposal_index = Self::proposal_count();
 			let proposal = Proposal {
 				proposer: origin.clone(),
 				value: amount,
 				beneficiary: beneficiary.clone(),
-				bond: 2000,
+				bond: T::ProposalBond::get(),
 			};
-			Proposals::<T, I>::insert(proposal_index, proposal);
-			ProposalCount::<T, I>::put(proposal_index + 1);
+			Proposals::<T>::insert(proposal_index, proposal);
+			ProposalCount::<T>::put(proposal_index + 1);
 
-			Self::deposit_event(Event::T::Proposed {proposal_index});
+			Self::deposit_event(Event::Proposed {proposal_index});
 			Ok(())
 		}
 
@@ -144,14 +171,14 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			proposal_index: ProposalIndex,
 		) -> DispatchResult {
-			let origin = ensure_origin(origin)?;
-			let proposal = <Proposals<T, I>>::take(&proposal_id).ok_or(Error::<T, I>::InvalidIndex)?;
+			T::RejectOrigin::ensure_signed(origin)?;
+			let proposal = <Proposals<T>>::take(&proposal_index).ok_or(Error::<T>::InvalidIndex)?;
 			let value = proposal.bond;
-			let imbalance = T::Currency::slash_reserved(&proposal.proposer, value).0;
-			T::OnSlash::on_unbalanced(imbalance);
+/* 			let imbalance = T::Currency::slash_reserved(&proposal.proposer, value).0;
+			T::OnSlash::on_unbalanced(imbalance); */
 
-			Self::deposit_event(Event::<T, I>::Rejected {
-				proposal_index: proposal_id,
+			Self::deposit_event(Event::<T>::Rejected {
+				proposal_index,
 				slashed: value,
 			});
 			Ok(())
@@ -162,14 +189,16 @@ pub mod pallet {
 		pub fn approve_proposal(
 			origin: OriginFor<T>,
 			proposal_index: ProposalIndex,
-		) -> DisptachResult {
-			let origin = ensure_origin(origin)?;
+		) -> DispatchResult {
+			let origin = T::ApproveOrigin::ensure_signed(origin)?;
 			
-			ensure!(<Proposals<T,I>>contains_key(proposal_id), Error::<T, I>::InvalidIndex);
-			// Call the nft creationm ,mint it and store it at the contract
+			ensure!(<Proposals<T>>::contains_key(proposal_index), Error::<T>::InvalidIndex);
+			T::Uniques::create(origin.clone(), proposal_index, origin.clone());
+			T::Uniques::mint(origin.clone(), proposal_index, origin.clone());
+			// Call the nft creation, mint it and store it at the contract
 			// creates a contract and sends the loan amount to the contract
-			Approvals::<T, I>::try_append(proposal_id)
-				.map_err(|_| Error::<T, I>::TooManyApprovals)?;
+			Approvals::<T>::try_append(proposal_index)
+				.map_err(|_| Error::<T>::TooManyApprovals)?;
 			Ok(())
 		}
     }
@@ -178,8 +207,5 @@ pub mod pallet {
 
     impl<T: Config> Pallet<T> {
 
-		// apy calculation
-		// 9 %
-    
     }
 }
