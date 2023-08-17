@@ -198,7 +198,7 @@ pub mod pallet {
 			proposal_index: ProposalIndex,
 		) -> DispatchResult {
 			T::RejectOrigin::ensure_origin(origin)?;
-			let proposal = <Proposals<T>>::take(&proposal_index).ok_or(Error::<T>::InvalidIndex)?;
+			let proposal = <Proposals<T>>::take(&proposal_index).ok_or(Error::<T>::InvalidIndex).unwrap();
 			let value = proposal.bond;
 /* 			let imbalance = T::Currency::slash_reserved(&proposal.proposer, value).0;
 			T::OnSlash::on_unbalanced(imbalance); */
@@ -216,10 +216,12 @@ pub mod pallet {
 			proposal_index: ProposalIndex,
 			collection_id: T::CollectionId,
 			item_id: T::ItemId,
-			beneficiary: AccountIdLookupOf<T>,
 		) -> DispatchResult {
 		 	let signer = ensure_signed(origin.clone())?;		
-			ensure!(<Proposals<T>>::contains_key(proposal_index), Error::<T>::InvalidIndex);
+			let proposal = <Proposals<T>>::take(&proposal_index).ok_or(Error::<T>::InvalidIndex).unwrap();
+			let user = proposal.beneficiary;
+			let beneficiary = <T::Lookup as frame_support::sp_runtime::traits::StaticLookup>::unlookup(user.clone());
+
 			pallet_uniques::Pallet::<T>::create(origin.clone(), collection_id, beneficiary.clone());
 			pallet_uniques::Pallet::<T>::mint(origin.clone(),  collection_id, item_id, beneficiary.clone());
 			// Call the nft creation, mint it and store it at the contract
