@@ -607,7 +607,7 @@ impl pallet_template::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 }
 
-/* /// Configure the pallet-community-loan-pool in pallets/template.
+/// Configure the pallet-community-loan-pool in pallets/template.
 impl pallet_community_loan_pool::Config for Runtime {
 	type Currency = Balances;
 	type ApproveOrigin = EitherOfDiverse<
@@ -621,7 +621,9 @@ impl pallet_community_loan_pool::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type ProposalBond = ProposalBond;
 	type MaxApprovals = MaxApprovals;
-} */
+	type ProposalBondMinimum = ProposalBondMinimum;
+	type ProposalBondMaximum = ();
+} 
 
 parameter_types! {
 	pub Features: PalletFeatures = PalletFeatures::all_enabled();
@@ -1499,7 +1501,7 @@ construct_runtime!(
 		Sudo: pallet_sudo,
 		// Include the custom logic from the pallet-template in the runtime.
 		TemplateModule: pallet_template,
-		//CommunityLoanPool: pallet_community_loan_pool,
+		CommunityLoanPool: pallet_community_loan_pool,
 		Nfts: pallet_nfts,
 		Uniques: pallet_uniques,
 		Contracts: pallet_contracts,

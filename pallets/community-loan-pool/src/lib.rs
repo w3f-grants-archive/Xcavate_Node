@@ -30,6 +30,23 @@ use frame_support::{
 
 type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
 
+#[cfg(feature = "runtime-benchmarks")]
+pub trait BenchmarkHelper<CollectionId, ItemId> {
+	fn to_collection(i: u32) -> CollectionId;
+	fn to_nft(i: u32) -> ItemId;
+}
+
+#[cfg(feature = "runtime-benchmarks")]
+impl<CollectionId: From<u32>, ItemId: From<u32>> BenchmarkHelper<CollectionId, ItemId> for NftHelper
+{
+	fn to_collection(i: u32) -> CollectionId {
+		i.into()
+	}
+	fn to_nft(i: u32) -> ItemId {
+		i.into()
+	}
+}
+
 #[frame_support::pallet]
 pub mod pallet {
     use super::*;
@@ -180,7 +197,7 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			proposal_index: ProposalIndex,
 		) -> DispatchResult {
-			T::RejectOrigin::ensure_signed(origin)?;
+			T::RejectOrigin::ensure_origin(origin)?;
 			let proposal = <Proposals<T>>::take(&proposal_index).ok_or(Error::<T>::InvalidIndex)?;
 			let value = proposal.bond;
 /* 			let imbalance = T::Currency::slash_reserved(&proposal.proposer, value).0;
@@ -197,12 +214,14 @@ pub mod pallet {
 		pub fn approve_proposal(
 			origin: OriginFor<T>,
 			proposal_index: ProposalIndex,
+			collection_id: T::CollectionId,
+			item_id: T::ItemId,
+			beneficiary: AccountIdLookupOf<T>,
 		) -> DispatchResult {
-			let origin = T::ApproveOrigin::ensure_signed(origin)?;
-			
+		 	let signer = ensure_signed(origin.clone())?;		
 			ensure!(<Proposals<T>>::contains_key(proposal_index), Error::<T>::InvalidIndex);
-			pallet_uniques::Pallet::<T>::create(origin.clone(), 10, origin.clone());
-			pallet_uniques::Pallet::<T>::mint(origin.clone(), 10, 10, origin.clone());
+			pallet_uniques::Pallet::<T>::create(origin.clone(), collection_id, beneficiary.clone());
+			pallet_uniques::Pallet::<T>::mint(origin.clone(),  collection_id, item_id, beneficiary.clone());
 			// Call the nft creation, mint it and store it at the contract
 			// creates a contract and sends the loan amount to the contract
 			Approvals::<T>::try_append(proposal_index)
