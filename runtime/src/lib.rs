@@ -609,7 +609,7 @@ impl pallet_template::Config for Runtime {
 
 /// Configure the pallet-community-loan-pool in pallets/template.
 impl pallet_community_loan_pool::Config for Runtime {
-	type Currency = Balances;
+ 	type Currency = Balances;
 	type ApproveOrigin = EitherOfDiverse<
 		EnsureRoot<AccountId>,
 		pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 3, 5>,
@@ -617,12 +617,12 @@ impl pallet_community_loan_pool::Config for Runtime {
 	type RejectOrigin = EitherOfDiverse<
 		EnsureRoot<AccountId>,
 		pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>,
-	>;
+	>; 
 	type RuntimeEvent = RuntimeEvent;
-	type ProposalBond = ProposalBond;
+	 type ProposalBond = ProposalBond;
 	type MaxApprovals = MaxApprovals;
 	type ProposalBondMinimum = ProposalBondMinimum;
-	type ProposalBondMaximum = ();
+	type ProposalBondMaximum = (); 
 } 
 
 parameter_types! {
