@@ -33,8 +33,6 @@ type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup
 #[frame_support::pallet]
 pub mod pallet {
     use super::*;
-    
-	use frame_support::traits::Uniques;
     use frame_system::pallet_prelude::*;
     use scale_info::TypeInfo;
 
@@ -61,7 +59,7 @@ pub mod pallet {
 
     // Configure the pallet by specifying the parameters and types on which it depends.
     #[pallet::config]
-    pub trait Config: frame_system::Config {
+    pub trait Config: frame_system::Config + pallet_uniques::Config{
         /// Because this pallet emits events, it depends on the runtime's definition of an event.
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
@@ -85,6 +83,14 @@ pub mod pallet {
 		/// NOTE: This parameter is also used within the Bounties Pallet extension if enabled.
 		#[pallet::constant]
 		type MaxApprovals: Get<u32>;
+
+		/// Minimum amount of funds that should be placed in a deposit for making a proposal.
+		#[pallet::constant]
+		type ProposalBondMinimum: Get<BalanceOf<Self>>;
+		
+		/// Maximum amount of funds that should be placed in a deposit for making a proposal.
+		#[pallet::constant]
+		type ProposalBondMaximum: Get<Option<BalanceOf<Self>>>;
 
     }
 
@@ -120,6 +126,7 @@ pub mod pallet {
 		TooManyProposals,
 		/// The person has no permission to call the function
 		InsufficientPermission,
+		TooManyApprovals,
     }
 
 
@@ -152,11 +159,13 @@ pub mod pallet {
 			let origin = ensure_signed(origin)?;
 			let beneficiary = T::Lookup::lookup(beneficiary)?;
 			let proposal_index = Self::proposal_count();
+			let bond = Self::calculate_bond(amount);
+
 			let proposal = Proposal {
 				proposer: origin.clone(),
-				value: amount,
+				amount,
 				beneficiary: beneficiary.clone(),
-				bond: T::ProposalBond::get(),
+				bond,
 			};
 			Proposals::<T>::insert(proposal_index, proposal);
 			ProposalCount::<T>::put(proposal_index + 1);
@@ -179,7 +188,6 @@ pub mod pallet {
 
 			Self::deposit_event(Event::<T>::Rejected {
 				proposal_index,
-				slashed: value,
 			});
 			Ok(())
 		}
@@ -193,8 +201,8 @@ pub mod pallet {
 			let origin = T::ApproveOrigin::ensure_signed(origin)?;
 			
 			ensure!(<Proposals<T>>::contains_key(proposal_index), Error::<T>::InvalidIndex);
-			T::Uniques::create(origin.clone(), proposal_index, origin.clone());
-			T::Uniques::mint(origin.clone(), proposal_index, origin.clone());
+			pallet_uniques::Pallet::<T>::create(origin.clone(), 10, origin.clone());
+			pallet_uniques::Pallet::<T>::mint(origin.clone(), 10, 10, origin.clone());
 			// Call the nft creation, mint it and store it at the contract
 			// creates a contract and sends the loan amount to the contract
 			Approvals::<T>::try_append(proposal_index)
@@ -206,6 +214,12 @@ pub mod pallet {
     //** Our helper functions.**//
 
     impl<T: Config> Pallet<T> {
-
+		fn calculate_bond(value: BalanceOf<T>) -> BalanceOf<T> {
+			let mut r = T::ProposalBondMinimum::get().max(T::ProposalBond::get() * value);
+			if let Some(m) = T::ProposalBondMaximum::get() {
+				r = r.min(m);
+			}
+			r
+		}
     }
 }
