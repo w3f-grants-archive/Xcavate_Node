@@ -373,162 +373,143 @@ impl pallet_balances::Config for Runtime {
 	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
 }
 //////////////////////////////////////////////Start///////////////////////////////////////////////
-use codec::Encode;
-use codec::MaxEncodedLen;
-use frame_support::log::{
-    error,
-    trace,
-};
+use codec::{Encode, MaxEncodedLen};
+use frame_support::log::{error, trace};
+use frame_system::RawOrigin;
 use pallet_contracts::chain_extension::{
-    ChainExtension,
-    Environment,
-    Ext,
-    InitState,
-    RetVal,
-    SysConfig,
+	ChainExtension, Environment, Ext, InitState, RetVal, SysConfig,
 };
 use sp_core::crypto::UncheckedFrom;
-use sp_runtime::DispatchError;
+use sp_runtime::{traits::StaticLookup, DispatchError};
 use sp_std::marker::PhantomData;
-use frame_system::RawOrigin;
-use sp_runtime::traits::StaticLookup;
 
 enum UniquesFunc {
-    Create,
-    Transfer,
-    Burn,
+	Create,
+	Transfer,
+	Burn,
 }
 
 impl TryFrom<u16> for UniquesFunc {
-    type Error = DispatchError;
+	type Error = DispatchError;
 
-    fn try_from(value: u16) -> Result<Self, Self::Error> {
-        match value {
-            1 => Ok(UniquesFunc::Create),
-            2 => Ok(UniquesFunc::Transfer),
-            3 => Ok(UniquesFunc::Burn),
-            _ => Err(DispatchError::Other(
-                "PalletUniquesExtension: Unimplemented func_id",
-            )),
-        }
-    }
+	fn try_from(value: u16) -> Result<Self, Self::Error> {
+		match value {
+			1 => Ok(UniquesFunc::Create),
+			2 => Ok(UniquesFunc::Transfer),
+			3 => Ok(UniquesFunc::Burn),
+			_ => Err(DispatchError::Other("PalletUniquesExtension: Unimplemented func_id")),
+		}
+	}
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Encode, Decode, MaxEncodedLen)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub enum Origin {
-    Caller,
-    Address,
+	Caller,
+	Address,
 }
 
 impl Default for Origin {
-    fn default() -> Self {
-        Self::Address
-    }
+	fn default() -> Self {
+		Self::Address
+	}
 }
 
 #[macro_export]
 macro_rules! select_origin {
-    ($origin:expr, $account:expr) => {
-        match $origin {
-            Origin::Caller => return Ok(RetVal::Converging(0)),
-            Origin::Address => RawOrigin::Signed($account),
-        }
-    };
+	($origin:expr, $account:expr) => {
+		match $origin {
+			Origin::Caller => return Ok(RetVal::Converging(0)),
+			Origin::Address => RawOrigin::Signed($account),
+		}
+	};
 }
-
 
 impl<T, W> ChainExtension<T> for UniquesExtension<T, W>
 where
-    T: pallet_uniques::Config + pallet_contracts::Config,
-    <T as pallet_uniques::Config>::CollectionId: Copy,
+	T: pallet_uniques::Config + pallet_contracts::Config,
+	<T as pallet_uniques::Config>::CollectionId: Copy,
 	<T as pallet_uniques::Config>::ItemId: Copy,
-    <<T as SysConfig>::Lookup as StaticLookup>::Source: From<<T as SysConfig>::AccountId>,
-    <T as SysConfig>::AccountId: From<[u8; 32]>,
+	<<T as SysConfig>::Lookup as StaticLookup>::Source: From<<T as SysConfig>::AccountId>,
+	<T as SysConfig>::AccountId: From<[u8; 32]>,
 {
-    fn call<E: Ext>(&mut self, env: Environment<E, InitState>) -> Result<RetVal, DispatchError>
-    where
-        E: Ext<T = T>,
-    {
-        let func_id = env.func_id().try_into()?;
-        let mut env = env.buf_in_buf_out();
+	fn call<E: Ext>(&mut self, env: Environment<E, InitState>) -> Result<RetVal, DispatchError>
+	where
+		E: Ext<T = T>,
+	{
+		let func_id = env.func_id().try_into()?;
+		let mut env = env.buf_in_buf_out();
 
-        match func_id {
-            UniquesFunc::Create => {
-                let (origin, collection, admin): (
-                    Origin,
-                    <T as pallet_uniques::Config>::CollectionId,
-                    T::AccountId,
-                ) = env.read_as()?;
+		match func_id {
+			UniquesFunc::Create => {
+				let (origin, collection, admin): (
+					Origin,
+					<T as pallet_uniques::Config>::CollectionId,
+					T::AccountId,
+				) = env.read_as()?;
 
-                let raw_origin = select_origin!(&origin, env.ext().address().clone());
+				let raw_origin = select_origin!(&origin, env.ext().address().clone());
 
-                let call_result = pallet_uniques::Pallet::<T>::create(
-                    raw_origin.into(),
-                    collection.into(),
-                    admin.into(),
-                );
-                return match call_result {
-                    Err(e) => {
-                        return Err(e)
-                    }
-                    Ok(_) => Ok(RetVal::Converging(0)),
-                };
-            }
+				let call_result = pallet_uniques::Pallet::<T>::create(
+					raw_origin.into(),
+					collection.into(),
+					admin.into(),
+				);
+				return match call_result {
+					Err(e) => return Err(e),
+					Ok(_) => Ok(RetVal::Converging(0)),
+				}
+			},
 			UniquesFunc::Transfer => {
-                let (origin, collection, item, dest): (
-                    Origin,
-                    <T as pallet_uniques::Config>::CollectionId,
-                    <T as pallet_uniques::Config>::ItemId,
-                    T::AccountId,
-                ) = env.read_as()?;
+				let (origin, collection, item, dest): (
+					Origin,
+					<T as pallet_uniques::Config>::CollectionId,
+					<T as pallet_uniques::Config>::ItemId,
+					T::AccountId,
+				) = env.read_as()?;
 
-                let raw_origin = select_origin!(&origin, env.ext().address().clone());
+				let raw_origin = select_origin!(&origin, env.ext().address().clone());
 
-                let call_result = pallet_uniques::Pallet::<T>::transfer(
-                    raw_origin.into(),
-                    collection.into(),
-                    item.into(),
-                    dest.into(),
-                );
-                return match call_result {
-                    Err(e) => {
-                        return Err(e)
-                    }
-                    Ok(_) => Ok(RetVal::Converging(0)),
-                };
-            }
-             UniquesFunc::Burn => {
-                let (origin, collection, item, check_owner): (
-                    Origin,
-                    <T as pallet_uniques::Config>::CollectionId,
-                    <T as pallet_uniques::Config>::ItemId,
-                    T::AccountId,
-                ) = env.read_as()?;
+				let call_result = pallet_uniques::Pallet::<T>::transfer(
+					raw_origin.into(),
+					collection.into(),
+					item.into(),
+					dest.into(),
+				);
+				return match call_result {
+					Err(e) => return Err(e),
+					Ok(_) => Ok(RetVal::Converging(0)),
+				}
+			},
+			UniquesFunc::Burn => {
+				let (origin, collection, item, check_owner): (
+					Origin,
+					<T as pallet_uniques::Config>::CollectionId,
+					<T as pallet_uniques::Config>::ItemId,
+					T::AccountId,
+				) = env.read_as()?;
 
-                let raw_origin = select_origin!(&origin, env.ext().address().clone());
+				let raw_origin = select_origin!(&origin, env.ext().address().clone());
 
-                let call_result = pallet_uniques::Pallet::<T>::burn(
-                    raw_origin.into(),
-                    collection.into(),
-                    item.into(),
-                    Some(check_owner.into()),
-                );
-                return match call_result {
-                    Err(e) => {
-                        return Err(e)
-                    }
-                    Ok(_) => Ok(RetVal::Converging(0)),
-                };
-            }  
-        }
-    }
+				let call_result = pallet_uniques::Pallet::<T>::burn(
+					raw_origin.into(),
+					collection.into(),
+					item.into(),
+					Some(check_owner.into()),
+				);
+				return match call_result {
+					Err(e) => return Err(e),
+					Ok(_) => Ok(RetVal::Converging(0)),
+				}
+			},
+		}
+	}
 }
 
 impl<T, W> Default for UniquesExtension<T, W> {
-    fn default() -> Self {
-        UniquesExtension(PhantomData)
-    }
+	fn default() -> Self {
+		UniquesExtension(PhantomData)
+	}
 }
 
 pub struct UniquesExtension<T, W>(PhantomData<(T, W)>);
@@ -607,9 +588,15 @@ impl pallet_template::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 }
 
+parameter_types! {
+	pub const CommunityLoanPalletId: PalletId = PalletId(*b"py/loana");
+
+}
+
 /// Configure the pallet-community-loan-pool in pallets/template.
 impl pallet_community_loan_pool::Config for Runtime {
- 	type Currency = Balances;
+	type PalletId = CommunityLoanPalletId;
+	type Currency = Balances;
 	type ApproveOrigin = EitherOfDiverse<
 		EnsureRoot<AccountId>,
 		pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 3, 5>,
@@ -617,13 +604,13 @@ impl pallet_community_loan_pool::Config for Runtime {
 	type RejectOrigin = EitherOfDiverse<
 		EnsureRoot<AccountId>,
 		pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>,
-	>; 
+	>;
 	type RuntimeEvent = RuntimeEvent;
-	 type ProposalBond = ProposalBond;
+	type ProposalBond = ProposalBond;
 	type MaxApprovals = MaxApprovals;
 	type ProposalBondMinimum = ProposalBondMinimum;
-	type ProposalBondMaximum = (); 
-} 
+	type ProposalBondMaximum = ();
+}
 
 parameter_types! {
 	pub Features: PalletFeatures = PalletFeatures::all_enabled();

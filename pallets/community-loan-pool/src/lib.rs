@@ -23,10 +23,12 @@ use frame_support::sp_runtime::{
 
 use frame_support::{
 	pallet_prelude::*,
-	traits::{Currency, ExistenceRequirement::KeepAlive, Get, Imbalance, OnUnbalanced,
-		ReservableCurrency, WithdrawReasons},
+	traits::{
+		Currency, ExistenceRequirement::KeepAlive, Get, Imbalance, OnUnbalanced,
+		ReservableCurrency, WithdrawReasons,
+	},
+	PalletId,
 };
-
 
 type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
 
@@ -37,7 +39,8 @@ pub trait BenchmarkHelper<CollectionId, ItemId> {
 }
 
 #[cfg(feature = "runtime-benchmarks")]
-impl<CollectionId: From<u32>, ItemId: From<u32>> BenchmarkHelper<CollectionId, ItemId> for NftHelper
+impl<CollectionId: From<u32>, ItemId: From<u32>> BenchmarkHelper<CollectionId, ItemId>
+	for NftHelper
 {
 	fn to_collection(i: u32) -> CollectionId {
 		i.into()
@@ -49,16 +52,15 @@ impl<CollectionId: From<u32>, ItemId: From<u32>> BenchmarkHelper<CollectionId, I
 
 #[frame_support::pallet]
 pub mod pallet {
-    use super::*;
-    use frame_system::pallet_prelude::*;
-    use scale_info::TypeInfo;
+	use super::*;
+	use frame_system::pallet_prelude::*;
+	use scale_info::TypeInfo;
 
-    #[cfg(feature = "std")]
-    use frame_support::serde::{Deserialize, Serialize};
+	#[cfg(feature = "std")]
+	use frame_support::serde::{Deserialize, Serialize};
 
-
-    type BalanceOf<T> =
-        <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+	type BalanceOf<T> =
+		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
 	pub type ProposalIndex = u32;
 
@@ -71,14 +73,14 @@ pub mod pallet {
 		bond: Balance,
 	}
 
-    #[pallet::pallet]
-    pub struct Pallet<T>(_);
+	#[pallet::pallet]
+	pub struct Pallet<T>(_);
 
-    // Configure the pallet by specifying the parameters and types on which it depends.
-    #[pallet::config]
-    pub trait Config: frame_system::Config + pallet_uniques::Config{
-        /// Because this pallet emits events, it depends on the runtime's definition of an event.
-        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+	// Configure the pallet by specifying the parameters and types on which it depends.
+	#[pallet::config]
+	pub trait Config: frame_system::Config + pallet_uniques::Config {
+		/// Because this pallet emits events, it depends on the runtime's definition of an event.
+		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
 		/// The staking balance.
 		type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
@@ -88,7 +90,6 @@ pub mod pallet {
 
 		/// Origin from which approves must come.
 		type ApproveOrigin: EnsureOrigin<Self::RuntimeOrigin>;
-
 
 		/// Fraction of a proposal's value that should be bonded in order to place the proposal.
 		/// An accepted proposal gets these back. A rejected proposal does not.
@@ -104,12 +105,15 @@ pub mod pallet {
 		/// Minimum amount of funds that should be placed in a deposit for making a proposal.
 		#[pallet::constant]
 		type ProposalBondMinimum: Get<BalanceOf<Self>>;
-		
+
 		/// Maximum amount of funds that should be placed in a deposit for making a proposal.
 		#[pallet::constant]
 		type ProposalBondMaximum: Get<Option<BalanceOf<Self>>>;
 
-    }
+		/// The treasury's pallet id, used for deriving its sovereign account ID.
+		#[pallet::constant]
+		type PalletId: Get<PalletId>;
+	}
 
 	#[pallet::storage]
 	#[pallet::getter(fn proposal_count)]
@@ -118,21 +122,20 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn proposals)]
 	pub(super) type Proposals<T: Config> = StorageMap<
-		_, 
+		_,
 		Twox64Concat,
 		ProposalIndex,
 		Proposal<T::AccountId, BalanceOf<T>>,
 		OptionQuery,
-		>;
+	>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn approvals)]
-	pub(super) type Approvals<T: Config> = 
+	pub(super) type Approvals<T: Config> =
 		StorageValue<_, BoundedVec<ProposalIndex, T::MaxApprovals>, ValueQuery>;
 
-
-    #[pallet::error]
-    pub enum Error<T> {
+	#[pallet::error]
+	pub enum Error<T> {
 		/// Proposer's balance is too low
 		InsufficientProposerBalance,
 		/// Loan pool's balance is too low
@@ -144,27 +147,23 @@ pub mod pallet {
 		/// The person has no permission to call the function
 		InsufficientPermission,
 		TooManyApprovals,
-    }
+	}
 
-
-    #[pallet::event]
-    #[pallet::generate_deposit(pub(super) fn deposit_event)]
-    pub enum Event<T: Config> {
+	#[pallet::event]
+	#[pallet::generate_deposit(pub(super) fn deposit_event)]
+	pub enum Event<T: Config> {
 		/// New Proposal
-		Proposed {proposal_index: ProposalIndex},
+		Proposed { proposal_index: ProposalIndex },
 		/// Proposal has been approved
-		Approved {proposal_index: ProposalIndex},
+		Approved { proposal_index: ProposalIndex },
 		/// Proposal has been rejected
-		Rejected {proposal_index: ProposalIndex},
+		Rejected { proposal_index: ProposalIndex },
 		/// Loan has been created
-		Loancreation {proposal_index: ProposalIndex}
-    }
+		Loancreation { proposal_index: ProposalIndex },
+	}
 
-
-
-
-    #[pallet::call]
-    impl<T: Config> Pallet<T> {
+	#[pallet::call]
+	impl<T: Config> Pallet<T> {
 		/// Apply for a loan
 		#[pallet::call_index(0)]
 		#[pallet::weight(0)]
@@ -187,7 +186,7 @@ pub mod pallet {
 			Proposals::<T>::insert(proposal_index, proposal);
 			ProposalCount::<T>::put(proposal_index + 1);
 
-			Self::deposit_event(Event::Proposed {proposal_index});
+			Self::deposit_event(Event::Proposed { proposal_index });
 			Ok(())
 		}
 
@@ -198,14 +197,13 @@ pub mod pallet {
 			proposal_index: ProposalIndex,
 		) -> DispatchResult {
 			T::RejectOrigin::ensure_origin(origin)?;
-			let proposal = <Proposals<T>>::take(&proposal_index).ok_or(Error::<T>::InvalidIndex).unwrap();
+			let proposal =
+				<Proposals<T>>::take(&proposal_index).ok_or(Error::<T>::InvalidIndex).unwrap();
 			let value = proposal.bond;
-/* 			let imbalance = T::Currency::slash_reserved(&proposal.proposer, value).0;
+			/* 			let imbalance = T::Currency::slash_reserved(&proposal.proposer, value).0;
 			T::OnSlash::on_unbalanced(imbalance); */
 
-			Self::deposit_event(Event::<T>::Rejected {
-				proposal_index,
-			});
+			Self::deposit_event(Event::<T>::Rejected { proposal_index });
 			Ok(())
 		}
 
@@ -217,24 +215,32 @@ pub mod pallet {
 			collection_id: T::CollectionId,
 			item_id: T::ItemId,
 		) -> DispatchResult {
-		 	let signer = ensure_signed(origin.clone())?;		
-			let proposal = <Proposals<T>>::take(&proposal_index).ok_or(Error::<T>::InvalidIndex).unwrap();
+			let signer = ensure_signed(origin.clone())?;
+			let proposal =
+				<Proposals<T>>::take(&proposal_index).ok_or(Error::<T>::InvalidIndex).unwrap();
 			let user = proposal.beneficiary;
-			let beneficiary = <T::Lookup as frame_support::sp_runtime::traits::StaticLookup>::unlookup(user.clone());
+			let beneficiary =
+				<T::Lookup as frame_support::sp_runtime::traits::StaticLookup>::unlookup(
+					user.clone(),
+				);
 
 			pallet_uniques::Pallet::<T>::create(origin.clone(), collection_id, beneficiary.clone());
-			pallet_uniques::Pallet::<T>::mint(origin.clone(),  collection_id, item_id, beneficiary.clone());
+			pallet_uniques::Pallet::<T>::mint(
+				origin.clone(),
+				collection_id,
+				item_id,
+				beneficiary.clone(),
+			);
 			// Call the nft creation, mint it and store it at the contract
 			// creates a contract and sends the loan amount to the contract
-			Approvals::<T>::try_append(proposal_index)
-				.map_err(|_| Error::<T>::TooManyApprovals)?;
+			Approvals::<T>::try_append(proposal_index).map_err(|_| Error::<T>::TooManyApprovals)?;
 			Ok(())
 		}
-    }
+	}
 
-    //** Our helper functions.**//
+	//** Our helper functions.**//
 
-    impl<T: Config> Pallet<T> {
+	impl<T: Config> Pallet<T> {
 		fn calculate_bond(value: BalanceOf<T>) -> BalanceOf<T> {
 			let mut r = T::ProposalBondMinimum::get().max(T::ProposalBond::get() * value);
 			if let Some(m) = T::ProposalBondMaximum::get() {
@@ -242,5 +248,5 @@ pub mod pallet {
 			}
 			r
 		}
-    }
+	}
 }
