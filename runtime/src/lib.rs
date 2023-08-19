@@ -607,9 +607,9 @@ impl pallet_community_loan_pool::Config for Runtime {
 	>;
 	type RuntimeEvent = RuntimeEvent;
 	type ProposalBond = ProposalBond;
-	type MaxApprovals = MaxApprovals;
 	type ProposalBondMinimum = ProposalBondMinimum;
 	type ProposalBondMaximum = ();
+	type OnSlash = ();
 }
 
 parameter_types! {
