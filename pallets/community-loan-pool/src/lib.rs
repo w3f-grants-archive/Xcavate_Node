@@ -198,7 +198,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			T::RejectOrigin::ensure_origin(origin)?;
 			let proposal =
-				<Proposals<T>>::take(&proposal_index).ok_or(Error::<T>::InvalidIndex).unwrap();
+				<Proposals<T>>::take(&proposal_index).ok_or(Error::<T>::InvalidIndex)?;
 			let value = proposal.bond;
 			let imbalance = <T as pallet::Config>::Currency::slash_reserved(&proposal.proposer, value).0;
 			T::OnSlash::on_unbalanced(imbalance); 
@@ -223,21 +223,22 @@ pub mod pallet {
 			collateral_price: BalanceOf<T>,
 			item_id: T::ItemId,
 			dest: T::AccountId,
+			admin: T::AccountId,
 			//mut selector: Vec<u8>,
 		) -> DispatchResult {
 			T::ApproveOrigin::ensure_origin(origin.clone())?;
-			let signer = ensure_signed(origin.clone())?;
 			let proposal =
-				<Proposals<T>>::take(&proposal_index).ok_or(Error::<T>::InvalidIndex).unwrap();
+				<Proposals<T>>::take(&proposal_index).ok_or(Error::<T>::InvalidIndex)?;
 			let err_amount = <T as pallet::Config>::Currency::unreserve(&proposal.proposer, proposal.bond);
 			debug_assert!(err_amount.is_zero());
-			let user = proposal.beneficiary;let value = proposal.amount;
+			let user = proposal.beneficiary;
+			let value = proposal.amount;
 			let contract =
 				<T::Lookup as frame_support::sp_runtime::traits::StaticLookup>::unlookup(
 					dest.clone(),
 				);
 			let admin = <T::Lookup as frame_support::sp_runtime::traits::StaticLookup>::unlookup(
-				signer.clone(),
+				admin.clone(),
 			);
 
 			pallet_uniques::Pallet::<T>::create(origin.clone(), collection_id, admin.clone());
@@ -249,7 +250,7 @@ pub mod pallet {
 			);
 			let gas_limit = 10_000_000;
 			let value = proposal.amount;
-			let mut arg1_enc: Vec<u8> = signer.encode();
+			let mut arg1_enc: Vec<u8> = admin.encode();
 			let mut arg2_enc: Vec<u8> = collection_id.clone().encode();
 			let mut arg3_enc: Vec<u8> = item_id.clone().encode();
 			let mut arg4_enc: Vec<u8> = collateral_price.encode();
@@ -279,6 +280,7 @@ pub mod pallet {
 			Self::deposit_event(Event::<T>::Approved { proposal_index });
 			Ok(())
 		}
+		
 	}
 
 	//** Our helper functions.**//

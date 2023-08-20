@@ -23,6 +23,7 @@ type AccountId = u32;
 pub const ALICE: AccountId = 1;
 pub const BOB: AccountId = 2;
 pub const CHARLIE: AccountId = 3;
+pub const DAVE: AccountId = 4;
 pub const COLLECTION_ID: u32 = 2;
 
 // Configure a mock runtime to test the pallet.
@@ -138,11 +139,11 @@ parameter_types! {
 impl pallet_community_loan_pool::Config for Test {
 	type PalletId = CommunityLoanPalletIdPalletId;
 	type Currency = Balances;
-	type ApproveOrigin = frame_system::EnsureRoot<u128>;
-	type RejectOrigin = frame_system::EnsureRoot<u128>;
+	type ApproveOrigin = frame_system::EnsureRoot<u32>;
+	type RejectOrigin = frame_system::EnsureRoot<u32>;
 	type RuntimeEvent = RuntimeEvent;
 	type ProposalBond = ProposalBond;
-	type ProposalBondMinimum = ConstU32<50>;
+	type ProposalBondMinimum = ConstU32<10000>;
 	type ProposalBondMaximum = ();
 	type OnSlash = ();
 }
@@ -156,6 +157,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 			(ALICE, 20_000_000),
 			(BOB, 15_000),
 			(CHARLIE, 150_000),
+			(DAVE, 5_000),
 		],
 	}
 	.assimilate_storage(&mut test)
