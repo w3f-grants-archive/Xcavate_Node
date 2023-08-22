@@ -700,7 +700,7 @@ impl pallet_contracts::Config for Runtime {
 	/// and make sure they are stable. Dispatchables exposed to contracts are not allowed to
 	/// change because that would break already deployed contracts. The `Call` structure itself
 	/// is not allowed to change the indices of existing pallets, too.
-	type CallFilter = Nothing;
+	type CallFilter = frame_support::traits::Everything;
 	type DepositPerItem = DepositPerItem;
 	type DepositPerByte = DepositPerByte;
 	// type DefaultDepositLimit = DefaultDepositLimit;
@@ -1490,7 +1490,7 @@ construct_runtime!(
 		TemplateModule: pallet_template,
 		CommunityLoanPool: pallet_community_loan_pool,
 		Nfts: pallet_nfts,
-		Uniques: pallet_uniques,
+		Uniques: pallet_uniques, //10
 		Contracts: pallet_contracts,
 		RandomnessCollectiveFlip: pallet_insecure_randomness_collective_flip,
 		Assets: pallet_assets::<Instance1>,

@@ -83,7 +83,7 @@ pub mod pallet {
 	pub struct Pallet<T>(_);
 
 	#[pallet::config]
-	pub trait Config: frame_system::Config + pallet_uniques::Config /*+ pallet_contracts::Config */ {
+	pub trait Config: frame_system::Config + pallet_uniques::Config /* + pallet_contracts::Config */  {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
@@ -263,7 +263,7 @@ pub mod pallet {
 			data.append(&mut arg4_enc);
 			data.append(&mut arg5_enc);
 
-/* 			pallet_contracts::Pallet::<T>::bare_call(
+/*  			pallet_contracts::Pallet::<T>::bare_call(
 				signer.clone(),
 				dest.clone(),
 				value,
@@ -272,7 +272,7 @@ pub mod pallet {
 				data,
 				false,
 			)
-			.result?; */
+			.result?;  */
 
 			// call the contract
 			// creates a contract and sends the loan amount to the contract
