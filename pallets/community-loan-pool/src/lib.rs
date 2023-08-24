@@ -31,11 +31,17 @@ use frame_support::{
 	inherent::Vec,
 };
 
+use sp_std::{collections::btree_map::BTreeMap, prelude::*};
+
 type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
 
 pub type NegativeImbalanceOf<T> = <<T as Config>::Currency as Currency<
 	<T as frame_system::Config>::AccountId,
 >>::NegativeImbalance;
+
+pub type PositiveImbalanceOf<T> = <<T as Config>::Currency as Currency<
+	<T as frame_system::Config>::AccountId,
+>>::PositiveImbalance;
 
 #[cfg(feature = "runtime-benchmarks")]
 pub trait BenchmarkHelper<CollectionId, ItemId> {
@@ -132,6 +138,25 @@ pub mod pallet {
 		Proposal<T::AccountId, BalanceOf<T>>,
 		OptionQuery,
 	>;
+
+ 	#[pallet::genesis_config]
+	#[derive(frame_support::DefaultNoBound)]
+	pub struct GenesisConfig<T: Config> {
+		#[serde(skip)]
+		_config: sp_std::marker::PhantomData<T>,
+	}
+
+	#[pallet::genesis_build]
+	impl<T: Config> GenesisBuild<T> for GenesisConfig<T> {
+		fn build(&self) {
+			// Create Treasury account
+			let account_id = <Pallet<T>>::account_id();
+			let min = <T as pallet::Config>::Currency::minimum_balance();
+			if <T as pallet::Config>::Currency::free_balance(&account_id) < min {
+				let _ = <T as pallet::Config>::Currency::make_free_balance_be(&account_id, min);
+			}
+		}
+	} 
 
 	#[pallet::error]
 	pub enum Error<T> {
@@ -237,17 +262,23 @@ pub mod pallet {
 				<T::Lookup as frame_support::sp_runtime::traits::StaticLookup>::unlookup(
 					dest.clone(),
 				);
-			let admin = <T::Lookup as frame_support::sp_runtime::traits::StaticLookup>::unlookup(
-				admin.clone(),
-			);
-
-			pallet_uniques::Pallet::<T>::create(origin.clone(), collection_id, admin.clone());
-			pallet_uniques::Pallet::<T>::mint(
-				origin.clone(),
+			pallet_uniques::Pallet::<T>::do_create_collection(
 				collection_id,
-				item_id,
-				contract.clone(),
-			);
+				admin.clone(),
+				admin.clone(),
+				T::CollectionDeposit::get(),
+				false,
+				pallet_uniques::Event::Created {
+					creator: admin.clone(),
+					owner: admin.clone(),
+					collection: collection_id,
+				},
+			)?;
+			pallet_uniques::Pallet::<T>::do_mint(collection_id, item_id, dest.clone(), |_| {
+				Ok(())
+			})?;
+			let mut imbalance = <PositiveImbalanceOf<T>>::zero();
+			imbalance.subsume(<T as pallet::Config>::Currency::deposit_creating(&dest, value.clone()));
 			let gas_limit = 10_000_000;
 			let value = proposal.amount;
 			let mut arg1_enc: Vec<u8> = admin.encode();
@@ -273,9 +304,6 @@ pub mod pallet {
 				false,
 			)
 			.result?;  */
-
-			// call the contract
-			// creates a contract and sends the loan amount to the contract
 			Proposals::<T>::remove(proposal_index);
 			Self::deposit_event(Event::<T>::Approved { proposal_index });
 			Ok(())
@@ -286,6 +314,10 @@ pub mod pallet {
 	//** Our helper functions.**//
 
 	impl<T: Config> Pallet<T> {
+		pub fn account_id() -> T::AccountId {
+			T::PalletId::get().into_account_truncating()
+		}
+
 		fn calculate_bond(value: BalanceOf<T>) -> BalanceOf<T> {
 			let mut r = T::ProposalBondMinimum::get().max(T::ProposalBond::get() * value);
 			if let Some(m) = T::ProposalBondMaximum::get() {

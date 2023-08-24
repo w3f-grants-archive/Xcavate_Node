@@ -258,5 +258,6 @@ fn testnet_genesis(
 				.collect(),
 			phantom: Default::default(),
 		},
+		community_loan_pool: Default::default(),
 	}
 }
