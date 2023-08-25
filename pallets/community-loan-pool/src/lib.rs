@@ -75,6 +75,11 @@ pub mod pallet {
 
 	pub type ProposalIndex = u32;
 
+	type BalanceOf1<T> = <<T as pallet_contracts::Config>::Currency as Currency<
+	<T as frame_system::Config>::AccountId,
+	>>::Balance;
+
+
 	/// A loan proposal
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
@@ -89,7 +94,7 @@ pub mod pallet {
 	pub struct Pallet<T>(_);
 
 	#[pallet::config]
-	pub trait Config: frame_system::Config + pallet_uniques::Config /* + pallet_contracts::Config */  {
+	pub trait Config: frame_system::Config + pallet_uniques::Config + pallet_contracts::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
@@ -249,9 +254,11 @@ pub mod pallet {
 			item_id: T::ItemId,
 			dest: T::AccountId,
 			admin: T::AccountId,
-			//mut selector: Vec<u8>,
+			//storage_deposit_limit: Option<BalanceOf1<T>>,
+			//gas_limit: Weight,
 		) -> DispatchResult {
-			T::ApproveOrigin::ensure_origin(origin.clone())?;
+			let signer = ensure_signed(origin.clone())?;
+			//T::ApproveOrigin::ensure_origin(origin.clone())?;
 			let proposal =
 				<Proposals<T>>::take(&proposal_index).ok_or(Error::<T>::InvalidIndex)?;
 			let err_amount = <T as pallet::Config>::Currency::unreserve(&proposal.proposer, proposal.bond);
@@ -279,8 +286,9 @@ pub mod pallet {
 			})?;
 			let mut imbalance = <PositiveImbalanceOf<T>>::zero();
 			imbalance.subsume(<T as pallet::Config>::Currency::deposit_creating(&dest, value.clone()));
-			let gas_limit = 10_000_000;
-			let value = proposal.amount;
+			// let gas_limit= 10_000_000_000;
+/* 			let value = proposal.amount;
+			let value2: BalanceOf1<T> = Default::default();
 			let mut arg1_enc: Vec<u8> = admin.encode();
 			let mut arg2_enc: Vec<u8> = collection_id.clone().encode();
 			let mut arg3_enc: Vec<u8> = item_id.clone().encode();
@@ -292,18 +300,19 @@ pub mod pallet {
 			data.append(&mut arg2_enc);
 			data.append(&mut arg3_enc);
 			data.append(&mut arg4_enc);
-			data.append(&mut arg5_enc);
+			data.append(&mut arg5_enc); */
 
-/*  			pallet_contracts::Pallet::<T>::bare_call(
+			/* pallet_contracts::Pallet::<T>::bare_call(
 				signer.clone(),
 				dest.clone(),
-				value,
+				value2,
 				gas_limit,
 				storage_deposit_limit,
 				data,
 				false,
+				pallet_contracts::Determinism::Deterministic,
 			)
-			.result?;  */
+			.result?; */
 			Proposals::<T>::remove(proposal_index);
 			Self::deposit_event(Event::<T>::Approved { proposal_index });
 			Ok(())
