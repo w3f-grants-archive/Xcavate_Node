@@ -17,7 +17,7 @@ mod tests;
 mod benchmarking;
 
 use frame_support::sp_runtime::{
-	traits::{AccountIdConversion, CheckedAdd, Saturating, StaticLookup, Zero},
+	traits::{AccountIdConversion, Saturating, StaticLookup, Zero},
 	Permill, RuntimeDebug,
 };
 

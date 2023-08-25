@@ -613,6 +613,13 @@ impl pallet_community_loan_pool::Config for Runtime {
 	type OnSlash = ();
 }
 
+/// Configure the pallet-community-loan-pool in pallets/template.
+impl pallet_xcavate_staking::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type Currency = Balances;
+}
+
+
 parameter_types! {
 	pub Features: PalletFeatures = PalletFeatures::all_enabled();
 	pub const MaxAttributesPerCall: u32 = 10;
@@ -1490,6 +1497,7 @@ construct_runtime!(
 		// Include the custom logic from the pallet-template in the runtime.
 		TemplateModule: pallet_template,
 		CommunityLoanPool: pallet_community_loan_pool,
+		XcavateStaking: pallet_xcavate_staking,
 		Nfts: pallet_nfts,
 		Uniques: pallet_uniques, //10
 		Contracts: pallet_contracts,

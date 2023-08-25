@@ -4401,6 +4401,7 @@ dependencies = [
  "pallet-treasury",
  "pallet-uniques",
  "pallet-utility",
+ "pallet-xcavate-staking",
  "parity-scale-codec",
  "scale-info",
  "sp-api",
@@ -5324,6 +5325,20 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std 5.0.0 (git+https://github.com/paritytech/substrate.git?branch=polkadot-v1.0.0)",
+]
+
+[[package]]
+name = "pallet-xcavate-staking"
+version = "4.0.0-dev"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
 ]
 
 [[package]]
