@@ -613,12 +613,16 @@ impl pallet_community_loan_pool::Config for Runtime {
 	type OnSlash = ();
 }
 
+parameter_types! {
+    pub const MinimumRemainingAmount: Balance = DOLLARS;
+}
+
 /// Configure the pallet-community-loan-pool in pallets/template.
 impl pallet_xcavate_staking::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = Balances;
+	type MinimumRemainingAmount = MinimumRemainingAmount;
 }
-
 
 parameter_types! {
 	pub Features: PalletFeatures = PalletFeatures::all_enabled();

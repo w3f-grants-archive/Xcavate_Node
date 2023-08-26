@@ -16,20 +16,34 @@ mod tests;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
+use frame_support::sp_runtime::{
+    traits::{AccountIdConversion, Zero},
+    Perbill,
+};
+
+use frame_support::{
+	pallet_prelude::*,
+	traits::{
+		Get, ReservableCurrency,		
+	},
+};
+
+
+
 #[frame_support::pallet]
 pub mod pallet {
+	use super::*;
+
 	use frame_support::{dispatch::DispatchResultWithPostInfo, pallet_prelude::*, 
 		traits::{Currency, LockIdentifier, LockableCurrency, WithdrawReasons}
 	};
 
-	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 	use frame_system::ensure_signed;
 
 	const EXAMPLE_ID: LockIdentifier = *b"stkxcavc";
 
-	type BalanceOf<T> =
-	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+	type Balance = u128;
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
@@ -40,19 +54,27 @@ pub mod pallet {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 		/// The lockable currency type.
-		type Currency: LockableCurrency<Self::AccountId, Moment = Self::BlockNumber>;
+		type Currency: Currency<Self::AccountId, Balance = Balance>
+		+ LockableCurrency<Self::AccountId, Moment = Self::BlockNumber>
+		+ ReservableCurrency<Self::AccountId>;
+		/// Minimum amount that should be left on staker account after staking.
+        /// Serves as a safeguard to prevent users from locking their entire free balance.
+        #[pallet::constant]
+        type MinimumRemainingAmount: Get<Balance>;
 	}
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {}
 
-	// The pallet's runtime storage items.
-	// https://docs.substrate.io/main-docs/build/runtime-storage/
 	#[pallet::storage]
-	#[pallet::getter(fn something)]
-	// Learn more about declaring storage items:
-	// https://docs.substrate.io/main-docs/build/runtime-storage/#declaring-storage-items
-	pub type Something<T> = StorageValue<_, u32>;
+    #[pallet::getter(fn ledger)]
+    pub type Ledger<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::AccountId, Balance, ValueQuery>;
+
+	/// Number of proposals that have been made.
+	#[pallet::storage]
+	#[pallet::getter(fn total_stake)]
+	pub(super) type TotalStake<T> = StorageValue<_, Balance, ValueQuery>;
 
 	// Pallets use events to inform users when important changes are made.
 	// https://docs.substrate.io/main-docs/build/events-errors/
@@ -60,20 +82,20 @@ pub mod pallet {
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {	
 		/// Balance was locked successfully.
-		Locked(<T as frame_system::Config>::AccountId, BalanceOf<T>),
+		Locked(<T as frame_system::Config>::AccountId, Balance),
 		/// Lock was extended successfully.
-		ExtendedLock(<T as frame_system::Config>::AccountId, BalanceOf<T>),
+		ExtendedLock(<T as frame_system::Config>::AccountId, Balance),
 		/// Balance was unlocked successfully.
-		Unlocked(<T as frame_system::Config>::AccountId),
+		Unlocked(<T as frame_system::Config>::AccountId, Balance),
 	}
 
 	// Errors inform users that something went wrong.
 	#[pallet::error]
 	pub enum Error<T> {
-		/// Error names should be descriptive.
-		NoneValue,
-		/// Errors should have helpful documentation associated with them.
-		StorageOverflow,
+		/// Can not stake with zero value.
+		StakingWithNoValue,
+        /// Unstaking a contract with zero value
+        UnstakingWithNoValue,
 	}
 
 	
@@ -81,19 +103,30 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		#[pallet::call_index(0)]
 		#[pallet::weight(0)]
-		pub fn lock_capital(
+		pub fn stake(
 			origin: OriginFor<T>,
-			#[pallet::compact] amount: BalanceOf<T>
+			#[pallet::compact] value: Balance
 		) -> DispatchResultWithPostInfo {
-			let user = ensure_signed(origin)?;
+			let staker = ensure_signed(origin)?;
 
-			T::Currency::set_lock(
-				EXAMPLE_ID,
-				&user,
-				amount,
-				WithdrawReasons::all(),
+			let mut ledger = Self::ledger(&staker);
+
+			let available_balance = Self::available_staking_balance(&staker);
+			let value_to_stake = value.min(available_balance);
+
+			ensure!(
+				value_to_stake > 0,
+				Error::<T>::StakingWithNoValue
 			);
-			Self::deposit_event(Event::Locked(user, amount));
+
+			ledger = ledger.saturating_add(value_to_stake);
+
+			Self::update_ledger(&staker, ledger);
+
+			let total_stake = Self::total_stake();
+			TotalStake::<T>::put(total_stake + value_to_stake);
+
+			Self::deposit_event(Event::Locked(staker, value));
 			Ok(().into())
 		}
 
@@ -101,32 +134,59 @@ pub mod pallet {
 		#[pallet::weight(1_000)]
 		pub fn extend_lock(
 			origin: OriginFor<T>,
-			#[pallet::compact] amount: BalanceOf<T>,
+			#[pallet::compact] value: Balance,
 		) -> DispatchResultWithPostInfo {
 			let user = ensure_signed(origin)?;
 
 			T::Currency::extend_lock(
 				EXAMPLE_ID,
 				&user,
-				amount,
+				value,
 				WithdrawReasons::all(),
 			);
 
-			Self::deposit_event(Event::ExtendedLock(user, amount));
+			Self::deposit_event(Event::ExtendedLock(user, value));
 			Ok(().into())
 		}
 
 		#[pallet::call_index(2)]
 		#[pallet::weight(1_000)]
-		pub fn unlock_all(
+		pub fn unstake(
 			origin: OriginFor<T>,
+			#[pallet::compact] value: Balance
 		) -> DispatchResultWithPostInfo {
-			let user = ensure_signed(origin)?;
+			let staker = ensure_signed(origin)?;
 
-			T::Currency::remove_lock(EXAMPLE_ID, &user);
+			ensure!(value > 0, Error::<T>::UnstakingWithNoValue);
 
-			Self::deposit_event(Event::Unlocked(user));
+			let mut ledger = Self::ledger(&staker);
+			ledger = ledger.saturating_sub(value);
+
+			Self::update_ledger(&staker, ledger);
+
+			let total_stake = Self::total_stake();
+			TotalStake::<T>::put(total_stake - value);
+
+			Self::deposit_event(Event::Unlocked(staker, value));
 			Ok(().into())
 		}
 	}
+
+	impl<T: Config> Pallet<T> {
+		fn available_staking_balance(staker: &T::AccountId) -> Balance {
+			let free_balance = T::Currency::free_balance(staker).saturating_sub(T::MinimumRemainingAmount::get());
+			free_balance.saturating_sub(Self::ledger(staker))
+		}
+
+		fn update_ledger(staker: &T::AccountId, ledger: Balance) {
+			if ledger == 0 {
+				Ledger::<T>::remove(&staker);
+				T::Currency::remove_lock(EXAMPLE_ID, staker);
+			} else {
+				T::Currency::set_lock(EXAMPLE_ID, staker, ledger, WithdrawReasons::all());
+				Ledger::<T>::insert(staker, ledger);
+			}
+		}
+	}
 }
+
