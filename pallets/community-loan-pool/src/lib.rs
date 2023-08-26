@@ -254,8 +254,8 @@ pub mod pallet {
 			item_id: T::ItemId,
 			dest: T::AccountId,
 			admin: T::AccountId,
-			//storage_deposit_limit: Option<BalanceOf1<T>>,
-			//gas_limit: Weight,
+			storage_deposit_limit: Option<BalanceOf1<T>>,
+			gas_limit: Weight,
 		) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
 			//T::ApproveOrigin::ensure_origin(origin.clone())?;
@@ -284,10 +284,8 @@ pub mod pallet {
 			pallet_uniques::Pallet::<T>::do_mint(collection_id, item_id, dest.clone(), |_| {
 				Ok(())
 			})?;
-			let mut imbalance = <PositiveImbalanceOf<T>>::zero();
-			imbalance.subsume(<T as pallet::Config>::Currency::deposit_creating(&dest, value.clone()));
 			// let gas_limit= 10_000_000_000;
-/* 			let value = proposal.amount;
+ 			let value = proposal.amount;
 			let value2: BalanceOf1<T> = Default::default();
 			let mut arg1_enc: Vec<u8> = admin.encode();
 			let mut arg2_enc: Vec<u8> = collection_id.clone().encode();
@@ -295,14 +293,15 @@ pub mod pallet {
 			let mut arg4_enc: Vec<u8> = collateral_price.encode();
 			let mut arg5_enc: Vec<u8> = value.clone().encode();
 			let mut data = Vec::new();
-			//data.append(&mut selector);
+			let mut selector: Vec<u8> = [0x0E, 0xA6, 0xbd, 0x42].into();
+			data.append(&mut selector);
 			data.append(&mut arg1_enc);
 			data.append(&mut arg2_enc);
 			data.append(&mut arg3_enc);
 			data.append(&mut arg4_enc);
-			data.append(&mut arg5_enc); */
+			data.append(&mut arg5_enc); 
 
-			/* pallet_contracts::Pallet::<T>::bare_call(
+			pallet_contracts::Pallet::<T>::bare_call(
 				signer.clone(),
 				dest.clone(),
 				value2,
@@ -312,7 +311,7 @@ pub mod pallet {
 				false,
 				pallet_contracts::Determinism::Deterministic,
 			)
-			.result?; */
+			.result?; 
 			Proposals::<T>::remove(proposal_index);
 			Self::deposit_event(Event::<T>::Approved { proposal_index });
 			Ok(())
