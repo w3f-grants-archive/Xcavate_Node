@@ -17,7 +17,7 @@ mod tests;
 mod benchmarking;
 
 use frame_support::sp_runtime::{
-    traits::{AccountIdConversion, Zero},
+    traits::{AccountIdConversion, Zero, SaturatedConversion},
     Perbill,
 };
 
@@ -27,6 +27,22 @@ use frame_support::{
 		Get, ReservableCurrency,		
 	},
 };
+
+use frame_support::traits::{OnTimestampSet, Time, UnixTime};
+
+use sp_std::{collections::btree_map::BTreeMap, prelude::*};
+
+pub type Balance = u128;
+
+#[derive(Clone, PartialEq, Encode, Decode, Default, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+pub struct LedgerAccount {
+	/// Balance locked
+	#[codec(compact)]
+    pub locked: Balance,
+	/// Timestamp locked
+	pub timestamp: u64,
+
+}
 
 
 
@@ -43,14 +59,12 @@ pub mod pallet {
 
 	const EXAMPLE_ID: LockIdentifier = *b"stkxcavc";
 
-	type Balance = u128;
-
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config {
+	pub trait Config: frame_system::Config{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 		/// The lockable currency type.
@@ -61,6 +75,7 @@ pub mod pallet {
         /// Serves as a safeguard to prevent users from locking their entire free balance.
         #[pallet::constant]
         type MinimumRemainingAmount: Get<Balance>;
+		type TimeProvider: UnixTime;
 	}
 
 	#[pallet::hooks]
@@ -69,7 +84,7 @@ pub mod pallet {
 	#[pallet::storage]
     #[pallet::getter(fn ledger)]
     pub type Ledger<T: Config> =
-        StorageMap<_, Blake2_128Concat, T::AccountId, Balance, ValueQuery>;
+        StorageMap<_, Blake2_128Concat, T::AccountId, LedgerAccount, ValueQuery>;
 
 	/// Number of proposals that have been made.
 	#[pallet::storage]
@@ -96,6 +111,8 @@ pub mod pallet {
 		StakingWithNoValue,
         /// Unstaking a contract with zero value
         UnstakingWithNoValue,
+		/// The locked period didn't end yet
+		UnlockPeriodNotReached,
 	}
 
 	
@@ -111,15 +128,18 @@ pub mod pallet {
 
 			let mut ledger = Self::ledger(&staker);
 
-			let available_balance = Self::available_staking_balance(&staker);
+			let available_balance = Self::available_staking_balance(&staker, &ledger);
 			let value_to_stake = value.min(available_balance);
+
+			let mut timestamp = T::TimeProvider::now().as_secs();
 
 			ensure!(
 				value_to_stake > 0,
 				Error::<T>::StakingWithNoValue
 			);
 
-			ledger = ledger.saturating_add(value_to_stake);
+			ledger.locked = ledger.locked.saturating_add(value_to_stake);
+			ledger.timestamp = timestamp;
 
 			Self::update_ledger(&staker, ledger);
 
@@ -160,7 +180,11 @@ pub mod pallet {
 			ensure!(value > 0, Error::<T>::UnstakingWithNoValue);
 
 			let mut ledger = Self::ledger(&staker);
-			ledger = ledger.saturating_sub(value);
+
+			let minute_timestamp = T::TimeProvider::now().as_secs();
+
+			ensure!(ledger.timestamp + 120 < minute_timestamp, Error::<T>::UnlockPeriodNotReached);
+			ledger.locked = ledger.locked.saturating_sub(value);
 
 			Self::update_ledger(&staker, ledger);
 
@@ -173,17 +197,17 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
-		fn available_staking_balance(staker: &T::AccountId) -> Balance {
+		fn available_staking_balance(staker: &T::AccountId, ledger: &LedgerAccount) -> Balance {
 			let free_balance = T::Currency::free_balance(staker).saturating_sub(T::MinimumRemainingAmount::get());
-			free_balance.saturating_sub(Self::ledger(staker))
+			free_balance.saturating_sub(ledger.locked)
 		}
 
-		fn update_ledger(staker: &T::AccountId, ledger: Balance) {
-			if ledger == 0 {
+		fn update_ledger(staker: &T::AccountId, ledger: LedgerAccount) {
+			if ledger.locked.is_zero() {
 				Ledger::<T>::remove(&staker);
 				T::Currency::remove_lock(EXAMPLE_ID, staker);
 			} else {
-				T::Currency::set_lock(EXAMPLE_ID, staker, ledger, WithdrawReasons::all());
+				T::Currency::set_lock(EXAMPLE_ID, staker, ledger.locked, WithdrawReasons::all());
 				Ledger::<T>::insert(staker, ledger);
 			}
 		}

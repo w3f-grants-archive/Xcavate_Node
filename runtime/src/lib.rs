@@ -622,6 +622,7 @@ impl pallet_xcavate_staking::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = Balances;
 	type MinimumRemainingAmount = MinimumRemainingAmount;
+	type TimeProvider = Timestamp;
 }
 
 parameter_types! {

@@ -5340,6 +5340,7 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
+ "sp-std 5.0.0 (git+https://github.com/paritytech/substrate.git?branch=polkadot-v0.9.36)",
 ]
 
 [[package]]
