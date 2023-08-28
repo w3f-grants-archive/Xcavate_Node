@@ -591,7 +591,6 @@ impl pallet_template::Config for Runtime {
 
 parameter_types! {
 	pub const CommunityLoanPalletId: PalletId = PalletId(*b"py/loana");
-
 }
 
 /// Configure the pallet-community-loan-pool in pallets/template.

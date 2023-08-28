@@ -35,6 +35,8 @@ use sp_std::{collections::btree_map::BTreeMap, prelude::*};
 
 type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
 
+pub type LoanApy = u64;
+
 pub type NegativeImbalanceOf<T> = <<T as Config>::Currency as Currency<
 	<T as frame_system::Config>::AccountId,
 >>::NegativeImbalance;
@@ -74,6 +76,7 @@ pub mod pallet {
 		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
 	pub type ProposalIndex = u32;
+	pub type LoanIndex = u32;
 
 	type BalanceOf1<T> = <<T as pallet_contracts::Config>::Currency as Currency<
 	<T as frame_system::Config>::AccountId,
@@ -88,6 +91,17 @@ pub mod pallet {
 		amount: Balance,
 		beneficiary: AccountId,
 		bond: Balance,
+	}
+
+	/// loan info
+	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
+	pub struct LoanInfo<AccountId, Balance, CollectionId, ItemId> {
+		borrower: AccountId,
+		amount: Balance,
+		collection_id: CollectionId,
+		item_id: ItemId,
+		loan_apy: LoanApy,
 	}
 
 	#[pallet::pallet]
@@ -126,7 +140,13 @@ pub mod pallet {
 
 		/// Handler for the unbalanced decrease when slashing for a rejected proposal or bounty.
 		type OnSlash: OnUnbalanced<NegativeImbalanceOf<Self>>;
+
 	}
+
+	/// Number of proposals that have been made.
+	#[pallet::storage]
+	#[pallet::getter(fn loan_count)]
+	pub(super) type LoanCount<T> = StorageValue<_, ProposalIndex, ValueQuery>;
 
 	/// Number of proposals that have been made.
 	#[pallet::storage]
@@ -143,6 +163,15 @@ pub mod pallet {
 		Proposal<T::AccountId, BalanceOf<T>>,
 		OptionQuery,
 	>;
+
+ 	#[pallet::storage]
+	pub(super) type OngoingLoans<T: Config> = StorageMap<
+		_,
+		Twox64Concat,
+		LoanIndex,
+		LoanInfo<T::AccountId, BalanceOf<T>, T::CollectionId, T::ItemId>,
+		OptionQuery,
+	>; 
 
  	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
@@ -252,6 +281,7 @@ pub mod pallet {
 			collection_id: T::CollectionId,
 			collateral_price: BalanceOf<T>,
 			item_id: T::ItemId,
+			loan_apy: LoanApy,
 			dest: T::AccountId,
 			admin: T::AccountId,
 			storage_deposit_limit: Option<BalanceOf1<T>>,
@@ -269,6 +299,19 @@ pub mod pallet {
 				<T::Lookup as frame_support::sp_runtime::traits::StaticLookup>::unlookup(
 					dest.clone(),
 				);
+
+			let loan_info = LoanInfo {
+				borrower: user,
+				amount: value,
+				collection_id,
+				item_id,
+				loan_apy,
+			};
+
+			let loan_index = Self::loan_count();
+
+			OngoingLoans::<T>::insert(loan_index, loan_info);
+
 			pallet_uniques::Pallet::<T>::do_create_collection(
 				collection_id,
 				admin.clone(),
@@ -313,9 +356,18 @@ pub mod pallet {
 			)
 			.result?; 
 			Proposals::<T>::remove(proposal_index);
+			LoanCount::<T>::put(loan_index + 1);
 			Self::deposit_event(Event::<T>::Approved { proposal_index });
 			Ok(())
 		}
+
+		/* pub fn delete_loan(
+			origin: OriginFor<T>,
+			loan_id: LoanIndex,
+		) -> DispatchResult {
+			let signer = ensure_signed(origin.clone())?;
+
+		} */
 		
 	}
 
