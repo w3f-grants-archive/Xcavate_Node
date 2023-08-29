@@ -25,7 +25,7 @@ use frame_support::{
 	pallet_prelude::*,
 	traits::{
 		Currency, ExistenceRequirement::KeepAlive, Get, Imbalance, OnUnbalanced,
-		ReservableCurrency, WithdrawReasons,
+		ReservableCurrency, WithdrawReasons, UnixTime
 	},
 	PalletId,
 	inherent::Vec,
@@ -68,6 +68,7 @@ pub mod pallet {
 	use super::*;
 	use frame_system::pallet_prelude::*;
 	use scale_info::TypeInfo;
+	use frame_support::sp_runtime::SaturatedConversion;
 
 	#[cfg(feature = "std")]
 	use frame_support::serde::{Deserialize, Serialize};
@@ -102,6 +103,7 @@ pub mod pallet {
 		collection_id: CollectionId,
 		item_id: ItemId,
 		loan_apy: LoanApy,
+		last_timestamp: u64,
 	}
 
 	#[pallet::pallet]
@@ -141,6 +143,12 @@ pub mod pallet {
 		/// Handler for the unbalanced decrease when slashing for a rejected proposal or bounty.
 		type OnSlash: OnUnbalanced<NegativeImbalanceOf<Self>>;
 
+		/// The maximum amount of loans that can run at the same time.
+		#[pallet::constant]
+		type MaxOngoingLoans: Get<u32>;
+
+		/// lose coupling of pallet timestamp
+		type TimeProvider: UnixTime;
 	}
 
 	/// Number of proposals that have been made.
@@ -152,6 +160,10 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn proposal_count)]
 	pub(super) type ProposalCount<T> = StorageValue<_, ProposalIndex, ValueQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn ongoing_loans)]
+	pub(super) type OngoingLoans<T: Config> = StorageValue<_, BoundedVec<ProposalIndex, T::MaxOngoingLoans>, ValueQuery>;
 
 	/// Proposals that have been made.
 	#[pallet::storage]
@@ -165,13 +177,16 @@ pub mod pallet {
 	>;
 
  	#[pallet::storage]
-	pub(super) type OngoingLoans<T: Config> = StorageMap<
+	 #[pallet::getter(fn loans)]
+	pub(super) type Loans<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
 		LoanIndex,
 		LoanInfo<T::AccountId, BalanceOf<T>, T::CollectionId, T::ItemId>,
 		OptionQuery,
 	>; 
+
+
 
  	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
@@ -202,6 +217,8 @@ pub mod pallet {
 		InvalidIndex,
 		/// There are too many loan proposals
 		InsufficientPermission,
+		/// Max amount of ongoing loan reached
+		TooManyLoans,
 	}
 
 	#[pallet::event]
@@ -215,31 +232,17 @@ pub mod pallet {
 		Rejected { proposal_index: ProposalIndex },
 	}
 
-/* 	#[pallet::hooks]
-	impl<T: Config<I>, I: 'static> Hooks<BlockNumberFor<T>> for Pallet<T, I> {
+ 	#[pallet::hooks]
+	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		/// ## Complexity
 		/// - `O(A)` where `A` is the number of approvals
 		fn on_initialize(n: frame_system::pallet_prelude::BlockNumberFor<T>) -> Weight {
-			let pot = Self::pot();
-			let deactivated = Deactivated::<T, I>::get();
-			if pot != deactivated {
-				T::Currency::reactivate(deactivated);
-				T::Currency::deactivate(pot);
-				Deactivated::<T, I>::put(&pot);
-				Self::deposit_event(Event::<T, I>::UpdatedInactive {
-					reactivated: deactivated,
-					deactivated: pot,
-				});
-			}
+			Self::charge_apy();
+			let used_weight = T::DbWeight::get().writes(1);
+			used_weight
 
-			// Check to see if we should spend some funds!
-			if (n % T::SpendPeriod::get()).is_zero() {
-				Self::spend_funds()
-			} else {
-				Weight::zero()
-			}
 		}
-	} */
+	} 
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
@@ -325,6 +328,7 @@ pub mod pallet {
 				<T::Lookup as frame_support::sp_runtime::traits::StaticLookup>::unlookup(
 					dest.clone(),
 				);
+			let timestamp = T::TimeProvider::now().as_secs();
 
 			let loan_info = LoanInfo {
 				borrower: user,
@@ -332,11 +336,15 @@ pub mod pallet {
 				collection_id,
 				item_id,
 				loan_apy,
+				last_timestamp: timestamp,
 			};
 
 			let loan_index = Self::loan_count();
 
-			OngoingLoans::<T>::insert(loan_index, loan_info);
+			Loans::<T>::insert(loan_index, loan_info);
+			OngoingLoans::<T>::try_append(loan_index)
+				.map_err(|_| Error::<T>::TooManyLoans)?;
+
 
 			pallet_uniques::Pallet::<T>::do_create_collection(
 				collection_id,
@@ -394,7 +402,7 @@ pub mod pallet {
 			loan_id: LoanIndex,
 		) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
-			let loan = <OngoingLoans<T>>::take(&loan_id).ok_or(Error::<T>::InvalidIndex)?;
+			let loan = <Loans<T>>::take(&loan_id).ok_or(Error::<T>::InvalidIndex)?;
 
 			let collection_id = loan.collection_id;
 			let item_id = loan.item_id;
@@ -402,7 +410,13 @@ pub mod pallet {
 			pallet_uniques::Pallet::<T>::do_burn(collection_id, item_id, |_,_| {
 				Ok(())
 			})?;
-			OngoingLoans::<T>::remove(loan_id);
+			
+			let mut loans = Self::ongoing_loans();
+			let index = loans.iter().position(|x|  *x == loan_id).unwrap();
+			loans.remove(index);
+
+			OngoingLoans::<T>::put(loans);
+			Loans::<T>::remove(loan_id);
 			Ok(())
 
 		} 
@@ -422,6 +436,32 @@ pub mod pallet {
 				r = r.min(m);
 			}
 			r
+		}
+
+ 		pub fn charge_apy() -> DispatchResult{
+			let ongoing_loans = Self::ongoing_loans();
+			let mut index = 0;
+			for i in ongoing_loans.clone() {
+				let loan_index = ongoing_loans[index];
+				let mut loan = <Loans<T>>::take(&loan_index).ok_or(Error::<T>::InvalidIndex)?;
+				let current_timestamp = T::TimeProvider::now().as_secs();
+				let time_difference = current_timestamp - loan.last_timestamp;
+				let loan_amount = Self::balance_to_u64(loan.amount).unwrap();
+				let interests = loan_amount * time_difference * loan.loan_apy / 365 / 60 / 60 / 24 / 100;
+				let interest_balance = Self::u64_to_balance_option(interests).unwrap();
+				loan.amount = loan.amount + interest_balance;
+				loan.last_timestamp = current_timestamp; 
+				index += 1; 
+			}
+			Ok(())
+		} 
+
+		pub fn balance_to_u64(input: BalanceOf<T>) -> Option<u64> {
+			TryInto::<u64>::try_into(input).ok()
+		}
+
+		pub fn u64_to_balance_option(input: u64) -> Option<BalanceOf<T>> {
+			input.try_into().ok()
 		}
 	}
 }
