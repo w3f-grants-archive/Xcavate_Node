@@ -215,6 +215,32 @@ pub mod pallet {
 		Rejected { proposal_index: ProposalIndex },
 	}
 
+/* 	#[pallet::hooks]
+	impl<T: Config<I>, I: 'static> Hooks<BlockNumberFor<T>> for Pallet<T, I> {
+		/// ## Complexity
+		/// - `O(A)` where `A` is the number of approvals
+		fn on_initialize(n: frame_system::pallet_prelude::BlockNumberFor<T>) -> Weight {
+			let pot = Self::pot();
+			let deactivated = Deactivated::<T, I>::get();
+			if pot != deactivated {
+				T::Currency::reactivate(deactivated);
+				T::Currency::deactivate(pot);
+				Deactivated::<T, I>::put(&pot);
+				Self::deposit_event(Event::<T, I>::UpdatedInactive {
+					reactivated: deactivated,
+					deactivated: pot,
+				});
+			}
+
+			// Check to see if we should spend some funds!
+			if (n % T::SpendPeriod::get()).is_zero() {
+				Self::spend_funds()
+			} else {
+				Weight::zero()
+			}
+		}
+	} */
+
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		/// Apply for a loan. A deposit amount is reserved
@@ -361,13 +387,25 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/* pub fn delete_loan(
+		#[pallet::call_index(3)]
+		#[pallet::weight(0)]
+		pub fn delete_loan(
 			origin: OriginFor<T>,
 			loan_id: LoanIndex,
 		) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
+			let loan = <OngoingLoans<T>>::take(&loan_id).ok_or(Error::<T>::InvalidIndex)?;
 
-		} */
+			let collection_id = loan.collection_id;
+			let item_id = loan.item_id;
+
+			pallet_uniques::Pallet::<T>::do_burn(collection_id, item_id, |_,_| {
+				Ok(())
+			})?;
+			OngoingLoans::<T>::remove(loan_id);
+			Ok(())
+
+		} 
 		
 	}
 
