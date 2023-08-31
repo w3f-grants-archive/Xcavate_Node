@@ -7,7 +7,6 @@
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
 /// Constant values used within the runtimezz
-
 pub mod constants;
 use codec::Decode;
 mod voter_bags;
@@ -616,7 +615,7 @@ impl pallet_community_loan_pool::Config for Runtime {
 }
 
 parameter_types! {
-    pub const MinimumRemainingAmount: Balance = DOLLARS;
+	pub const MinimumRemainingAmount: Balance = DOLLARS;
 }
 
 /// Configure the pallet-xcavate-staking in pallets/template.

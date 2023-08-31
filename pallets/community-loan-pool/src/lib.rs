@@ -22,13 +22,13 @@ use frame_support::sp_runtime::{
 };
 
 use frame_support::{
+	inherent::Vec,
 	pallet_prelude::*,
 	traits::{
 		Currency, ExistenceRequirement::KeepAlive, Get, Imbalance, OnUnbalanced,
-		ReservableCurrency, WithdrawReasons, UnixTime
+		ReservableCurrency, UnixTime, WithdrawReasons,
 	},
 	PalletId,
-	inherent::Vec,
 };
 
 use sp_std::{collections::btree_map::BTreeMap, prelude::*};
@@ -66,9 +66,9 @@ impl<CollectionId: From<u32>, ItemId: From<u32>> BenchmarkHelper<CollectionId, I
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
+	use frame_support::sp_runtime::SaturatedConversion;
 	use frame_system::pallet_prelude::*;
 	use scale_info::TypeInfo;
-	use frame_support::sp_runtime::SaturatedConversion;
 
 	#[cfg(feature = "std")]
 	use frame_support::serde::{Deserialize, Serialize};
@@ -80,9 +80,8 @@ pub mod pallet {
 	pub type LoanIndex = u32;
 
 	type BalanceOf1<T> = <<T as pallet_contracts::Config>::Currency as Currency<
-	<T as frame_system::Config>::AccountId,
+		<T as frame_system::Config>::AccountId,
 	>>::Balance;
-
 
 	/// A loan proposal
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
@@ -110,7 +109,9 @@ pub mod pallet {
 	pub struct Pallet<T>(_);
 
 	#[pallet::config]
-	pub trait Config: frame_system::Config + pallet_uniques::Config + pallet_contracts::Config {
+	pub trait Config:
+		frame_system::Config + pallet_uniques::Config + pallet_contracts::Config
+	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
@@ -163,7 +164,8 @@ pub mod pallet {
 
 	#[pallet::storage]
 	#[pallet::getter(fn ongoing_loans)]
-	pub(super) type OngoingLoans<T: Config> = StorageValue<_, BoundedVec<ProposalIndex, T::MaxOngoingLoans>, ValueQuery>;
+	pub(super) type OngoingLoans<T: Config> =
+		StorageValue<_, BoundedVec<ProposalIndex, T::MaxOngoingLoans>, ValueQuery>;
 
 	/// Proposals that have been made.
 	#[pallet::storage]
@@ -176,19 +178,17 @@ pub mod pallet {
 		OptionQuery,
 	>;
 
- 	#[pallet::storage]
-	 #[pallet::getter(fn loans)]
+	#[pallet::storage]
+	#[pallet::getter(fn loans)]
 	pub(super) type Loans<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
 		LoanIndex,
 		LoanInfo<T::AccountId, BalanceOf<T>, T::CollectionId, T::ItemId>,
 		OptionQuery,
-	>; 
+	>;
 
-
-
- 	#[pallet::genesis_config]
+	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
 	pub struct GenesisConfig<T: Config> {
 		#[serde(skip)]
@@ -205,7 +205,7 @@ pub mod pallet {
 				let _ = <T as pallet::Config>::Currency::make_free_balance_be(&account_id, min);
 			}
 		}
-	} 
+	}
 
 	#[pallet::error]
 	pub enum Error<T> {
@@ -232,7 +232,7 @@ pub mod pallet {
 		Rejected { proposal_index: ProposalIndex },
 	}
 
- 	#[pallet::hooks]
+	/*  	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		/// ## Complexity
 		/// - `O(A)` where `A` is the number of approvals
@@ -242,12 +242,12 @@ pub mod pallet {
 			used_weight
 
 		}
-	} 
+	}  */
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		/// Apply for a loan. A deposit amount is reserved
-		/// and slashed if the proposal is rejected. It is returned once the proposal is awarded. 
+		/// and slashed if the proposal is rejected. It is returned once the proposal is awarded.
 		#[pallet::call_index(0)]
 		#[pallet::weight(0)]
 		pub fn propose(
@@ -257,7 +257,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let beneficiary = T::Lookup::lookup(beneficiary)?;
-			let proposal_index = Self::proposal_count();
+			let proposal_index = Self::proposal_count() + 1;
 			let bond = Self::calculate_bond(amount);
 			<T as pallet::Config>::Currency::reserve(&origin, bond)
 				.map_err(|_| Error::<T>::InsufficientProposersBalance)?;
@@ -269,7 +269,7 @@ pub mod pallet {
 				bond,
 			};
 			Proposals::<T>::insert(proposal_index, proposal);
-			ProposalCount::<T>::put(proposal_index + 1);
+			ProposalCount::<T>::put(proposal_index);
 
 			Self::deposit_event(Event::Proposed { proposal_index });
 			Ok(())
@@ -285,11 +285,11 @@ pub mod pallet {
 			proposal_index: ProposalIndex,
 		) -> DispatchResult {
 			T::RejectOrigin::ensure_origin(origin)?;
-			let proposal =
-				<Proposals<T>>::take(&proposal_index).ok_or(Error::<T>::InvalidIndex)?;
+			let proposal = <Proposals<T>>::take(&proposal_index).ok_or(Error::<T>::InvalidIndex)?;
 			let value = proposal.bond;
-			let imbalance = <T as pallet::Config>::Currency::slash_reserved(&proposal.proposer, value).0;
-			T::OnSlash::on_unbalanced(imbalance); 
+			let imbalance =
+				<T as pallet::Config>::Currency::slash_reserved(&proposal.proposer, value).0;
+			T::OnSlash::on_unbalanced(imbalance);
 
 			Proposals::<T>::remove(proposal_index);
 
@@ -298,7 +298,8 @@ pub mod pallet {
 		}
 
 		/// Approve a proposed spend. The original deposit will be released.
-		/// It will call the create_loan function in the contract and deposit the proposal amount in the contract.
+		/// It will call the create_loan function in the contract and deposit the proposal amount in
+		/// the contract.
 		///
 		/// May only be called from `T::ApproveOrigin`.
 
@@ -318,16 +319,15 @@ pub mod pallet {
 		) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
 			//T::ApproveOrigin::ensure_origin(origin.clone())?;
-			let proposal =
-				<Proposals<T>>::take(&proposal_index).ok_or(Error::<T>::InvalidIndex)?;
-			let err_amount = <T as pallet::Config>::Currency::unreserve(&proposal.proposer, proposal.bond);
+			let proposal = <Proposals<T>>::take(&proposal_index).ok_or(Error::<T>::InvalidIndex)?;
+			let err_amount =
+				<T as pallet::Config>::Currency::unreserve(&proposal.proposer, proposal.bond);
 			debug_assert!(err_amount.is_zero());
 			let user = proposal.beneficiary;
 			let value = proposal.amount;
-			let contract =
-				<T::Lookup as frame_support::sp_runtime::traits::StaticLookup>::unlookup(
-					dest.clone(),
-				);
+			let contract = <T::Lookup as frame_support::sp_runtime::traits::StaticLookup>::unlookup(
+				dest.clone(),
+			);
 			let timestamp = T::TimeProvider::now().as_secs();
 
 			let loan_info = LoanInfo {
@@ -342,9 +342,7 @@ pub mod pallet {
 			let loan_index = Self::loan_count();
 
 			Loans::<T>::insert(loan_index, loan_info);
-			OngoingLoans::<T>::try_append(loan_index)
-				.map_err(|_| Error::<T>::TooManyLoans)?;
-
+			OngoingLoans::<T>::try_append(loan_index).map_err(|_| Error::<T>::TooManyLoans)?;
 
 			pallet_uniques::Pallet::<T>::do_create_collection(
 				collection_id,
@@ -358,11 +356,9 @@ pub mod pallet {
 					collection: collection_id,
 				},
 			)?;
-			pallet_uniques::Pallet::<T>::do_mint(collection_id, item_id, dest.clone(), |_| {
-				Ok(())
-			})?;
+			pallet_uniques::Pallet::<T>::do_mint(collection_id, item_id, dest.clone(), |_| Ok(()))?;
 			// let gas_limit= 10_000_000_000;
- 			let value = proposal.amount;
+			let value = proposal.amount;
 			let value2: BalanceOf1<T> = Default::default();
 			let mut arg1_enc: Vec<u8> = admin.encode();
 			let mut arg2_enc: Vec<u8> = collection_id.clone().encode();
@@ -376,7 +372,7 @@ pub mod pallet {
 			data.append(&mut arg2_enc);
 			data.append(&mut arg3_enc);
 			data.append(&mut arg4_enc);
-			data.append(&mut arg5_enc); 
+			data.append(&mut arg5_enc);
 
 			pallet_contracts::Pallet::<T>::bare_call(
 				signer.clone(),
@@ -388,7 +384,7 @@ pub mod pallet {
 				false,
 				pallet_contracts::Determinism::Deterministic,
 			)
-			.result?; 
+			.result?;
 			Proposals::<T>::remove(proposal_index);
 			LoanCount::<T>::put(loan_index + 1);
 			Self::deposit_event(Event::<T>::Approved { proposal_index });
@@ -397,30 +393,23 @@ pub mod pallet {
 
 		#[pallet::call_index(3)]
 		#[pallet::weight(0)]
-		pub fn delete_loan(
-			origin: OriginFor<T>,
-			loan_id: LoanIndex,
-		) -> DispatchResult {
+		pub fn delete_loan(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
 			let loan = <Loans<T>>::take(&loan_id).ok_or(Error::<T>::InvalidIndex)?;
 
 			let collection_id = loan.collection_id;
 			let item_id = loan.item_id;
 
-			pallet_uniques::Pallet::<T>::do_burn(collection_id, item_id, |_,_| {
-				Ok(())
-			})?;
-			
+			pallet_uniques::Pallet::<T>::do_burn(collection_id, item_id, |_, _| Ok(()))?;
+
 			let mut loans = Self::ongoing_loans();
-			let index = loans.iter().position(|x|  *x == loan_id).unwrap();
+			let index = loans.iter().position(|x| *x == loan_id).unwrap();
 			loans.remove(index);
 
 			OngoingLoans::<T>::put(loans);
 			Loans::<T>::remove(loan_id);
 			Ok(())
-
-		} 
-		
+		}
 	}
 
 	//** Our helper functions.**//
@@ -438,7 +427,7 @@ pub mod pallet {
 			r
 		}
 
- 		pub fn charge_apy() -> DispatchResult{
+		pub fn charge_apy() -> DispatchResult {
 			let ongoing_loans = Self::ongoing_loans();
 			let mut index = 0;
 			for i in ongoing_loans.clone() {
@@ -447,14 +436,15 @@ pub mod pallet {
 				let current_timestamp = T::TimeProvider::now().as_secs();
 				let time_difference = current_timestamp - loan.last_timestamp;
 				let loan_amount = Self::balance_to_u64(loan.amount).unwrap();
-				let interests = loan_amount * time_difference * loan.loan_apy / 365 / 60 / 60 / 24 / 100;
+				let interests =
+					loan_amount * time_difference * loan.loan_apy / 365 / 60 / 60 / 24 / 100;
 				let interest_balance = Self::u64_to_balance_option(interests).unwrap();
 				loan.amount = loan.amount + interest_balance;
-				loan.last_timestamp = current_timestamp; 
-				index += 1; 
+				loan.last_timestamp = current_timestamp;
+				index += 1;
 			}
 			Ok(())
-		} 
+		}
 
 		pub fn balance_to_u64(input: BalanceOf<T>) -> Option<u64> {
 			TryInto::<u64>::try_into(input).ok()

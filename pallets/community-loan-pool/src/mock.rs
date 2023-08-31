@@ -1,19 +1,16 @@
 use super::*;
 
 use crate as pallet_community_loan_pool;
-use crate::{Pallet};
-use frame_support::traits::{ConstU16, ConstU64, AsEnsureOriginWithArg};
+use crate::Pallet;
 use frame_support::{
 	parameter_types,
+	traits::{AsEnsureOriginWithArg, ConstBool, ConstU16, ConstU64, Nothing},
 };
-use sp_core::{H256, ConstU32};
+use sp_core::{ConstU32, H256};
 use sp_runtime::{
 	testing::Header,
 	traits::{BlakeTwo256, IdentityLookup},
 };
-use frame_support::traits::ConstBool;
-use frame_support::traits::Nothing;
-
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -77,7 +74,7 @@ impl pallet_balances::Config for Test {
 	type MaxLocks = ();
 	type MaxReserves = ConstU32<50>;
 	type ReserveIdentifier = [u8; 8];
-} 
+}
 
 impl pallet_uniques::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
@@ -135,7 +132,6 @@ parameter_types! {
 	pub const CommunityLoanPalletIdPalletId: PalletId = PalletId(*b"py/cmmty");
 }
 
-
 impl pallet_community_loan_pool::Config for Test {
 	type PalletId = CommunityLoanPalletIdPalletId;
 	type Currency = Balances;
@@ -153,12 +149,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 	let mut test = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
 
 	pallet_balances::GenesisConfig::<Test> {
-		balances: vec![
-			(ALICE, 20_000_000),
-			(BOB, 15_000),
-			(CHARLIE, 150_000),
-			(DAVE, 5_000),
-		],
+		balances: vec![(ALICE, 20_000_000), (BOB, 15_000), (CHARLIE, 150_000), (DAVE, 5_000)],
 	}
 	.assimilate_storage(&mut test)
 	.unwrap();

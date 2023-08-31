@@ -17,15 +17,13 @@ mod tests;
 mod benchmarking;
 
 use frame_support::sp_runtime::{
-    traits::{AccountIdConversion, Zero, SaturatedConversion},
-    Perbill,
+	traits::{AccountIdConversion, SaturatedConversion, Zero},
+	Perbill,
 };
 
 use frame_support::{
 	pallet_prelude::*,
-	traits::{
-		Get, ReservableCurrency,		
-	},
+	traits::{Get, ReservableCurrency},
 };
 
 use frame_support::traits::{OnTimestampSet, Time, UnixTime};
@@ -38,24 +36,22 @@ pub type Balance = u128;
 pub struct LedgerAccount {
 	/// Balance locked
 	#[codec(compact)]
-    pub locked: Balance,
+	pub locked: Balance,
 	/// Timestamp locked
 	pub timestamp: u64,
-
 }
-
-
 
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
 
-	use frame_support::{dispatch::DispatchResultWithPostInfo, pallet_prelude::*, 
-		traits::{Currency, LockIdentifier, LockableCurrency, WithdrawReasons}
+	use frame_support::{
+		dispatch::DispatchResultWithPostInfo,
+		pallet_prelude::*,
+		traits::{Currency, LockIdentifier, LockableCurrency, WithdrawReasons},
 	};
 
-	use frame_system::pallet_prelude::*;
-	use frame_system::ensure_signed;
+	use frame_system::{ensure_signed, pallet_prelude::*};
 
 	const EXAMPLE_ID: LockIdentifier = *b"stkxcavc";
 
@@ -64,17 +60,17 @@ pub mod pallet {
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config{
+	pub trait Config: frame_system::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 		/// The lockable currency type.
 		type Currency: Currency<Self::AccountId, Balance = Balance>
-		+ LockableCurrency<Self::AccountId, Moment = Self::BlockNumber>
-		+ ReservableCurrency<Self::AccountId>;
+			+ LockableCurrency<Self::AccountId, Moment = Self::BlockNumber>
+			+ ReservableCurrency<Self::AccountId>;
 		/// Minimum amount that should be left on staker account after staking.
-        /// Serves as a safeguard to prevent users from locking their entire free balance.
-        #[pallet::constant]
-        type MinimumRemainingAmount: Get<Balance>;
+		/// Serves as a safeguard to prevent users from locking their entire free balance.
+		#[pallet::constant]
+		type MinimumRemainingAmount: Get<Balance>;
 		type TimeProvider: UnixTime;
 	}
 
@@ -82,9 +78,9 @@ pub mod pallet {
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {}
 
 	#[pallet::storage]
-    #[pallet::getter(fn ledger)]
-    pub type Ledger<T: Config> =
-        StorageMap<_, Blake2_128Concat, T::AccountId, LedgerAccount, ValueQuery>;
+	#[pallet::getter(fn ledger)]
+	pub type Ledger<T: Config> =
+		StorageMap<_, Blake2_128Concat, T::AccountId, LedgerAccount, ValueQuery>;
 
 	/// Number of proposals that have been made.
 	#[pallet::storage]
@@ -95,7 +91,7 @@ pub mod pallet {
 	// https://docs.substrate.io/main-docs/build/events-errors/
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
-	pub enum Event<T: Config> {	
+	pub enum Event<T: Config> {
 		/// Balance was locked successfully.
 		Locked(<T as frame_system::Config>::AccountId, Balance),
 		/// Lock was extended successfully.
@@ -109,20 +105,19 @@ pub mod pallet {
 	pub enum Error<T> {
 		/// Can not stake with zero value.
 		StakingWithNoValue,
-        /// Unstaking a contract with zero value
-        UnstakingWithNoValue,
+		/// Unstaking a contract with zero value
+		UnstakingWithNoValue,
 		/// The locked period didn't end yet
 		UnlockPeriodNotReached,
 	}
 
-	
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		#[pallet::call_index(0)]
 		#[pallet::weight(0)]
 		pub fn stake(
 			origin: OriginFor<T>,
-			#[pallet::compact] value: Balance
+			#[pallet::compact] value: Balance,
 		) -> DispatchResultWithPostInfo {
 			let staker = ensure_signed(origin)?;
 
@@ -133,10 +128,7 @@ pub mod pallet {
 
 			let mut timestamp = T::TimeProvider::now().as_secs();
 
-			ensure!(
-				value_to_stake > 0,
-				Error::<T>::StakingWithNoValue
-			);
+			ensure!(value_to_stake > 0, Error::<T>::StakingWithNoValue);
 
 			ledger.locked = ledger.locked.saturating_add(value_to_stake);
 			ledger.timestamp = timestamp;
@@ -158,12 +150,7 @@ pub mod pallet {
 		) -> DispatchResultWithPostInfo {
 			let user = ensure_signed(origin)?;
 
-			T::Currency::extend_lock(
-				EXAMPLE_ID,
-				&user,
-				value,
-				WithdrawReasons::all(),
-			);
+			T::Currency::extend_lock(EXAMPLE_ID, &user, value, WithdrawReasons::all());
 
 			Self::deposit_event(Event::ExtendedLock(user, value));
 			Ok(().into())
@@ -173,7 +160,7 @@ pub mod pallet {
 		#[pallet::weight(1_000)]
 		pub fn unstake(
 			origin: OriginFor<T>,
-			#[pallet::compact] value: Balance
+			#[pallet::compact] value: Balance,
 		) -> DispatchResultWithPostInfo {
 			let staker = ensure_signed(origin)?;
 
@@ -198,7 +185,8 @@ pub mod pallet {
 
 	impl<T: Config> Pallet<T> {
 		fn available_staking_balance(staker: &T::AccountId, ledger: &LedgerAccount) -> Balance {
-			let free_balance = T::Currency::free_balance(staker).saturating_sub(T::MinimumRemainingAmount::get());
+			let free_balance =
+				T::Currency::free_balance(staker).saturating_sub(T::MinimumRemainingAmount::get());
 			free_balance.saturating_sub(ledger.locked)
 		}
 
@@ -213,4 +201,3 @@ pub mod pallet {
 		}
 	}
 }
-

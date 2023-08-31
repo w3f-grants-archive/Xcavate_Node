@@ -1,8 +1,8 @@
 use node_template_runtime::{
 	constants::currency::DOLLARS, opaque::SessionKeys, wasm_binary_unwrap, AccountId, AssetsConfig,
 	BabeConfig, Balance, BalancesConfig, CouncilConfig, DemocracyConfig, GenesisConfig,
-	MaxNominations, SessionConfig, Signature, StakerStatus, StakingConfig,
-	SudoConfig, SystemConfig, TechnicalCommitteeConfig, BABE_GENESIS_EPOCH_CONFIG, WASM_BINARY,
+	MaxNominations, SessionConfig, Signature, StakerStatus, StakingConfig, SudoConfig,
+	SystemConfig, TechnicalCommitteeConfig, BABE_GENESIS_EPOCH_CONFIG, WASM_BINARY,
 };
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use sc_service::{ChainType, Properties};
