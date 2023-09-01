@@ -311,7 +311,7 @@ pub mod pallet {
 			proposal_index: ProposalIndex,
 			collection_id: T::CollectionId,
 			collateral_price: BalanceOf<T>,
-			value_funds: BalanceOf<T>,
+			value_funds: BalanceOf1<T>,
 			item_id: T::ItemId,
 			loan_apy: LoanApy,
 			dest: T::AccountId,
@@ -361,10 +361,10 @@ pub mod pallet {
 			pallet_uniques::Pallet::<T>::do_mint(collection_id, item_id, dest.clone(), |_| Ok(()))?;
 			let mut imbalance = <PositiveImbalanceOf<T>>::zero();
 
-			imbalance.subsume(<T as pallet::Config>::Currency::deposit_creating(&dest.clone(), value_funds));
+			//imbalance.subsume(<T as pallet::Config>::Currency::deposit_creating(&dest.clone(), value_funds));
 			// let gas_limit= 10_000_000_000;
 			let value = proposal.amount;
-			let value2: BalanceOf1<T> = Default::default();
+			///let value2: BalanceOf1<T> = Default::default();
 			let mut arg1_enc: Vec<u8> = admin.encode();
 			let mut arg2_enc: Vec<u8> = collection_id.clone().encode();
 			let mut arg3_enc: Vec<u8> = item_id.clone().encode();
@@ -382,7 +382,7 @@ pub mod pallet {
 			pallet_contracts::Pallet::<T>::bare_call(
 				signer.clone(),
 				dest.clone(),
-				value2,
+				value_funds,
 				gas_limit,
 				storage_deposit_limit,
 				data,
