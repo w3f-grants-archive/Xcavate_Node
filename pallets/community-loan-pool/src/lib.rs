@@ -333,7 +333,7 @@ pub mod pallet {
 			let timestamp = T::TimeProvider::now().as_secs();
 
 			let loan_info = LoanInfo {
-				borrower: user,
+				borrower: user.clone(),
 				amount: value,
 				collection_id,
 				item_id,
@@ -363,13 +363,15 @@ pub mod pallet {
 
 			//imbalance.subsume(<T as pallet::Config>::Currency::deposit_creating(&dest.clone(), value_funds));
 			// let gas_limit= 10_000_000_000;
+			let palled_id = Self::account_id();
 			let value = proposal.amount;
 			///let value2: BalanceOf1<T> = Default::default();
 			let mut arg1_enc: Vec<u8> = admin.encode();
-			let mut arg2_enc: Vec<u8> = collection_id.clone().encode();
-			let mut arg3_enc: Vec<u8> = item_id.clone().encode();
-			let mut arg4_enc: Vec<u8> = collateral_price.encode();
-			let mut arg5_enc: Vec<u8> = value.clone().encode();
+			let mut arg2_enc: Vec<u8> = user.encode();
+			let mut arg3_enc: Vec<u8> = collection_id.clone().encode();
+			let mut arg4_enc: Vec<u8> = item_id.clone().encode();
+			let mut arg5_enc: Vec<u8> = collateral_price.encode();
+			let mut arg6_enc: Vec<u8> = value.clone().encode();
 			let mut data = Vec::new();
 			let mut selector: Vec<u8> = [0x0E, 0xA6, 0xbd, 0x42].into();
 			data.append(&mut selector);
@@ -378,9 +380,10 @@ pub mod pallet {
 			data.append(&mut arg3_enc);
 			data.append(&mut arg4_enc);
 			data.append(&mut arg5_enc);
+			data.append(&mut arg6_enc);
 
 			pallet_contracts::Pallet::<T>::bare_call(
-				signer.clone(),
+				palled_id.clone(),
 				dest.clone(),
 				value_funds,
 				gas_limit,
