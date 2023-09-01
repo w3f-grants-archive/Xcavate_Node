@@ -361,7 +361,7 @@ pub mod pallet {
 			pallet_uniques::Pallet::<T>::do_mint(collection_id, item_id, dest.clone(), |_| Ok(()))?;
 			let mut imbalance = <PositiveImbalanceOf<T>>::zero();
 
-			imbalance.subsume(<T as pallet::Config>::Currency::deposit_creating(&admin.clone(), value_funds));
+			imbalance.subsume(<T as pallet::Config>::Currency::deposit_creating(&dest.clone(), value_funds));
 			// let gas_limit= 10_000_000_000;
 			let value = proposal.amount;
 			let value2: BalanceOf1<T> = Default::default();
@@ -395,6 +395,10 @@ pub mod pallet {
 			Self::deposit_event(Event::<T>::Approved { proposal_index });
 			Ok(())
 		}
+
+		/// Delete the loan after the loan is paid back. The collateral nft will be deleted.
+		///
+		/// May only be called from the loan contract.
 
 		#[pallet::call_index(3)]
 		#[pallet::weight(0)]
