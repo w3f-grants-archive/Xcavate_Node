@@ -1,7 +1,7 @@
 [package]
 name = "pallet-xcavate-staking"
 version = "4.0.0-dev"
-description = "The Xcavate pallet xcavate-staking""
+description = "The Xcavate pallet xcavate-staking"
 authors = ["Xcavate Network"]
 homepage = "https://xcavate.io"
 edition = "2021"

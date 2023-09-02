@@ -61,6 +61,40 @@ fn session_keys(
 	SessionKeys { grandpa, aura, im_online, authority_discovery }
 }
 
+pub fn get_endowed_accounts_with_balance() -> Vec<(AccountId, u128)> {
+	let accounts: Vec<AccountId> =
+		vec![
+			get_account_id_from_seed::<sr25519::Public>("Alice"),
+			get_account_id_from_seed::<sr25519::Public>("Bob"),
+			get_account_id_from_seed::<sr25519::Public>("Charlie"),
+			get_account_id_from_seed::<sr25519::Public>("Dave"),
+			get_account_id_from_seed::<sr25519::Public>("Eve"),
+			get_account_id_from_seed::<sr25519::Public>("Ferdie"),
+			get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
+			get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
+			get_account_id_from_seed::<sr25519::Public>("Charlie//stash"),
+			get_account_id_from_seed::<sr25519::Public>("Dave//stash"),
+		];
+	
+	const ENDOWMENT: Balance = 10_000_000 * DOLLARS;
+	let accounts_with_balance: Vec<(AccountId, u128)> = accounts.iter().cloned().map(|k| (k, ENDOWMENT)).collect();
+	let json_data = &include_bytes!("../../seed/balances.json")[..];
+	let additional_accounts_with_balance: Vec<(AccountId, u128)> = serde_json::from_slice(json_data).unwrap();
+	
+	let mut accounts = additional_accounts_with_balance.clone();
+	
+	accounts_with_balance.iter().for_each(|tup1| {
+		for tup2 in additional_accounts_with_balance.iter() {
+			if tup1.0 == tup2.0 {
+				return;
+			}
+		}
+		accounts.push(tup1.to_owned());
+	});
+
+	accounts
+}
+
 pub fn development_config() -> Result<ChainSpec, String> {
 	let wasm_binary = WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?;
 
@@ -82,7 +116,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 				vec![authority_keys_from_seed("Alice")],
 				vec![],
 				get_account_id_from_seed::<sr25519::Public>("Alice"),
-				None,
+				get_endowed_accounts_with_balance(),
 				true,
 			)
 		},
@@ -120,7 +154,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 				vec![authority_keys_from_seed("Alice"), authority_keys_from_seed("Bob")],
 				vec![],
 				get_account_id_from_seed::<sr25519::Public>("Alice"),
-				None,
+				get_endowed_accounts_with_balance(),
 				true,
 			)
 		},
@@ -151,36 +185,19 @@ fn testnet_genesis(
 	)>,
 	initial_nominators: Vec<AccountId>,
 	root_key: AccountId,
-	endowed_accounts: Option<Vec<AccountId>>,
+	endowed_accounts: Vec<(AccountId, u128)>,
 	_enable_println: bool,
 ) -> GenesisConfig {
-	let mut endowed_accounts: Vec<AccountId> = endowed_accounts.unwrap_or_else(|| {
-		vec![
-			get_account_id_from_seed::<sr25519::Public>("Alice"),
-			get_account_id_from_seed::<sr25519::Public>("Bob"),
-			get_account_id_from_seed::<sr25519::Public>("Charlie"),
-			get_account_id_from_seed::<sr25519::Public>("Dave"),
-			get_account_id_from_seed::<sr25519::Public>("Eve"),
-			get_account_id_from_seed::<sr25519::Public>("Ferdie"),
-			get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
-			get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
-			get_account_id_from_seed::<sr25519::Public>("Charlie//stash"),
-			get_account_id_from_seed::<sr25519::Public>("Dave//stash"),
-			get_account_id_from_seed::<sr25519::Public>("Eve//stash"),
-			get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
-		]
-	});
-
 	// endow all authorities and nominators.
-	initial_authorities
+/* 	initial_authorities
 		.iter()
 		.map(|x| &x.0)
 		.chain(initial_nominators.iter())
-		.for_each(|x| {
-			if !endowed_accounts.contains(x) {
+		.for_each(|x, y| {
+			if !endowed_accounts.contains((x,y)) {
 				endowed_accounts.push(x.clone())
 			}
-		});
+		}); */
 
 	// stakers: all validators and nominators.
 	let mut rng = rand::thread_rng();
@@ -209,7 +226,10 @@ fn testnet_genesis(
 	GenesisConfig {
 		system: SystemConfig { code: wasm_binary_unwrap().to_vec() },
 		balances: BalancesConfig {
-			balances: endowed_accounts.iter().cloned().map(|x| (x, ENDOWMENT)).collect(),
+			balances: endowed_accounts.iter()
+			.cloned()
+			.map(|x| (x.0.clone(), x.1.clone()))
+			.collect(),
 		},
 		aura: Default::default(),
 		grandpa: Default::default(),
@@ -251,13 +271,11 @@ fn testnet_genesis(
 		alliance_motion: Default::default(),
 		democracy: DemocracyConfig::default(),
 		technical_committee: TechnicalCommitteeConfig {
-			members: endowed_accounts
-				.iter()
-				.take((num_endowed_accounts + 1) / 2)
-				.cloned()
-				.collect(),
+			members: vec![],
 			phantom: Default::default(),
 		},
 		community_loan_pool: Default::default(),
 	}
 }
+
+
