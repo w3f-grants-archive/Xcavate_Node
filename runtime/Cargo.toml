@@ -1,9 +1,9 @@
 [package]
 name = "node-template-runtime"
 version = "4.0.0-dev"
-description = "Xcavate FRAME-based Substrate node."
-authors = ["Substrate DevHub <https://github.com/substrate-developer-hub>"]
-homepage = "https://substrate.io/"
+description = "The Xcavate Substrate runtime"
+authors = ["Xcavate Network"]
+homepage = "https://xcavate.io"
 edition = "2021"
 license = "Unlicense"
 publish = false

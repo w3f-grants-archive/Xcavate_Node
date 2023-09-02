@@ -1,9 +1,9 @@
 [package]
 name = "pallet-community-loan-pool"
 version = "4.0.0-dev"
-description = "Xcavate pallet to manage loans."
-authors = ["Substrate DevHub <https://github.com/substrate-developer-hub>"]
-homepage = "https://substrate.io"
+description = "The Xcavate pallet community-loan-pool"
+authors = ["Xcavate Network"]
+homepage = "https://xcavate.io"
 edition = "2021"
 license = "Apache-2.0"
 publish = false

@@ -1,9 +1,9 @@
 [package]
 name = "node-template"
 version = "4.0.0-dev"
-description = "A fresh FRAME-based Substrate node, ready for hacking."
-authors = ["Substrate DevHub <https://github.com/substrate-developer-hub>"]
-homepage = "https://substrate.io/"
+description = "The Xcavate Substrate node"
+authors = ["Xcavate Network"]
+homepage = "https://xcavate.io"
 edition = "2021"
 license = "Unlicense"
 publish = false
