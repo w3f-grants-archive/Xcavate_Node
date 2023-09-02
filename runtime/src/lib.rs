@@ -593,7 +593,7 @@ parameter_types! {
 	pub const MaxLoans: u32 = 10000;
 }
 
-/// Configure the pallet-community-loan-pool in pallets/template.
+/// Configure the pallet-community-loan-pool in pallets/community-loan-pool.
 impl pallet_community_loan_pool::Config for Runtime {
 	type PalletId = CommunityLoanPalletId;
 	type Currency = Balances;
@@ -618,7 +618,7 @@ parameter_types! {
 	pub const MinimumRemainingAmount: Balance = DOLLARS;
 }
 
-/// Configure the pallet-xcavate-staking in pallets/template.
+/// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
 impl pallet_xcavate_staking::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = Balances;

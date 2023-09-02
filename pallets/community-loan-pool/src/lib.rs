@@ -17,7 +17,7 @@ mod tests;
 mod benchmarking;
 
 use frame_support::sp_runtime::{
-	traits::{AccountIdConversion, Saturating, StaticLookup, Zero},
+	traits::{AccountIdConversion, StaticLookup, Zero},
 	Permill, RuntimeDebug,
 };
 
@@ -25,13 +25,13 @@ use frame_support::{
 	inherent::Vec,
 	pallet_prelude::*,
 	traits::{
-		Currency, ExistenceRequirement::KeepAlive, Get, Imbalance, OnUnbalanced,
-		ReservableCurrency, UnixTime, WithdrawReasons,
+		Currency, Get, OnUnbalanced,
+		ReservableCurrency, UnixTime,
 	},
 	PalletId,
 };
 
-use sp_std::{collections::btree_map::BTreeMap, prelude::*};
+use sp_std::prelude::*;
 
 type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
 
@@ -66,12 +66,8 @@ impl<CollectionId: From<u32>, ItemId: From<u32>> BenchmarkHelper<CollectionId, I
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	use frame_support::sp_runtime::SaturatedConversion;
 	use frame_system::pallet_prelude::*;
 	use scale_info::TypeInfo;
-
-	#[cfg(feature = "std")]
-	use frame_support::serde::{Deserialize, Serialize};
 
 	type BalanceOf<T> =
 		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -115,7 +111,7 @@ pub mod pallet {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
-		/// The staking balance.
+		/// The currency type.
 		type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
 
 		/// Origin from which rejections must come.
@@ -162,6 +158,7 @@ pub mod pallet {
 	#[pallet::getter(fn proposal_count)]
 	pub(super) type ProposalCount<T> = StorageValue<_, ProposalIndex, ValueQuery>;
 
+	/// All currently ongoing loans
 	#[pallet::storage]
 	#[pallet::getter(fn ongoing_loans)]
 	pub(super) type OngoingLoans<T: Config> =
@@ -178,6 +175,7 @@ pub mod pallet {
 		OptionQuery,
 	>;
 
+	/// Mapping of ongoing loans
 	#[pallet::storage]
 	#[pallet::getter(fn loans)]
 	pub(super) type Loans<T: Config> = StorageMap<
@@ -299,7 +297,7 @@ pub mod pallet {
 		}
 
 		/// Approve a proposed spend. The original deposit will be released.
-		/// It will call the create_loan function in the contract and deposit the proposal amount in
+		/// It will call the create_loan function in the contract and deposit the loan amount in
 		/// the contract.
 		///
 		/// May only be called from `T::ApproveOrigin`.
@@ -319,7 +317,7 @@ pub mod pallet {
 			storage_deposit_limit: Option<BalanceOf1<T>>,
 			gas_limit: Weight,
 		) -> DispatchResult {
-			let signer = ensure_signed(origin.clone())?;
+			let _signer = ensure_signed(origin.clone())?;
 			//T::ApproveOrigin::ensure_origin(origin.clone())?;
 			let proposal = <Proposals<T>>::take(&proposal_index).ok_or(Error::<T>::InvalidIndex)?;
 			let err_amount =
@@ -327,9 +325,6 @@ pub mod pallet {
 			debug_assert!(err_amount.is_zero());
 			let user = proposal.beneficiary;
 			let value = proposal.amount;
-			let contract = <T::Lookup as frame_support::sp_runtime::traits::StaticLookup>::unlookup(
-				dest.clone(),
-			);
 			let timestamp = T::TimeProvider::now().as_secs();
 
 			let loan_info = LoanInfo {
@@ -345,7 +340,8 @@ pub mod pallet {
 
 			Loans::<T>::insert(loan_index, loan_info);
 			OngoingLoans::<T>::try_append(loan_index).map_err(|_| Error::<T>::TooManyLoans)?;
-
+			/// calls the create collection function from the uniques pallet, and set the admin as
+			/// the admin of the collection
 			pallet_uniques::Pallet::<T>::do_create_collection(
 				collection_id,
 				admin.clone(),
@@ -358,14 +354,12 @@ pub mod pallet {
 					collection: collection_id,
 				},
 			)?;
+			/// calls the mint collection function from the uniques pallet, mints a nft and puts
+			/// the loan contract as the owner
 			pallet_uniques::Pallet::<T>::do_mint(collection_id, item_id, dest.clone(), |_| Ok(()))?;
-			let mut imbalance = <PositiveImbalanceOf<T>>::zero();
 
-			//imbalance.subsume(<T as pallet::Config>::Currency::deposit_creating(&dest.clone(), value_funds));
-			// let gas_limit= 10_000_000_000;
 			let palled_id = Self::account_id();
 			let value = proposal.amount;
-			///let value2: BalanceOf1<T> = Default::default();
 			let mut arg1_enc: Vec<u8> = admin.encode();
 			let mut arg2_enc: Vec<u8> = user.encode();
 			let mut arg3_enc: Vec<u8> = collection_id.clone().encode();
@@ -382,6 +376,7 @@ pub mod pallet {
 			data.append(&mut arg5_enc);
 			data.append(&mut arg6_enc);
 
+			/// Calls the creat loan function of the loan smart contract
 			pallet_contracts::Pallet::<T>::bare_call(
 				palled_id.clone(),
 				dest.clone(),
@@ -406,7 +401,7 @@ pub mod pallet {
 		#[pallet::call_index(3)]
 		#[pallet::weight(0)]
 		pub fn delete_loan(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
-			let signer = ensure_signed(origin.clone())?;
+			let _signer = ensure_signed(origin.clone())?;
 			let loan = <Loans<T>>::take(&loan_id).ok_or(Error::<T>::InvalidIndex)?;
 
 			let collection_id = loan.collection_id;
@@ -443,7 +438,7 @@ pub mod pallet {
 		pub fn charge_apy() -> DispatchResult {
 			let ongoing_loans = Self::ongoing_loans();
 			let mut index = 0;
-			for i in ongoing_loans.clone() {
+			for _i in ongoing_loans.clone() {
 				let loan_index = ongoing_loans[index];
 				let mut loan = <Loans<T>>::take(&loan_index).ok_or(Error::<T>::InvalidIndex)?;
 				let current_timestamp = T::TimeProvider::now().as_secs();

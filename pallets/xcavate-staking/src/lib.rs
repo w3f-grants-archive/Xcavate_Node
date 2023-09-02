@@ -17,8 +17,7 @@ mod tests;
 mod benchmarking;
 
 use frame_support::sp_runtime::{
-	traits::{AccountIdConversion, SaturatedConversion, Zero},
-	Perbill,
+	traits::Zero,
 };
 
 use frame_support::{
@@ -26,9 +25,9 @@ use frame_support::{
 	traits::{Get, ReservableCurrency},
 };
 
-use frame_support::traits::{OnTimestampSet, Time, UnixTime};
+use frame_support::traits::UnixTime;
 
-use sp_std::{collections::btree_map::BTreeMap, prelude::*};
+use sp_std::prelude::*;
 
 pub type Balance = u128;
 
@@ -47,7 +46,6 @@ pub mod pallet {
 
 	use frame_support::{
 		dispatch::DispatchResultWithPostInfo,
-		pallet_prelude::*,
 		traits::{Currency, LockIdentifier, LockableCurrency, WithdrawReasons},
 	};
 
@@ -126,7 +124,7 @@ pub mod pallet {
 			let available_balance = Self::available_staking_balance(&staker, &ledger);
 			let value_to_stake = value.min(available_balance);
 
-			let mut timestamp = T::TimeProvider::now().as_secs();
+			let timestamp = T::TimeProvider::now().as_secs();
 
 			ensure!(value_to_stake > 0, Error::<T>::StakingWithNoValue);
 
