@@ -228,20 +228,26 @@ pub mod pallet {
 		Approved { proposal_index: ProposalIndex },
 		/// Proposal has been rejected
 		Rejected { proposal_index: ProposalIndex },
+		/// Loan has been deleted
+		Deleted { loan_index: LoanIndex },
+		/// Charged APY
+		ApyCharged {loan_index: LoanIndex},
 	}
 
 	// Work in progress, to be included in the future
-	/*  	#[pallet::hooks]
+	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		/// ## Complexity
 		/// - `O(A)` where `A` is the number of approvals
 		fn on_initialize(n: frame_system::pallet_prelude::BlockNumberFor<T>) -> Weight {
-			Self::charge_apy();
 			let used_weight = T::DbWeight::get().writes(1);
 			used_weight
-
 		}
-	}  */
+
+		fn on_finalize(_: T::BlockNumber) {
+			Self::charge_apy();
+		}
+	}  
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
@@ -415,6 +421,7 @@ pub mod pallet {
 
 			OngoingLoans::<T>::put(loans);
 			Loans::<T>::remove(loan_id);
+			Self::deposit_event(Event::<T>::Deleted { loan_index: loan_id });
 			Ok(())
 		}
 	}
@@ -449,6 +456,8 @@ pub mod pallet {
 				let interest_balance = Self::u64_to_balance_option(interests).unwrap();
 				loan.amount = loan.amount + interest_balance;
 				loan.last_timestamp = current_timestamp;
+				Loans::<T>::insert(loan_index, loan);
+				Self::deposit_event(Event::<T>::ApyCharged{loan_index});
 				index += 1;
 			}
 			Ok(())
