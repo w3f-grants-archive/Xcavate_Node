@@ -26,6 +26,9 @@ frame-system = { version = "4.0.0-dev", default-features = false, git = "https:/
 pallet-balances = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v1.0.0" }
 sp-std = { default-features = false, version = "5.0.0", git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.36" }
 
+# Local dependencies
+pallet-community-loan-pool = { path = "../community-loan-pool", default-features = false }
+
 [dev-dependencies]
 sp-core = { version = "7.0.0", git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v1.0.0" }
 sp-io = { version = "7.0.0", git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v1.0.0" }
@@ -41,6 +44,7 @@ std = [
 	"scale-info/std",
 	"pallet-balances/std",
 	"sp-std/std",
+	"pallet-community-loan-pool/std",
 ]
 runtime-benchmarks = ["frame-benchmarking/runtime-benchmarks"]
 try-runtime = ["frame-support/try-runtime"]

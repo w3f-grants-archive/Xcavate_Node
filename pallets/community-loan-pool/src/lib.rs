@@ -244,7 +244,7 @@ pub mod pallet {
 			used_weight
 		}
 
-		fn on_finalize(_: T::BlockNumber) {
+		fn on_finalize(_: frame_system::pallet_prelude::BlockNumberFor<T>) {
 			Self::charge_apy();
 		}
 	}  

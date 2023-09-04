@@ -5336,6 +5336,7 @@ dependencies = [
  "frame-support",
  "frame-system",
  "pallet-balances",
+ "pallet-community-loan-pool",
  "parity-scale-codec",
  "scale-info",
  "sp-core",
