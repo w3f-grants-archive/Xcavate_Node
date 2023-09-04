@@ -93,12 +93,12 @@ pub mod pallet {
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
 	pub struct LoanInfo<AccountId, Balance, CollectionId, ItemId> {
-		borrower: AccountId,
-		amount: Balance,
-		collection_id: CollectionId,
-		item_id: ItemId,
-		loan_apy: LoanApy,
-		last_timestamp: u64,
+		pub borrower: AccountId,
+		pub amount: Balance,
+		pub collection_id: CollectionId,
+		pub item_id: ItemId,
+		pub loan_apy: LoanApy,
+		pub last_timestamp: u64,
 	}
 
 	#[pallet::pallet]
@@ -237,8 +237,7 @@ pub mod pallet {
 	// Work in progress, to be included in the future
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-		/// ## Complexity
-		/// - `O(A)` where `A` is the number of approvals
+
 		fn on_initialize(n: frame_system::pallet_prelude::BlockNumberFor<T>) -> Weight {
 			let used_weight = T::DbWeight::get().writes(1);
 			used_weight
