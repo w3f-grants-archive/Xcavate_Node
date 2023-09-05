@@ -65,6 +65,7 @@ pub mod pallet {
 	use super::*;
 	use frame_system::pallet_prelude::*;
 	use scale_info::TypeInfo;
+	use frame_support::sp_runtime::Saturating;
 
 	type BalanceOf<T> =
 		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -156,6 +157,12 @@ pub mod pallet {
 	#[pallet::getter(fn proposal_count)]
 	pub(super) type ProposalCount<T> = StorageValue<_, ProposalIndex, ValueQuery>;
 
+	/// Total amount of loan funds
+	#[pallet::storage]
+	#[pallet::getter(fn total_loan_amount)]
+	pub(super) type TotalLoanAmount<T> = StorageValue<_, u64, ValueQuery>;
+
+
 	/// All currently ongoing loans
 	#[pallet::storage]
 	#[pallet::getter(fn ongoing_loans)]
@@ -211,7 +218,7 @@ pub mod pallet {
 		InsufficientLoanPoolBalance,
 		/// No proposal index
 		InvalidIndex,
-		/// There are too many loan proposals
+		/// The caller doesn't have enough permission
 		InsufficientPermission,
 		/// Max amount of ongoing loan reached
 		TooManyLoans,
@@ -230,9 +237,11 @@ pub mod pallet {
 		Deleted { loan_index: LoanIndex },
 		/// Charged APY
 		ApyCharged { loan_index: LoanIndex },
+		/// Loan has been updated
+		LoanUpdated {loan_index: LoanIndex }, 
 	}
 
-	/* 	// Work in progress, to be included in the future
+	// Work in progress, to be included in the future
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 
@@ -244,7 +253,7 @@ pub mod pallet {
 		fn on_finalize(_: frame_system::pallet_prelude::BlockNumberFor<T>) {
 			Self::charge_apy();
 		}
-	}   */
+	}   
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
@@ -332,7 +341,7 @@ pub mod pallet {
 
 			let loan_info = LoanInfo {
 				borrower: user.clone(),
-				amount: value,
+				amount: value.clone(),
 				collection_id,
 				item_id,
 				loan_apy,
@@ -363,7 +372,6 @@ pub mod pallet {
 			pallet_uniques::Pallet::<T>::do_mint(collection_id, item_id, dest.clone(), |_| Ok(()))?;
 
 			let palled_id = Self::account_id();
-			let value = proposal.amount;
 			let mut arg1_enc: Vec<u8> = admin.encode();
 			let mut arg2_enc: Vec<u8> = user.encode();
 			let mut arg3_enc: Vec<u8> = collection_id.clone().encode();
@@ -392,6 +400,8 @@ pub mod pallet {
 				pallet_contracts::Determinism::Deterministic,
 			)
 			.result?;
+			let new_value = Self::total_loan_amount() + Self::balance_to_u64(value).unwrap();
+			TotalLoanAmount::<T>::put(new_value);
 			Proposals::<T>::remove(proposal_index);
 			LoanCount::<T>::put(loan_index);
 			Self::deposit_event(Event::<T>::Approved { proposal_index });
@@ -405,8 +415,9 @@ pub mod pallet {
 		#[pallet::call_index(3)]
 		#[pallet::weight(0)]
 		pub fn delete_loan(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
-			let _signer = ensure_signed(origin.clone())?;
+			let signer = ensure_signed(origin.clone())?;
 			let loan = <Loans<T>>::take(&loan_id).ok_or(Error::<T>::InvalidIndex)?;
+			ensure!(signer == loan.contract_account_id, Error::<T>::InsufficientPermission);
 
 			let collection_id = loan.collection_id;
 			let item_id = loan.item_id;
@@ -423,39 +434,22 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Updates the loan after an amount of the loan got repaid.
+		///
+		/// May only be called from the loan contract.
+
 		#[pallet::call_index(4)]
 		#[pallet::weight(0)]
-		pub fn charge_interests(
-			origin: OriginFor<T>,
-			loan_index: LoanIndex,
-			dest: T::AccountId,
-			value: BalanceOf<T>,
-			value_funds: BalanceOf1<T>,
-		) -> DispatchResult {
-			let gas_limit: Weight = Weight::from_parts(5000000000, 5000000000);
-			let palled_id = Self::account_id();
-			let mut arg1_enc: Vec<u8> = loan_index.encode();
-			let mut arg2_enc: Vec<u8> = value.encode();
-			let mut data = Vec::new();
-			let mut selector: Vec<u8> = [0xd3, 0x5e, 0x8d, 0x68].into();
-			data.append(&mut selector);
-			data.append(&mut arg1_enc);
-			data.append(&mut arg2_enc);
-			pallet_contracts::Pallet::<T>::bare_call(
-				palled_id.clone(),
-				dest.clone(),
-				value_funds,
-				gas_limit,
-				None,
-				data,
-				false,
-				pallet_contracts::Determinism::Deterministic,
-			)
-			.result?;
-			Self::deposit_event(Event::<T>::ApyCharged { loan_index });
+		pub fn update_loan(origin: OriginFor<T>, loan_id: LoanIndex, amount: BalanceOf<T>) -> DispatchResult {
+			let signer = ensure_signed(origin.clone())?;
+			let mut loan = <Loans<T>>::take(&loan_id).ok_or(Error::<T>::InvalidIndex)?;
+			ensure!(signer == loan.contract_account_id, Error::<T>::InsufficientPermission);
+			loan.amount = loan.amount.saturating_sub(amount);
+			Loans::<T>::insert(loan_id, loan);
+			Self::deposit_event(Event::<T>::LoanUpdated {loan_index: loan_id});
 			Ok(())
 		}
-	}
+	} 
 
 	//** Our helper functions.**//
 
@@ -488,18 +482,20 @@ pub mod pallet {
 				loan.amount = loan.amount + interest_balance;
 				loan.last_timestamp = current_timestamp;
 				Loans::<T>::insert(loan_index, loan.clone());
+				let dest = loan.contract_account_id;
+				let palled_id = Self::account_id();
 				let gas_limit: Weight = Weight::from_parts(5000000000, 5000000000);
 				let value: BalanceOf1<T> = Default::default();
 				let mut arg1_enc: Vec<u8> = loan_index.encode();
-				let mut arg2_enc: Vec<u8> = interests.encode();
+				let mut arg2_enc: Vec<u8> = interest_balance.encode();
 				let mut data = Vec::new();
 				let mut selector: Vec<u8> = [0xd3, 0x5e, 0x8d, 0x68].into();
 				data.append(&mut selector);
 				data.append(&mut arg1_enc);
 				data.append(&mut arg2_enc);
 				pallet_contracts::Pallet::<T>::bare_call(
-					Self::account_id(),
-					loan.contract_account_id,
+					palled_id.clone(),
+					dest.clone(),
 					value,
 					gas_limit,
 					None,

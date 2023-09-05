@@ -252,7 +252,9 @@ pub mod pallet {
 				index += 1;
 			}
 			let average_loan_apy = loan_apys / ongoing_loans.len() as u64;
-			average_loan_apy.try_into().unwrap()
+			let total_amount_loan = pallet_community_loan_pool::Pallet::<T>::total_loan_amount();
+			let loan_apy = total_amount_loan / Self::total_stake() as u64 * average_loan_apy;
+			loan_apy.try_into().unwrap()
 		}
 
 		pub fn claim_rewards() -> DispatchResult {
