@@ -16,9 +16,7 @@ mod tests;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
-use frame_support::sp_runtime::{
-	traits::Zero,
-};
+use frame_support::sp_runtime::traits::Zero;
 
 use frame_support::{
 	pallet_prelude::*,
@@ -58,7 +56,7 @@ pub mod pallet {
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config + pallet_community_loan_pool::Config{
+	pub trait Config: frame_system::Config + pallet_community_loan_pool::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 		/// The lockable currency type.
@@ -84,7 +82,7 @@ pub mod pallet {
 	/// All current stakers
 	#[pallet::storage]
 	#[pallet::getter(fn active_stakers)]
-	pub type ActiveStakers<T: Config> = 
+	pub type ActiveStakers<T: Config> =
 		StorageValue<_, BoundedVec<T::AccountId, T::MaxStakers>, ValueQuery>;
 
 	/// Number of proposals that have been made.
@@ -125,16 +123,15 @@ pub mod pallet {
 	// Work in progress, to be included in the future
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-
 		fn on_initialize(n: frame_system::pallet_prelude::BlockNumberFor<T>) -> Weight {
 			let used_weight = T::DbWeight::get().writes(1);
 			used_weight
 		}
-	
+
 		fn on_finalize(_: frame_system::pallet_prelude::BlockNumberFor<T>) {
 			Self::claim_rewards();
 		}
-	}  
+	}
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
@@ -177,7 +174,12 @@ pub mod pallet {
 		) -> DispatchResultWithPostInfo {
 			let user = ensure_signed(origin)?;
 
-			<T as pallet::Config>::Currency::extend_lock(EXAMPLE_ID, &user, value, WithdrawReasons::all());
+			<T as pallet::Config>::Currency::extend_lock(
+				EXAMPLE_ID,
+				&user,
+				value,
+				WithdrawReasons::all(),
+			);
 
 			Self::deposit_event(Event::ExtendedLock(user, value));
 			Ok(().into())
@@ -219,8 +221,8 @@ pub mod pallet {
 
 	impl<T: Config> Pallet<T> {
 		fn available_staking_balance(staker: &T::AccountId, ledger: &LedgerAccount) -> Balance {
-			let free_balance =
-			<T as pallet::Config>::Currency::free_balance(staker).saturating_sub(T::MinimumRemainingAmount::get());
+			let free_balance = <T as pallet::Config>::Currency::free_balance(staker)
+				.saturating_sub(T::MinimumRemainingAmount::get());
 			free_balance.saturating_sub(ledger.locked)
 		}
 
@@ -229,7 +231,12 @@ pub mod pallet {
 				Ledger::<T>::remove(&staker);
 				<T as pallet::Config>::Currency::remove_lock(EXAMPLE_ID, staker);
 			} else {
-				<T as pallet::Config>::Currency::set_lock(EXAMPLE_ID, staker, ledger.locked, WithdrawReasons::all());
+				<T as pallet::Config>::Currency::set_lock(
+					EXAMPLE_ID,
+					staker,
+					ledger.locked,
+					WithdrawReasons::all(),
+				);
 				Ledger::<T>::insert(staker, ledger);
 			}
 		}
@@ -257,7 +264,8 @@ pub mod pallet {
 				ensure!(ledger.locked > 0, Error::<T>::NoStakedAmount);
 				let apy = Self::calculate_current_apy();
 				let current_timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
-				let rewards = ledger.locked as u64 * apy * (current_timestamp - ledger.timestamp) / 365 / 60 / 60 / 24 / 100;
+				let rewards = ledger.locked as u64 * apy * (current_timestamp - ledger.timestamp) /
+					365 / 60 / 60 / 24 / 100;
 				ledger.locked = ledger.locked + rewards as u128;
 				ledger.timestamp = current_timestamp;
 				Ledger::<T>::insert(staker.clone(), ledger);

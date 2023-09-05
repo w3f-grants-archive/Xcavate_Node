@@ -24,10 +24,7 @@ use frame_support::sp_runtime::{
 use frame_support::{
 	inherent::Vec,
 	pallet_prelude::*,
-	traits::{
-		Currency, Get, OnUnbalanced,
-		ReservableCurrency, UnixTime,
-	},
+	traits::{Currency, Get, OnUnbalanced, ReservableCurrency, UnixTime},
 	PalletId,
 };
 
@@ -99,6 +96,7 @@ pub mod pallet {
 		pub item_id: ItemId,
 		pub loan_apy: LoanApy,
 		pub last_timestamp: u64,
+		pub contract_account_id: AccountId,
 	}
 
 	#[pallet::pallet]
@@ -231,10 +229,10 @@ pub mod pallet {
 		/// Loan has been deleted
 		Deleted { loan_index: LoanIndex },
 		/// Charged APY
-		ApyCharged {loan_index: LoanIndex},
+		ApyCharged { loan_index: LoanIndex },
 	}
 
-	// Work in progress, to be included in the future
+	/* 	// Work in progress, to be included in the future
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 
@@ -246,7 +244,7 @@ pub mod pallet {
 		fn on_finalize(_: frame_system::pallet_prelude::BlockNumberFor<T>) {
 			Self::charge_apy();
 		}
-	}  
+	}   */
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
@@ -339,6 +337,7 @@ pub mod pallet {
 				item_id,
 				loan_apy,
 				last_timestamp: timestamp,
+				contract_account_id: dest.clone(),
 			};
 
 			let loan_index = Self::loan_count() + 1;
@@ -423,6 +422,39 @@ pub mod pallet {
 			Self::deposit_event(Event::<T>::Deleted { loan_index: loan_id });
 			Ok(())
 		}
+
+		#[pallet::call_index(4)]
+		#[pallet::weight(0)]
+		pub fn charge_interests(
+			origin: OriginFor<T>,
+			loan_index: LoanIndex,
+			dest: T::AccountId,
+			value: BalanceOf<T>,
+			value_funds: BalanceOf1<T>,
+		) -> DispatchResult {
+			let gas_limit: Weight = Weight::from_parts(5000000000, 5000000000);
+			let palled_id = Self::account_id();
+			let mut arg1_enc: Vec<u8> = loan_index.encode();
+			let mut arg2_enc: Vec<u8> = value.encode();
+			let mut data = Vec::new();
+			let mut selector: Vec<u8> = [0xd3, 0x5e, 0x8d, 0x68].into();
+			data.append(&mut selector);
+			data.append(&mut arg1_enc);
+			data.append(&mut arg2_enc);
+			pallet_contracts::Pallet::<T>::bare_call(
+				palled_id.clone(),
+				dest.clone(),
+				value_funds,
+				gas_limit,
+				None,
+				data,
+				false,
+				pallet_contracts::Determinism::Deterministic,
+			)
+			.result?;
+			Self::deposit_event(Event::<T>::ApyCharged { loan_index });
+			Ok(())
+		}
 	}
 
 	//** Our helper functions.**//
@@ -455,8 +487,28 @@ pub mod pallet {
 				let interest_balance = Self::u64_to_balance_option(interests).unwrap();
 				loan.amount = loan.amount + interest_balance;
 				loan.last_timestamp = current_timestamp;
-				Loans::<T>::insert(loan_index, loan);
-				Self::deposit_event(Event::<T>::ApyCharged{loan_index});
+				Loans::<T>::insert(loan_index, loan.clone());
+				let gas_limit: Weight = Weight::from_parts(5000000000, 5000000000);
+				let value: BalanceOf1<T> = Default::default();
+				let mut arg1_enc: Vec<u8> = loan_index.encode();
+				let mut arg2_enc: Vec<u8> = interests.encode();
+				let mut data = Vec::new();
+				let mut selector: Vec<u8> = [0xd3, 0x5e, 0x8d, 0x68].into();
+				data.append(&mut selector);
+				data.append(&mut arg1_enc);
+				data.append(&mut arg2_enc);
+				pallet_contracts::Pallet::<T>::bare_call(
+					Self::account_id(),
+					loan.contract_account_id,
+					value,
+					gas_limit,
+					None,
+					data,
+					false,
+					pallet_contracts::Determinism::Deterministic,
+				)
+				.result?;
+				Self::deposit_event(Event::<T>::ApyCharged { loan_index });
 				index += 1;
 			}
 			Ok(())
