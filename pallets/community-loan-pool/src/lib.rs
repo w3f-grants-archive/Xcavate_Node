@@ -30,6 +30,8 @@ use frame_support::{
 
 use sp_std::prelude::*;
 
+use frame_support::sp_runtime::SaturatedConversion;
+
 type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
 
 pub type LoanApy = u64;
@@ -100,6 +102,13 @@ pub mod pallet {
 		pub contract_account_id: AccountId,
 	}
 
+	/// AccountId storage
+	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
+	pub struct PalletIdStorage<AccountId> {
+		pallet_id: AccountId,
+	}
+
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
 
@@ -146,6 +155,10 @@ pub mod pallet {
 		/// lose coupling of pallet timestamp
 		type TimeProvider: UnixTime;
 	}
+
+/* 	#[pallet::storage]
+	#[pallet::getter(fn loan_pool_account)]
+	pub(super) type LoanPoolAccount<T> = StorageValue<_, PalletIdStorage<T::AccountId>, ValueQuery>; */
 
 	/// Number of proposals that have been made.
 	#[pallet::storage]
@@ -250,8 +263,12 @@ pub mod pallet {
 			used_weight
 		}
 
-		fn on_finalize(_: frame_system::pallet_prelude::BlockNumberFor<T>) {
-			Self::charge_apy();
+		fn on_finalize(n: frame_system::pallet_prelude::BlockNumberFor<T>) {
+			let block = n.saturated_into::<u64>();
+			if block % 2 == 0 {
+				Self::charge_apy();
+			}
+			
 		}
 	}   
 

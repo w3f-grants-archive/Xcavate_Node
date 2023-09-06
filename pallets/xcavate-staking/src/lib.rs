@@ -20,10 +20,12 @@ use frame_support::sp_runtime::traits::Zero;
 
 use frame_support::{
 	pallet_prelude::*,
-	traits::{Get, ReservableCurrency},
+	traits::{Get, ExistenceRequirement::KeepAlive, ReservableCurrency},
 };
 
 use frame_support::traits::UnixTime;
+
+use frame_support::sp_runtime::SaturatedConversion;
 
 use sp_std::prelude::*;
 
@@ -128,8 +130,11 @@ pub mod pallet {
 			used_weight
 		}
 
-		fn on_finalize(_: frame_system::pallet_prelude::BlockNumberFor<T>) {
-			Self::claim_rewards();
+		fn on_finalize(n: frame_system::pallet_prelude::BlockNumberFor<T>) {
+			let block = n.saturated_into::<u64>();
+			if block % 2 == 0 {
+				Self::claim_rewards();
+			}
 		}
 	}
 
@@ -234,7 +239,7 @@ pub mod pallet {
 				<T as pallet::Config>::Currency::set_lock(
 					EXAMPLE_ID,
 					staker,
-					ledger.locked,
+					ledger.locked * 1000000000000,
 					WithdrawReasons::all(),
 				);
 				Ledger::<T>::insert(staker, ledger);
@@ -271,6 +276,8 @@ pub mod pallet {
 				ledger.locked = ledger.locked + rewards as u128;
 				ledger.timestamp = current_timestamp;
 				Ledger::<T>::insert(staker.clone(), ledger);
+				let loan_pool_account = pallet_community_loan_pool::Pallet::<T>::account_id();
+				<T as pallet::Config>::Currency::transfer(&loan_pool_account, staker, (rewards*1000000000000).into(), KeepAlive);
 				Self::deposit_event(Event::<T>::RewardsClaimed(rewards.into()));
 				index += 1;
 			}
