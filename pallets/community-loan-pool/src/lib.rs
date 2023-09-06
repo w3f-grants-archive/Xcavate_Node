@@ -65,9 +65,9 @@ impl<CollectionId: From<u32>, ItemId: From<u32>> BenchmarkHelper<CollectionId, I
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
+	use frame_support::sp_runtime::Saturating;
 	use frame_system::pallet_prelude::*;
 	use scale_info::TypeInfo;
-	use frame_support::sp_runtime::Saturating;
 
 	type BalanceOf<T> =
 		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -156,7 +156,7 @@ pub mod pallet {
 		type TimeProvider: UnixTime;
 	}
 
-/* 	#[pallet::storage]
+	/* 	#[pallet::storage]
 	#[pallet::getter(fn loan_pool_account)]
 	pub(super) type LoanPoolAccount<T> = StorageValue<_, PalletIdStorage<T::AccountId>, ValueQuery>; */
 
@@ -174,7 +174,6 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn total_loan_amount)]
 	pub(super) type TotalLoanAmount<T> = StorageValue<_, u64, ValueQuery>;
-
 
 	/// All currently ongoing loans
 	#[pallet::storage]
@@ -251,13 +250,12 @@ pub mod pallet {
 		/// Charged APY
 		ApyCharged { loan_index: LoanIndex },
 		/// Loan has been updated
-		LoanUpdated {loan_index: LoanIndex }, 
+		LoanUpdated { loan_index: LoanIndex },
 	}
 
 	// Work in progress, to be included in the future
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-
 		fn on_initialize(n: frame_system::pallet_prelude::BlockNumberFor<T>) -> Weight {
 			let used_weight = T::DbWeight::get().writes(1);
 			used_weight
@@ -268,9 +266,8 @@ pub mod pallet {
 			if block % 2 == 0 {
 				Self::charge_apy();
 			}
-			
 		}
-	}   
+	}
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
@@ -457,16 +454,22 @@ pub mod pallet {
 
 		#[pallet::call_index(4)]
 		#[pallet::weight(0)]
-		pub fn update_loan(origin: OriginFor<T>, loan_id: LoanIndex, amount: BalanceOf<T>) -> DispatchResult {
+		pub fn update_loan(
+			origin: OriginFor<T>,
+			loan_id: LoanIndex,
+			amount: BalanceOf<T>,
+		) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
 			let mut loan = <Loans<T>>::take(&loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(signer == loan.contract_account_id, Error::<T>::InsufficientPermission);
 			loan.amount = loan.amount.saturating_sub(amount);
 			Loans::<T>::insert(loan_id, loan);
-			Self::deposit_event(Event::<T>::LoanUpdated {loan_index: loan_id});
+			let new_value = Self::total_loan_amount() - Self::balance_to_u64(amount).unwrap();
+			TotalLoanAmount::<T>::put(new_value);
+			Self::deposit_event(Event::<T>::LoanUpdated { loan_index: loan_id });
 			Ok(())
 		}
-	} 
+	}
 
 	//** Our helper functions.**//
 

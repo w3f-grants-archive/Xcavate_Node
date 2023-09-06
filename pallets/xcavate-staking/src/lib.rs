@@ -20,7 +20,7 @@ use frame_support::sp_runtime::traits::Zero;
 
 use frame_support::{
 	pallet_prelude::*,
-	traits::{Get, ExistenceRequirement::KeepAlive, ReservableCurrency},
+	traits::{ExistenceRequirement::KeepAlive, Get, ReservableCurrency},
 };
 
 use frame_support::traits::UnixTime;
@@ -204,7 +204,7 @@ pub mod pallet {
 
 			let minute_timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
 
-			ensure!(ledger.timestamp + 120 < minute_timestamp, Error::<T>::UnlockPeriodNotReached);
+			//ensure!(ledger.timestamp + 120 < minute_timestamp, Error::<T>::UnlockPeriodNotReached);
 			ledger.locked = ledger.locked.saturating_sub(value);
 
 			if ledger.locked.is_zero() {
@@ -277,7 +277,12 @@ pub mod pallet {
 				ledger.timestamp = current_timestamp;
 				Ledger::<T>::insert(staker.clone(), ledger);
 				let loan_pool_account = pallet_community_loan_pool::Pallet::<T>::account_id();
-				<T as pallet::Config>::Currency::transfer(&loan_pool_account, staker, (rewards*1000000000000).into(), KeepAlive);
+				<T as pallet::Config>::Currency::transfer(
+					&loan_pool_account,
+					staker,
+					(rewards * 1000000000000).into(),
+					KeepAlive,
+				);
 				Self::deposit_event(Event::<T>::RewardsClaimed(rewards.into()));
 				index += 1;
 			}
