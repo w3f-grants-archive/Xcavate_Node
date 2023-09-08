@@ -12,6 +12,18 @@ use sp_runtime::{
 	traits::{BlakeTwo256, IdentityLookup},
 };
 
+use pallet_contracts::Schedule;
+
+use pallet_transaction_payment::CurrencyAdapter;
+
+use frame_support::traits::ConstU8;
+
+use frame_support::weights::IdentityFee;
+
+use pallet_transaction_payment::{ConstFeeMultiplier, Multiplier};
+
+use sp_runtime::traits::One;
+
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -22,6 +34,8 @@ pub const BOB: AccountId = 2;
 pub const CHARLIE: AccountId = 3;
 pub const DAVE: AccountId = 4;
 pub const COLLECTION_ID: u32 = 2;
+
+pub type Balance = u128;
 
 // Configure a mock runtime to test the pallet.
 frame_support::construct_runtime!(
@@ -34,6 +48,10 @@ frame_support::construct_runtime!(
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
 		Uniques: pallet_uniques::{Pallet, Call, Storage, Event<T>},
 		CommunityLoanPool: pallet_community_loan_pool,
+		Contracts: pallet_contracts::{Pallet, Call, Storage, Event<T>},
+		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
+		Randomness: pallet_insecure_randomness_collective_flip::{Pallet, Storage},
+		TransactionPayment: pallet_transaction_payment::{Pallet, Storage, Event<T>},
 	}
 );
 
@@ -95,24 +113,36 @@ impl pallet_uniques::Config for Test {
 	type WeightInfo = ();
 }
 
-/* parameter_types! {
+parameter_types! {
+	pub FeeMultiplier: Multiplier = Multiplier::one();
+}
+
+impl pallet_transaction_payment::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type OnChargeTransaction = CurrencyAdapter<Balances, ()>;
+	type OperationalFeeMultiplier = ConstU8<5>;
+	type WeightToFee = IdentityFee<u32>;
+	type LengthToFee = IdentityFee<u32>;
+	type FeeMultiplierUpdate = ConstFeeMultiplier<FeeMultiplier>;
+}
+
+parameter_types! {
 	pub const ContractDeposit: u64 = 16;
 	pub const DeletionQueueDepth: u32 = 1024;
-	pub const DeletionWeightLimit: Weight = 500_000_000_000;
 	pub MySchedule: Schedule<Test> = <Schedule<Test>>::default();
-	pub static DepositPerByte: BalanceOf<Test> = 1;
-	pub const DepositPerItem: BalanceOf<Test> = 2;
-} */
+}
 
-/* impl pallet_contracts::Config for Test {
-	type Time = ();
-	type Randomness = ();
+impl pallet_insecure_randomness_collective_flip::Config for Test {}
+
+impl pallet_contracts::Config for Test {
+	type Time = Timestamp;
+	type Randomness = Randomness;
 	type Currency = Balances;
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeCall = RuntimeCall;
 	type CallFilter = Nothing;
-	type DepositPerItem = DepositPerItem;
-	type DepositPerByte = DepositPerByte;
+	type DepositPerItem = ();
+	type DepositPerByte = ();
 	type CallStack = [pallet_contracts::Frame<Self>; 5];
 	type WeightPrice = ();
 	type WeightInfo = ();
@@ -125,11 +155,22 @@ impl pallet_uniques::Config for Test {
 	type MaxStorageKeyLen = ConstU32<128>;
 	type UnsafeUnstableInterface = ConstBool<false>;
 	type MaxDebugBufferLen = ConstU32<{ 2 * 1024 * 1024 }>;
-} */
+}
+
+parameter_types! {
+	pub const MinimumPeriod: u64 = 1;
+}
+impl pallet_timestamp::Config for Test {
+	type Moment = u64;
+	type OnTimestampSet = ();
+	type MinimumPeriod = MinimumPeriod;
+	type WeightInfo = ();
+}
 
 parameter_types! {
 	pub const ProposalBond: Permill = Permill::from_percent(5);
 	pub const CommunityLoanPalletIdPalletId: PalletId = PalletId(*b"py/cmmty");
+	pub const MaxLoans: u32 = 10000;
 }
 
 impl pallet_community_loan_pool::Config for Test {
@@ -142,6 +183,8 @@ impl pallet_community_loan_pool::Config for Test {
 	type ProposalBondMinimum = ConstU32<10000>;
 	type ProposalBondMaximum = ();
 	type OnSlash = ();
+	type MaxOngoingLoans = MaxLoans;
+	type TimeProvider = Timestamp;
 }
 
 // Build genesis storage according to the mock runtime.

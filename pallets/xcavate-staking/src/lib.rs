@@ -132,7 +132,7 @@ pub mod pallet {
 
 		fn on_finalize(n: frame_system::pallet_prelude::BlockNumberFor<T>) {
 			let block = n.saturated_into::<u64>();
-			if block % 2 == 0 {
+			if block % 10 == 0 {
 				Self::claim_rewards();
 			}
 		}
@@ -204,7 +204,8 @@ pub mod pallet {
 
 			let minute_timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
 
-			//ensure!(ledger.timestamp + 120 < minute_timestamp, Error::<T>::UnlockPeriodNotReached);
+			//ensure!(ledger.timestamp + 120 < minute_timestamp,
+			// Error::<T>::UnlockPeriodNotReached);
 			ledger.locked = ledger.locked.saturating_sub(value);
 
 			if ledger.locked.is_zero() {
@@ -275,13 +276,19 @@ pub mod pallet {
 					365 / 60 / 60 / 24 / 100;
 				ledger.locked = ledger.locked + rewards as u128;
 				ledger.timestamp = current_timestamp;
-				Ledger::<T>::insert(staker.clone(), ledger);
+				Ledger::<T>::insert(staker.clone(), ledger.clone());
 				let loan_pool_account = pallet_community_loan_pool::Pallet::<T>::account_id();
 				<T as pallet::Config>::Currency::transfer(
 					&loan_pool_account,
 					staker,
 					(rewards * 1000000000000).into(),
 					KeepAlive,
+				);
+				<T as pallet::Config>::Currency::set_lock(
+					EXAMPLE_ID,
+					staker,
+					ledger.locked * 1000000000000,
+					WithdrawReasons::all(),
 				);
 				Self::deposit_event(Event::<T>::RewardsClaimed(rewards.into()));
 				index += 1;

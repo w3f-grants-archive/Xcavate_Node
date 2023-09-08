@@ -263,7 +263,7 @@ pub mod pallet {
 
 		fn on_finalize(n: frame_system::pallet_prelude::BlockNumberFor<T>) {
 			let block = n.saturated_into::<u64>();
-			if block % 2 == 0 {
+			if block % 10 == 0 {
 				Self::charge_apy();
 			}
 		}
