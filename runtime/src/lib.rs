@@ -82,9 +82,6 @@ use pallet_transaction_payment::{ConstFeeMultiplier, CurrencyAdapter, Multiplier
 pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
 
-/// Import the template pallet.
-pub use pallet_template;
-
 /// Import the nft pallet
 use pallet_nfts::PalletFeatures;
 
@@ -581,11 +578,6 @@ impl pallet_asset_tx_payment::Config for Runtime {
 impl pallet_sudo::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeCall = RuntimeCall;
-}
-
-/// Configure the pallet-template in pallets/template.
-impl pallet_template::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
 }
 
 parameter_types! {
@@ -1502,8 +1494,6 @@ construct_runtime!(
 		Balances: pallet_balances,
 		TransactionPayment: pallet_transaction_payment,
 		Sudo: pallet_sudo,
-		// Include the custom logic from the pallet-template in the runtime.
-		TemplateModule: pallet_template,
 		CommunityLoanPool: pallet_community_loan_pool,
 		XcavateStaking: pallet_xcavate_staking,
 		Nfts: pallet_nfts,
@@ -1596,7 +1586,7 @@ mod benches {
 		[frame_system, SystemBench::<Runtime>]
 		[pallet_balances, Balances]
 		[pallet_timestamp, Timestamp]
-		[pallet_template, TemplateModule]
+		[pallet_community_loan_pool, CommunityLoanPool]
 		[pallet_nfts, Nfts]
 		[pallet_uniques, Uniques]
 		[pallet_contracts, Contracts]

@@ -44,6 +44,12 @@ pub type PositiveImbalanceOf<T> = <<T as Config>::Currency as Currency<
 	<T as frame_system::Config>::AccountId,
 >>::PositiveImbalance;
 
+pub type BalanceOf<T> =
+		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+
+#[cfg(feature = "runtime-benchmarks")]
+pub struct NftHelper;
+
 #[cfg(feature = "runtime-benchmarks")]
 pub trait BenchmarkHelper<CollectionId, ItemId> {
 	fn to_collection(i: u32) -> CollectionId;
@@ -69,9 +75,7 @@ pub mod pallet {
 	use frame_system::pallet_prelude::*;
 	use scale_info::TypeInfo;
 
-	type BalanceOf<T> =
-		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
-
+	
 	pub type ProposalIndex = u32;
 	pub type LoanIndex = u32;
 
