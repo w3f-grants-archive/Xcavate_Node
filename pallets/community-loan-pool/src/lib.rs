@@ -6,12 +6,15 @@
 /// <https://docs.substrate.io/reference/frame-pallets/>
 /// <https://docs.substrate.io/reference/frame-pallets/>
 pub use pallet::*;
+pub use weights::WeightInfo;
 
 #[cfg(test)]
 mod mock;
 
 #[cfg(test)]
 mod tests;
+pub mod weights;
+pub use weights::*;
 
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
@@ -47,6 +50,10 @@ pub type PositiveImbalanceOf<T> = <<T as Config>::Currency as Currency<
 pub type BalanceOf<T> =
 		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
+type BalanceOf1<T> = <<T as pallet_contracts::Config>::Currency as Currency<
+	<T as frame_system::Config>::AccountId,
+>>::Balance;
+
 #[cfg(feature = "runtime-benchmarks")]
 pub struct NftHelper;
 
@@ -78,10 +85,6 @@ pub mod pallet {
 	
 	pub type ProposalIndex = u32;
 	pub type LoanIndex = u32;
-
-	type BalanceOf1<T> = <<T as pallet_contracts::Config>::Currency as Currency<
-		<T as frame_system::Config>::AccountId,
-	>>::Balance;
 
 	/// A loan proposal
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
@@ -158,6 +161,12 @@ pub mod pallet {
 
 		/// lose coupling of pallet timestamp
 		type TimeProvider: UnixTime;
+
+		/// Type representing the weight of this pallet
+		type WeightInfo: WeightInfo;
+
+		#[cfg(feature = "runtime-benchmarks")]
+		type Helper: crate::BenchmarkHelper<Self::CollectionId, Self::ItemId>;
 	}
 
 	/* 	#[pallet::storage]
@@ -278,7 +287,7 @@ pub mod pallet {
 		/// Apply for a loan. A deposit amount is reserved
 		/// and slashed if the proposal is rejected. It is returned once the proposal is awarded.
 		#[pallet::call_index(0)]
-		#[pallet::weight(0)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::propose())]
 		pub fn propose(
 			origin: OriginFor<T>,
 			amount: BalanceOf<T>,
@@ -308,7 +317,7 @@ pub mod pallet {
 		///
 		/// May only be called from `T::RejectOrigin`.
 		#[pallet::call_index(1)]
-		#[pallet::weight(0)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::reject_proposal())]
 		pub fn reject_proposal(
 			origin: OriginFor<T>,
 			proposal_index: ProposalIndex,

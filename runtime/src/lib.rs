@@ -604,6 +604,9 @@ impl pallet_community_loan_pool::Config for Runtime {
 	type OnSlash = ();
 	type MaxOngoingLoans = MaxLoans;
 	type TimeProvider = Timestamp;
+	type WeightInfo = pallet_community_loan_pool::weights::SubstrateWeight<Runtime>;
+	#[cfg(feature = "runtime-benchmarks")]
+	type Helper = pallet_nft::NftHelper;
 }
 
 parameter_types! {

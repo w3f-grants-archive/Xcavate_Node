@@ -185,6 +185,9 @@ impl pallet_community_loan_pool::Config for Test {
 	type OnSlash = ();
 	type MaxOngoingLoans = MaxLoans;
 	type TimeProvider = Timestamp;
+	type WeightInfo = weights::SubstrateWeight<Test>;
+	#[cfg(feature = "runtime-benchmarks")]
+	type Helper = NftHelper;
 }
 
 // Build genesis storage according to the mock runtime.
