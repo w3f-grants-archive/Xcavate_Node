@@ -48,7 +48,7 @@ pub type PositiveImbalanceOf<T> = <<T as Config>::Currency as Currency<
 >>::PositiveImbalance;
 
 pub type BalanceOf<T> =
-		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
 type BalanceOf1<T> = <<T as pallet_contracts::Config>::Currency as Currency<
 	<T as frame_system::Config>::AccountId,
@@ -82,7 +82,6 @@ pub mod pallet {
 	use frame_system::pallet_prelude::*;
 	use scale_info::TypeInfo;
 
-	
 	pub type ProposalIndex = u32;
 	pub type LoanIndex = u32;
 

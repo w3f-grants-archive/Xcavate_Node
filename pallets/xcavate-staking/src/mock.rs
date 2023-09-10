@@ -6,7 +6,7 @@ use frame_support::{
 	parameter_types,
 	traits::{AsEnsureOriginWithArg, ConstBool, ConstU16, ConstU64, Nothing},
 };
-use sp_core::{ConstU32, H256, ConstU128};
+use sp_core::{ConstU128, ConstU32, H256};
 use sp_runtime::{
 	testing::Header,
 	traits::{BlakeTwo256, IdentityLookup},
@@ -18,8 +18,7 @@ use pallet_transaction_payment::CurrencyAdapter;
 
 use frame_support::traits::ConstU8;
 
-use frame_support::weights::IdentityFee;
-use frame_support::weights;
+use frame_support::{weights, weights::IdentityFee};
 
 use pallet_community_loan_pool::SubstrateWeight;
 
@@ -198,8 +197,8 @@ impl pallet_community_loan_pool::Config for Test {
 	type MaxOngoingLoans = MaxLoans;
 	type TimeProvider = Timestamp;
 	type WeightInfo = SubstrateWeight<Test>;
-	#[cfg(feature = "runtime-benchmarks")]
-	type Helper = NftHelper;
+	/* #[cfg(feature = "runtime-benchmarks")]
+	type Helper = NftHelper; */
 }
 
 parameter_types! {

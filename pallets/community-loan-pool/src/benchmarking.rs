@@ -4,20 +4,18 @@ use super::*;
 
 #[allow(unused)]
 use crate::Pallet as CommunityLoanPool;
-use frame_benchmarking::v1::{benchmarks, account, benchmarks_instance_pallet, BenchmarkError};
+use frame_benchmarking::v1::{account, benchmarks, benchmarks_instance_pallet, BenchmarkError};
 use frame_support::{
 	ensure,
+	sp_runtime::Saturating,
 	traits::{EnsureOrigin, OnInitialize, UnfilteredDispatchable},
 };
 use frame_system::RawOrigin;
-use frame_support::sp_runtime::Saturating;
- use scale_info::Type;
+use scale_info::Type;
 
 const SEED: u32 = 0;
 
-fn setup_proposal<T: Config>(
-	u: u32,
-) -> (T::AccountId, BalanceOf<T>, AccountIdLookupOf<T>) {
+fn setup_proposal<T: Config>(u: u32) -> (T::AccountId, BalanceOf<T>, AccountIdLookupOf<T>) {
 	let caller = account("caller", u, SEED);
 	let value: BalanceOf<T> = T::ProposalBondMinimum::get().saturating_mul(100u32.into());
 	let _ = <T as pallet::Config>::Currency::make_free_balance_be(&caller, value);
@@ -28,7 +26,8 @@ fn setup_proposal<T: Config>(
 
 fn setup_pot_account<T: Config>() {
 	let pot_account = CommunityLoanPool::<T>::account_id();
-	let value = <T as pallet::Config>::Currency::minimum_balance().saturating_mul(1_000_000_000u32.into());
+	let value =
+		<T as pallet::Config>::Currency::minimum_balance().saturating_mul(1_000_000_000u32.into());
 	let _ = <T as pallet::Config>::Currency::make_free_balance_be(&pot_account, value);
 }
 
@@ -52,7 +51,7 @@ benchmarks! {
 		)?;
 		let proposal_id = CommunityLoanPool::<T>::proposal_count();
 		let reject_origin = T::RejectOrigin::try_successful_origin().map_err(|_| BenchmarkError::Weightless)?;
-	}: _<T::RuntimeOrigin>(reject_origin, proposal_id) 
+	}: _<T::RuntimeOrigin>(reject_origin, proposal_id)
 
 /* 	approve_proposal {
 		let (caller, value, beneficiary_lookup) = setup_proposal::<T>(SEED);

@@ -25,13 +25,12 @@ use frame_support::{
 
 use frame_support::traits::UnixTime;
 
-use frame_support::sp_runtime::SaturatedConversion;
-use frame_support::sp_runtime::Saturating;
+use frame_support::sp_runtime::{SaturatedConversion, Saturating};
 
 use sp_std::prelude::*;
 
 pub type BalanceOf<T> =
-		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -77,7 +76,6 @@ pub mod pallet {
 		pub timestamp: u64,
 	}
 
-
 	#[pallet::storage]
 	#[pallet::getter(fn ledger)]
 	pub type Ledger<T: Config> =
@@ -100,13 +98,13 @@ pub mod pallet {
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
 		/// Balance was locked successfully.
-		Locked{staker: <T as frame_system::Config>::AccountId, amount: BalanceOf<T>},
+		Locked { staker: <T as frame_system::Config>::AccountId, amount: BalanceOf<T> },
 		/// Lock was extended successfully.
-		ExtendedLock{staker: <T as frame_system::Config>::AccountId, amount: BalanceOf<T>},
+		ExtendedLock { staker: <T as frame_system::Config>::AccountId, amount: BalanceOf<T> },
 		/// Balance was unlocked successfully.
-		Unlocked{staker: <T as frame_system::Config>::AccountId, amount: BalanceOf<T>},
+		Unlocked { staker: <T as frame_system::Config>::AccountId, amount: BalanceOf<T> },
 		/// Rewards were claimed successfully.
-		RewardsClaimed{amount: BalanceOf<T>},
+		RewardsClaimed { amount: BalanceOf<T> },
 	}
 
 	// Errors inform users that something went wrong.
@@ -150,47 +148,45 @@ pub mod pallet {
 		) -> DispatchResultWithPostInfo {
 			let staker = ensure_signed(origin)?;
 
-			
+			ensure!(!value.is_zero(), Error::<T>::StakingWithNoValue);
 
 			if Self::ledger(&staker) == None {
 				let available_balance = <T as pallet::Config>::Currency::free_balance(&staker)
-				.saturating_sub(T::MinimumRemainingAmount::get());
+					.saturating_sub(T::MinimumRemainingAmount::get());
 
 				let value_to_stake = value.min(available_balance);
 
 				let timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
 
-				let ledger = LedgerAccount {
-					locked: value_to_stake,
-					timestamp,
-				};
+				let ledger = LedgerAccount { locked: value_to_stake, timestamp };
 
 				Self::update_ledger(&staker, ledger);
 
-				Self::deposit_event(Event::Locked{staker, amount: value});
-				return Ok(().into());
-			} 
+				ActiveStakers::<T>::try_append(staker.clone())
+					.map_err(|_| Error::<T>::TooManyStakers);
 
-			let mut ledger = Self::ledger(&staker).unwrap();
+				let total_stake = Self::total_stake();
+				TotalStake::<T>::put(total_stake + value_to_stake);
+			} else {
+				let mut ledger = Self::ledger(&staker).unwrap();
 
-			let available_balance = Self::available_staking_balance(&staker, &ledger);
-			let value_to_stake = value.min(available_balance);
+				let available_balance = Self::available_staking_balance(&staker, &ledger);
+				let value_to_stake = value.min(available_balance);
 
-			let timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
+				let timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
 
-			//ensure!(value_to_stake > 0, Error::<T>::StakingWithNoValue);
+				//ensure!(value_to_stake > 0, Error::<T>::StakingWithNoValue);
 
-			ledger.locked = ledger.locked + value;
-			ledger.timestamp = timestamp;
+				ledger.locked = ledger.locked + value;
+				ledger.timestamp = timestamp;
 
-			Self::update_ledger(&staker, ledger);
+				Self::update_ledger(&staker, ledger);
 
-			ActiveStakers::<T>::try_append(staker.clone()).map_err(|_| Error::<T>::TooManyStakers);
+				let total_stake = Self::total_stake();
+				TotalStake::<T>::put(total_stake + value_to_stake);
+			}
 
-			let total_stake = Self::total_stake();
-			TotalStake::<T>::put(total_stake + value_to_stake);
-
-			Self::deposit_event(Event::Locked{staker, amount: value});
+			Self::deposit_event(Event::Locked { staker, amount: value });
 			Ok(().into())
 		}
 
@@ -209,7 +205,7 @@ pub mod pallet {
 				WithdrawReasons::all(),
 			);
 
-			Self::deposit_event(Event::ExtendedLock{staker: user, amount: value});
+			Self::deposit_event(Event::ExtendedLock { staker: user, amount: value });
 			Ok(().into())
 		}
 
@@ -243,13 +239,16 @@ pub mod pallet {
 			let total_stake = Self::total_stake();
 			TotalStake::<T>::put(total_stake - value);
 
-			Self::deposit_event(Event::Unlocked{staker, amount: value});
+			Self::deposit_event(Event::Unlocked { staker, amount: value });
 			Ok(().into())
 		}
 	}
 
 	impl<T: Config> Pallet<T> {
-		fn available_staking_balance(staker: &T::AccountId, ledger: &LedgerAccount<BalanceOf<T>>) -> BalanceOf<T> {
+		fn available_staking_balance(
+			staker: &T::AccountId,
+			ledger: &LedgerAccount<BalanceOf<T>>,
+		) -> BalanceOf<T> {
 			let free_balance = <T as pallet::Config>::Currency::free_balance(staker)
 				.saturating_sub(T::MinimumRemainingAmount::get());
 			free_balance.saturating_sub(ledger.locked)
@@ -260,13 +259,19 @@ pub mod pallet {
 				Ledger::<T>::remove(&staker);
 				<T as pallet::Config>::Currency::remove_lock(EXAMPLE_ID, staker);
 			} else {
-				<T as pallet::Config>::Currency::set_lock(
-					EXAMPLE_ID,
-					staker,
-					ledger.locked/*  * 1000000000000 */,
-					WithdrawReasons::all(),
-				);
-				Ledger::<T>::insert(staker, ledger);
+				let locking_amount = Self::balance_to_u64(ledger.locked).unwrap() * 1000000000000;
+				if Self::u64_to_balance_option(locking_amount) == None {
+					Ledger::<T>::insert(staker, ledger);
+				} else {
+					<T as pallet::Config>::Currency::set_lock(
+						EXAMPLE_ID,
+						staker,
+						Self::u64_to_balance_option(locking_amount).unwrap(),
+						WithdrawReasons::all(),
+					);
+					Ledger::<T>::insert(staker, ledger);
+				}
+				
 			}
 		}
 
@@ -274,6 +279,9 @@ pub mod pallet {
 			let ongoing_loans = pallet_community_loan_pool::Pallet::<T>::ongoing_loans();
 			let mut index = 0;
 			let mut loan_apys = 0;
+			if ongoing_loans.len() == 0 {
+				return 0
+			}
 			for _i in ongoing_loans.clone() {
 				let loan_index = ongoing_loans[index];
 				let loan = pallet_community_loan_pool::Pallet::<T>::loans(&loan_index).unwrap();
@@ -282,7 +290,8 @@ pub mod pallet {
 			}
 			let average_loan_apy = loan_apys / ongoing_loans.len() as u64;
 			let total_amount_loan = pallet_community_loan_pool::Pallet::<T>::total_loan_amount();
-			let loan_apy = total_amount_loan / Self::balance_to_u64(Self::total_stake()).unwrap() * average_loan_apy;
+			let loan_apy = total_amount_loan / Self::balance_to_u64(Self::total_stake()).unwrap() *
+				average_loan_apy;
 			loan_apy.try_into().unwrap()
 		}
 
@@ -296,7 +305,7 @@ pub mod pallet {
 				let apy = Self::calculate_current_apy();
 				let current_timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
 				let locked_amount = Self::balance_to_u64(ledger.locked).unwrap();
-				let rewards =  locked_amount * apy * (current_timestamp - ledger.timestamp) /
+				let rewards = locked_amount * apy * (current_timestamp - ledger.timestamp) /
 					365 / 60 / 60 / 24 / 100;
 				let new_locked_amount = locked_amount + rewards;
 				ledger.locked = Self::u64_to_balance_option(new_locked_amount).unwrap();
@@ -309,14 +318,17 @@ pub mod pallet {
 					(rewards * 1000000000000).try_into().ok().unwrap(),
 					KeepAlive,
 				);
-				let locking_amount = Self::u64_to_balance_option(new_locked_amount * 1000000000000).unwrap();
+				let locking_amount =
+					Self::u64_to_balance_option(new_locked_amount * 1000000000000).unwrap();
 				<T as pallet::Config>::Currency::set_lock(
 					EXAMPLE_ID,
 					staker,
 					locking_amount,
 					WithdrawReasons::all(),
 				);
-				Self::deposit_event(Event::<T>::RewardsClaimed{amount: rewards.try_into().ok().unwrap()});
+				Self::deposit_event(Event::<T>::RewardsClaimed {
+					amount: rewards.try_into().ok().unwrap(),
+				});
 				index += 1;
 			}
 			Ok(())

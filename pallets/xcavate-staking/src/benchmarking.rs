@@ -3,18 +3,23 @@
 use super::*;
 
 #[allow(unused)]
-use crate::Pallet as Template;
-use frame_benchmarking::v1::{benchmarks, whitelisted_caller};
+use crate::Pallet as XcavateStaking;
+use frame_benchmarking::v1::{benchmarks, account, benchmarks_instance_pallet, BenchmarkError};
+use frame_support::{
+	ensure,
+	traits::{EnsureOrigin, OnInitialize, UnfilteredDispatchable},
+};
 use frame_system::RawOrigin;
+use frame_benchmarking::whitelisted_caller;
 
 benchmarks! {
-	do_something {
-		let s in 0 .. 100;
+	stake {
 		let caller: T::AccountId = whitelisted_caller();
-	}: _(RawOrigin::Signed(caller), s)
+		let value: BalanceOf<T> = 100u32.into();
+	}: _(RawOrigin::Signed(caller), value)
 	verify {
-		assert_eq!(Something::<T>::get(), Some(s));
+		assert_eq!(TotalStake::<T>::get(), 100u32.into());
 	}
 
-	impl_benchmark_test_suite!(Template, crate::mock::new_test_ext(), crate::mock::Test);
+	impl_benchmark_test_suite!(XcavateStaking, crate::mock::new_test_ext(), crate::mock::Test);
 }

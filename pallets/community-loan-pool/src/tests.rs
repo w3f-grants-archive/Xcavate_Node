@@ -57,17 +57,19 @@ fn approve_fails_invalid_index() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_noop!(
-			CommunityLoanPool::approve_proposal(RuntimeOrigin::signed(ALICE),
-			0,
-			0,
-			100,
-			100,
-			0,
-			10,
-			BOB,
-			ALICE,
-			None,
-			5000000000.into(),),
+			CommunityLoanPool::approve_proposal(
+				RuntimeOrigin::signed(ALICE),
+				0,
+				0,
+				100,
+				100,
+				0,
+				10,
+				BOB,
+				ALICE,
+				None,
+				5000000000.into(),
+			),
 			Error::<Test>::InvalidIndex
 		);
 	})
