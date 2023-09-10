@@ -326,6 +326,9 @@ pub mod pallet {
 					locking_amount,
 					WithdrawReasons::all(),
 				);
+				let total_stake = Self::total_stake();
+				let new_total_stake = total_stake + Self::u64_to_balance_option(rewards).unwrap();
+				TotalStake::<T>::put(new_total_stake);
 				Self::deposit_event(Event::<T>::RewardsClaimed {
 					amount: rewards.try_into().ok().unwrap(),
 				});

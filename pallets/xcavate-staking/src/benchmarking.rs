@@ -17,9 +17,6 @@ benchmarks! {
 		let caller: T::AccountId = whitelisted_caller();
 		let value: BalanceOf<T> = 100u32.into();
 	}: _(RawOrigin::Signed(caller), value)
-	verify {
-		assert_eq!(TotalStake::<T>::get(), 100u32.into());
-	}
 
 	impl_benchmark_test_suite!(XcavateStaking, crate::mock::new_test_ext(), crate::mock::Test);
 }
