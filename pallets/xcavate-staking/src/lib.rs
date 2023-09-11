@@ -120,6 +120,8 @@ pub mod pallet {
 		NoStakedAmount,
 		/// Too many stakers
 		TooManyStakers,
+		///
+		NoStaker,
 	}
 
 	// Work in progress, to be included in the future
@@ -132,9 +134,9 @@ pub mod pallet {
 
 		fn on_finalize(n: frame_system::pallet_prelude::BlockNumberFor<T>) {
 			let block = n.saturated_into::<u64>();
-			if block % 10 == 0 {
+			/* if block % 10 == 0 { */
 				Self::claim_rewards();
-			}
+			/* } */
 		}
 	}
 
@@ -217,7 +219,7 @@ pub mod pallet {
 		) -> DispatchResultWithPostInfo {
 			let staker = ensure_signed(origin)?;
 
-			//ensure!(value > 0, Error::<T>::UnstakingWithNoValue);
+			ensure!(Self::ledger(&staker) != None, Error::<T>::NoStaker);
 
 			let mut ledger = Self::ledger(&staker).unwrap();
 

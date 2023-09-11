@@ -266,7 +266,7 @@ pub mod pallet {
 	}
 
 	// Work in progress, to be included in the future
-	#[pallet::hooks]
+/* 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(n: frame_system::pallet_prelude::BlockNumberFor<T>) -> Weight {
 			let used_weight = T::DbWeight::get().writes(1);
@@ -275,11 +275,11 @@ pub mod pallet {
 
 		fn on_finalize(n: frame_system::pallet_prelude::BlockNumberFor<T>) {
 			let block = n.saturated_into::<u64>();
-			if block % 10 == 0 {
+			//if block % 10 == 0 {
 				Self::charge_apy();
-			}
+			//}
 		}
-	}
+	} */
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
