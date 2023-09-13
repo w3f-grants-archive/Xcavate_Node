@@ -33,8 +33,6 @@ use frame_support::{
 
 use sp_std::prelude::*;
 
-use frame_support::sp_runtime::SaturatedConversion;
-
 type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
 
 pub type LoanApy = u64;
@@ -300,9 +298,9 @@ pub mod pallet {
 				.map_err(|_| Error::<T>::InsufficientProposersBalance)?;
 
 			let proposal = Proposal {
-				proposer: origin.clone(),
+				proposer: origin,
 				amount,
-				beneficiary: beneficiary.clone(),
+				beneficiary: beneficiary,
 				bond,
 			};
 			Proposals::<T>::insert(proposal_index, proposal);
@@ -322,7 +320,7 @@ pub mod pallet {
 			proposal_index: ProposalIndex,
 		) -> DispatchResult {
 			T::RejectOrigin::ensure_origin(origin)?;
-			let proposal = <Proposals<T>>::take(&proposal_index).ok_or(Error::<T>::InvalidIndex)?;
+			let proposal = <Proposals<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
 			let value = proposal.bond;
 			let imbalance =
 				<T as pallet::Config>::Currency::slash_reserved(&proposal.proposer, value).0;
@@ -357,7 +355,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let _signer = ensure_signed(origin.clone())?;
 			//T::ApproveOrigin::ensure_origin(origin.clone())?;
-			let proposal = <Proposals<T>>::take(&proposal_index).ok_or(Error::<T>::InvalidIndex)?;
+			let proposal = <Proposals<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
 			let err_amount =
 				<T as pallet::Config>::Currency::unreserve(&proposal.proposer, proposal.bond);
 			debug_assert!(err_amount.is_zero());
@@ -416,7 +414,7 @@ pub mod pallet {
 
 			/// Calls the creat loan function of the loan smart contract
 			pallet_contracts::Pallet::<T>::bare_call(
-				palled_id.clone(),
+				palled_id,
 				dest.clone(),
 				value_funds,
 				gas_limit,
