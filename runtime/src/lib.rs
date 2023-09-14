@@ -18,7 +18,7 @@ use frame_support::{
 	pallet_prelude::{DispatchClass, Get},
 	traits::{
 		tokens::nonfungibles_v2::Inspect, AsEnsureOriginWithArg, ConstU16, EitherOfDiverse,
-		EqualPrivilegeOnly, Nothing, U128CurrencyToVote,
+		EqualPrivilegeOnly, U128CurrencyToVote,
 	},
 	PalletId,
 };
@@ -371,12 +371,10 @@ impl pallet_balances::Config for Runtime {
 }
 //////////////////////////////////////////////Start///////////////////////////////////////////////
 use codec::{Encode, MaxEncodedLen};
-use frame_support::log::{error, trace};
 use frame_system::RawOrigin;
 use pallet_contracts::chain_extension::{
 	ChainExtension, Environment, Ext, InitState, RetVal, SysConfig,
 };
-use sp_core::crypto::UncheckedFrom;
 use sp_runtime::{traits::StaticLookup, DispatchError};
 use sp_std::marker::PhantomData;
 
@@ -449,10 +447,10 @@ where
 
 				let call_result = pallet_uniques::Pallet::<T>::create(
 					raw_origin.into(),
-					collection.into(),
+					collection,
 					admin.into(),
 				);
-				return match call_result {
+				match call_result {
 					Err(e) => return Err(e),
 					Ok(_) => Ok(RetVal::Converging(0)),
 				}
@@ -469,11 +467,11 @@ where
 
 				let call_result = pallet_uniques::Pallet::<T>::transfer(
 					raw_origin.into(),
-					collection.into(),
-					item.into(),
+					collection,
+					item,
 					dest.into(),
 				);
-				return match call_result {
+				match call_result {
 					Err(e) => return Err(e),
 					Ok(_) => Ok(RetVal::Converging(0)),
 				}
@@ -490,11 +488,11 @@ where
 
 				let call_result = pallet_uniques::Pallet::<T>::burn(
 					raw_origin.into(),
-					collection.into(),
-					item.into(),
+					collection,
+					item,
 					Some(check_owner.into()),
 				);
-				return match call_result {
+				match call_result {
 					Err(e) => return Err(e),
 					Ok(_) => Ok(RetVal::Converging(0)),
 				}
@@ -627,9 +625,9 @@ parameter_types! {
 	pub Features: PalletFeatures = PalletFeatures::all_enabled();
 	pub const MaxAttributesPerCall: u32 = 10;
 	pub const CollectionDeposit: Balance = 100 * DOLLARS;
-	pub const ItemDeposit: Balance = 1 * DOLLARS;
+	pub const ItemDeposit: Balance = DOLLARS;
 	pub const MetadataDepositBase: Balance = 10 * DOLLARS;
-	pub const MetadataDepositPerByte: Balance = 1 * DOLLARS;
+	pub const MetadataDepositPerByte: Balance = DOLLARS;
 	pub const StringLimit: u32 = 50;
 	pub const KeyLimit: u32 = 32;
 	pub const ValueLimit: u32 = 256;
@@ -732,7 +730,7 @@ impl pallet_contracts::Config for Runtime {
 parameter_types! {
 	pub const AssetConversionPalletId: PalletId = PalletId(*b"py/ascon");
 	pub const AssetDeposit: Balance = 100 * DOLLARS;
-	pub const ApprovalDeposit: Balance = 1 * DOLLARS;
+	pub const ApprovalDeposit: Balance = DOLLARS;
 
 }
 
@@ -1102,8 +1100,8 @@ impl Get<Option<(usize, ExtendedBalance)>> for OffchainRandomBalancing {
 
 parameter_types! {
 	// phase durations. 1/4 of the last session for each.
-	pub const SignedPhase: u32 = EPOCH_DURATION_IN_BLOCKS as u32 / 4;
-	pub const UnsignedPhase: u32 = EPOCH_DURATION_IN_BLOCKS as u32 / 4;
+	pub const SignedPhase: u32 = EPOCH_DURATION_IN_BLOCKS / 4;
+	pub const UnsignedPhase: u32 = EPOCH_DURATION_IN_BLOCKS / 4;
 	pub BetterUnsignedThreshold: Perbill = Perbill::from_rational(1u32, 10_000);
 
 	// We prioritize im-online heartbeats over election solution submission.

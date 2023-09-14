@@ -300,7 +300,7 @@ pub mod pallet {
 			let proposal = Proposal {
 				proposer: origin,
 				amount,
-				beneficiary: beneficiary,
+				beneficiary,
 				bond,
 			};
 			Proposals::<T>::insert(proposal_index, proposal);
@@ -365,7 +365,7 @@ pub mod pallet {
 
 			let loan_info = LoanInfo {
 				borrower: user.clone(),
-				amount: value.clone(),
+				amount: value,
 				collection_id,
 				item_id,
 				loan_apy,
@@ -377,8 +377,8 @@ pub mod pallet {
 
 			Loans::<T>::insert(loan_index, loan_info);
 			OngoingLoans::<T>::try_append(loan_index).map_err(|_| Error::<T>::TooManyLoans)?;
-			/// calls the create collection function from the uniques pallet, and set the admin as
-			/// the admin of the collection
+			// calls the create collection function from the uniques pallet, and set the admin as
+			// the admin of the collection
 			pallet_uniques::Pallet::<T>::do_create_collection(
 				collection_id,
 				admin.clone(),
@@ -391,8 +391,8 @@ pub mod pallet {
 					collection: collection_id,
 				},
 			)?;
-			/// calls the mint collection function from the uniques pallet, mints a nft and puts
-			/// the loan contract as the owner
+			// calls the mint collection function from the uniques pallet, mints a nft and puts
+			// the loan contract as the owner
 			pallet_uniques::Pallet::<T>::do_mint(collection_id, item_id, dest.clone(), |_| Ok(()))?;
 
 			let palled_id = Self::account_id();
@@ -412,7 +412,7 @@ pub mod pallet {
 			data.append(&mut arg5_enc);
 			data.append(&mut arg6_enc);
 
-			/// Calls the creat loan function of the loan smart contract
+			// Calls the creat loan function of the loan smart contract
 			pallet_contracts::Pallet::<T>::bare_call(
 				palled_id,
 				dest.clone(),
@@ -440,7 +440,7 @@ pub mod pallet {
 		#[pallet::weight(0)]
 		pub fn delete_loan(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
-			let loan = <Loans<T>>::take(&loan_id).ok_or(Error::<T>::InvalidIndex)?;
+			let loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(signer == loan.contract_account_id, Error::<T>::InsufficientPermission);
 
 			let collection_id = loan.collection_id;
@@ -470,7 +470,7 @@ pub mod pallet {
 			amount: BalanceOf<T>,
 		) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
-			let mut loan = <Loans<T>>::take(&loan_id).ok_or(Error::<T>::InvalidIndex)?;
+			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(signer == loan.contract_account_id, Error::<T>::InsufficientPermission);
 			loan.amount = loan.amount.saturating_sub(amount);
 			Loans::<T>::insert(loan_id, loan);
@@ -499,17 +499,16 @@ pub mod pallet {
 		// Work in progress, to be implmented in the future
 		pub fn charge_apy() -> DispatchResult {
 			let ongoing_loans = Self::ongoing_loans();
-			let mut index = 0;
-			for _i in ongoing_loans.clone() {
-				let loan_index = ongoing_loans[index];
-				let mut loan = <Loans<T>>::take(&loan_index).ok_or(Error::<T>::InvalidIndex)?;
+			for i in ongoing_loans {
+				let loan_index = i;
+				let mut loan = <Loans<T>>::take(loan_index).ok_or(Error::<T>::InvalidIndex)?;
 				let current_timestamp = T::TimeProvider::now().as_secs();
 				let time_difference = current_timestamp - loan.last_timestamp;
 				let loan_amount = Self::balance_to_u64(loan.amount).unwrap();
 				let interests =
 					loan_amount * time_difference * loan.loan_apy / 365 / 60 / 60 / 24 / 100;
 				let interest_balance = Self::u64_to_balance_option(interests).unwrap();
-				loan.amount = loan.amount + interest_balance;
+				loan.amount += interest_balance;
 				loan.last_timestamp = current_timestamp;
 				Loans::<T>::insert(loan_index, loan.clone());
 				let dest = loan.contract_account_id;
@@ -535,7 +534,6 @@ pub mod pallet {
 				)
 				.result?;
 				Self::deposit_event(Event::<T>::ApyCharged { loan_index });
-				index += 1;
 			}
 			Ok(())
 		}
