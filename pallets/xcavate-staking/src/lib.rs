@@ -284,6 +284,9 @@ pub mod pallet {
 			}
 			let average_loan_apy = loan_apys / ongoing_loans.len() as u64;
 			let total_amount_loan = pallet_community_loan_pool::Pallet::<T>::total_loan_amount();
+			if total_amount_loan == 0 {
+				return 0
+			}
 			total_amount_loan / Self::balance_to_u64(Self::total_stake()).unwrap() *
 				average_loan_apy
 		}
