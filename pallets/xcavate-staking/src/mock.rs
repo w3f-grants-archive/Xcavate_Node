@@ -1,12 +1,11 @@
 use super::*;
 
 use crate as pallet_xcavate_staking;
-use crate::Pallet;
 use frame_support::{
 	parameter_types,
 	traits::{AsEnsureOriginWithArg, ConstBool, ConstU16, ConstU64, Nothing},
 };
-use sp_core::{ConstU128, ConstU32, H256};
+use sp_core::{ConstU32, H256};
 use sp_runtime::{
 	testing::Header,
 	traits::{BlakeTwo256, IdentityLookup},
@@ -18,7 +17,7 @@ use pallet_transaction_payment::CurrencyAdapter;
 
 use frame_support::traits::ConstU8;
 
-use frame_support::{weights, weights::IdentityFee};
+use frame_support::weights::IdentityFee;
 
 use pallet_community_loan_pool::SubstrateWeight;
 
@@ -39,13 +38,6 @@ pub const ALICE: AccountId = 1;
 pub const BOB: AccountId = 2;
 pub const CHARLIE: AccountId = 3;
 pub const DAVE: AccountId = 4;
-pub const COLLECTION_ID: u32 = 2;
-
-pub type Balance = u128;
-
-pub const MILLICENTS: Balance = 100_000_000_000_000;
-pub const CENTS: Balance = 1_000 * MILLICENTS; // assume this is worth about a cent.
-pub const DOLLARS: Balance = 100 * CENTS;
 
 // Configure a mock runtime to test the pallet.
 frame_support::construct_runtime!(

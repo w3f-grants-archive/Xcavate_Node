@@ -1,7 +1,6 @@
 use super::*;
 
 use crate as pallet_community_loan_pool;
-use crate::Pallet;
 use frame_support::{
 	parameter_types,
 	traits::{AsEnsureOriginWithArg, ConstBool, ConstU16, ConstU64, Nothing},
@@ -33,9 +32,6 @@ pub const ALICE: AccountId = 1;
 pub const BOB: AccountId = 2;
 pub const CHARLIE: AccountId = 3;
 pub const DAVE: AccountId = 4;
-pub const COLLECTION_ID: u32 = 2;
-
-pub type Balance = u128;
 
 // Configure a mock runtime to test the pallet.
 frame_support::construct_runtime!(

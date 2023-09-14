@@ -1,6 +1,5 @@
 use crate::{mock::*, Error, Event};
-use frame_support::{assert_noop, assert_ok, BoundedVec};
-use sp_core::ConstU32;
+use frame_support::{assert_noop, assert_ok};
 
 #[test]
 fn propose_works() {
@@ -11,6 +10,7 @@ fn propose_works() {
 	})
 }
 
+#[test]
 fn propose_doesnt_work_not_enough_userbalance() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
