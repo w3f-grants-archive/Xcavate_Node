@@ -83,6 +83,8 @@ pallet-scheduler = { version = "4.0.0-dev", default-features = false, git = "htt
 pallet-preimage = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v1.0.0" }
 pallet-referenda = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v1.0.0" }
 pallet-conviction-voting = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v1.0.0" }
+pallet-acurast-fulfillment-receiver = { git = "https://github.com/Acurast/acurast-core.git", default-features = false, branch = "develop" }
+acurast-p256-crypto = { git = "https://github.com/Acurast/acurast-core.git", default-features = false, branch = "develop" }
 
 # Used for the node template's RPCs
 frame-system-rpc-runtime-api = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v1.0.0" }
@@ -173,6 +175,8 @@ std = [
 	"pallet-preimage/std",
 	"pallet-referenda/std",
 	"pallet-conviction-voting/std",
+	"pallet-acurast-fulfillment-receiver/std",
+	"acurast-p256-crypto/std",
 ]
 runtime-benchmarks = [
 	"frame-benchmarking/runtime-benchmarks",

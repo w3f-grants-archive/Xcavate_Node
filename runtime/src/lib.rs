@@ -22,6 +22,9 @@ use frame_support::{
 	},
 	PalletId,
 };
+// use acurast_p256_crypto::MultiSignature;
+use pallet_acurast_fulfillment_receiver::Fulfillment;
+
 use frame_system::{
 	limits::BlockWeights as SystemBlockWeights, EnsureRoot, EnsureSigned, EnsureSignedBy,
 	EnsureWithSuccess,
@@ -52,7 +55,6 @@ use sp_std::prelude::*;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
-
 /// Implementations of some helper traits passed into runtime modules as associated types.
 pub mod impls;
 use impls::CreditToBlockAuthor;
@@ -1480,6 +1482,23 @@ impl pallet_preimage::Config for Runtime {
 
 // TODO:
 
+
+pub struct OnAcurastFulfillment;
+impl pallet_acurast_fulfillment_receiver::traits::OnFulfillment<Runtime> for OnAcurastFulfillment {
+	fn on_fulfillment(
+		_from: <Runtime as frame_system::Config>::AccountId,
+		_fulfillment: Fulfillment,
+	) -> DispatchResultWithInfo<PostDispatchInfo> {
+		Ok(PostDispatchInfo { actual_weight: None, pays_fee: Pays::No })
+	}
+}
+
+impl pallet_acurast_fulfillment_receiver::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type OnFulfillment = OnAcurastFulfillment;
+	type WeightInfo = ();
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub struct Runtime
@@ -1535,6 +1554,9 @@ construct_runtime!(
 		// TODO::
 		// AssetConversionTxPayment: pallet_asset_conversion_tx_payment,
 		// AssetConversion: pallet_asset_conversion,
+
+		// Acurast
+		AcurastReceiver: pallet_acurast_fulfillment_receiver::{Pallet, Call, Storage, Event<T>} = 40,
 
 	}
 );
