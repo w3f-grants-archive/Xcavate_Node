@@ -13,6 +13,7 @@ mod voter_bags;
 use constants::{currency::*, time::*};
 use frame_election_provider_support::{onchain, ExtendedBalance, SequentialPhragmen, VoteWeight};
 use frame_support::{
+	dispatch::{PostDispatchInfo, Pays },
 	instances::{Instance1, Instance2},
 	ord_parameter_types,
 	pallet_prelude::{DispatchClass, Get},
@@ -49,7 +50,7 @@ use sp_runtime::{
 		IdentifyAccount, NumberFor, One, OpaqueKeys, Verify,
 	},
 	transaction_validity::{TransactionPriority, TransactionSource, TransactionValidity},
-	ApplyExtrinsicResult, FixedU128, MultiSignature, Percent,
+	ApplyExtrinsicResult, FixedU128, MultiSignature, Percent, DispatchResultWithInfo
 };
 use sp_std::prelude::*;
 #[cfg(feature = "std")]
