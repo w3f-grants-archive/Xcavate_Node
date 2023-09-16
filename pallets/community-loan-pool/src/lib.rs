@@ -147,6 +147,9 @@ pub mod pallet {
 		/// Origin from which approves must come.
 		type ApproveOrigin: EnsureOrigin<Self::RuntimeOrigin>;
 
+		/// Origin who can add or remove committee members
+		type CommitteeOrigin: EnsureOrigin<Self::RuntimeOrigin>;
+
 		/// Fraction of a proposal's value that should be bonded in order to place the proposal.
 		/// An accepted proposal gets these back. A rejected proposal does not.
 		#[pallet::constant]
@@ -179,11 +182,23 @@ pub mod pallet {
 
 		#[cfg(feature = "runtime-benchmarks")]
 		type Helper: crate::BenchmarkHelper<Self::CollectionId, Self::ItemId>;
+
+		/// The amount of time given to vote for a proposal
+		type VotingTime: Get<Self::BlockNumber>;
+
+		/// The maximum amount of commitee members
+		type MaxCommitteeMembers: Get<u32>;
 	}
 
 	/* 	#[pallet::storage]
 	#[pallet::getter(fn loan_pool_account)]
 	pub(super) type LoanPoolAccount<T> = StorageValue<_, PalletIdStorage<T::AccountId>, ValueQuery>; */
+
+	/// Vec of admins who are able to vote
+	#[pallet::storage]
+	#[pallet::getter(fn voting_committee)]
+	pub(super) type VotingCommittee<T: Config> =
+		StorageValue<_, BoundedVec<T::AccountId, T::MaxOngoingLoans>, ValueQuery>;
 
 	/// Number of proposals that have been made.
 	#[pallet::storage]
@@ -194,6 +209,12 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn proposal_count)]
 	pub(super) type ProposalCount<T> = StorageValue<_, ProposalIndex, ValueQuery>;
+
+	/// Proposals with won the voting
+	#[pallet::storage]
+	#[pallet::getter(fn evaluated_loans)]
+	pub(super) type EvaluatedLoans<T: Config> =
+		StorageValue<_, BoundedVec<ProposalIndex, T::MaxOngoingLoans>, ValueQuery>;
 
 	/// Total amount of loan funds
 	#[pallet::storage]
@@ -240,6 +261,16 @@ pub mod pallet {
 	pub(super) type UserVotes<T: Config> =
 		StorageMap<_, Twox64Concat, (ProposalIndex, T::AccountId), Vote, OptionQuery>;
 
+	/// Stores the project keys and round types ending on a given block
+	#[pallet::storage]
+	pub type RoundsExpiring<T: Config> = StorageMap<
+		_,
+		Blake2_128Concat,
+		BlockNumberFor<T>,
+		BoundedVec<ProposalIndex, T::MaxOngoingLoans>,
+		ValueQuery,
+	>;
+
 	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
 	pub struct GenesisConfig<T: Config> {
@@ -273,6 +304,12 @@ pub mod pallet {
 		TooManyLoans,
 		/// User has already voted
 		AlreadyVoted,
+		/// Loan got not approved
+		NotApproved,
+		/// The account is already a member in the voting committee
+		AlreadyMember,
+		/// There are already enough committee members
+		TooManyMembers,
 	}
 
 	#[pallet::event]
@@ -295,8 +332,24 @@ pub mod pallet {
 	// Work in progress, to be included in the future
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-		fn on_initialize(_n: frame_system::pallet_prelude::BlockNumberFor<T>) -> Weight {
-			T::DbWeight::get().writes(1)
+		fn on_initialize(n: frame_system::pallet_prelude::BlockNumberFor<T>) -> Weight {
+			let mut weight = T::DbWeight::get().reads_writes(1, 1);
+
+			let ended_votings = RoundsExpiring::<T>::take(n);
+
+			ended_votings.iter().for_each(|item| {
+				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
+				let mut voting_result = <OngoingVotes<T>>::take(item);
+				if voting_result.is_some() {
+					if voting_result.clone().unwrap().yes_votes > voting_result.unwrap().no_votes {
+						EvaluatedLoans::<T>::try_append(item);
+					} else {
+						Self::reject_loan_proposal(*item);
+					}
+					OngoingVotes::<T>::remove(item);
+				}			
+			});
+			weight
 		}
 
 		fn on_finalize(_n: frame_system::pallet_prelude::BlockNumberFor<T>) {
@@ -325,39 +378,27 @@ pub mod pallet {
 			<T as pallet::Config>::Currency::reserve(&origin, bond)
 				.map_err(|_| Error::<T>::InsufficientProposersBalance)?;
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
+			let expiry_block =
+				current_block_number.saturating_add(<T as Config>::VotingTime::get());
 
-			let proposal =
-				Proposal { proposer: origin, amount, beneficiary, bond, created_at: current_block_number };
+			RoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
+				keys.try_push(proposal_index).map_err(|_| Error::<T>::TooManyLoans)?;
+				Ok::<(), DispatchError>(())
+			})?;
+
+			let proposal = Proposal {
+				proposer: origin,
+				amount,
+				beneficiary,
+				bond,
+				created_at: current_block_number,
+			};
 			let vote_stats = VoteStats { yes_votes: 0, no_votes: 0 };
 			OngoingVotes::<T>::insert(proposal_index, vote_stats);
 			Proposals::<T>::insert(proposal_index, proposal);
 			ProposalCount::<T>::put(proposal_index);
 
 			Self::deposit_event(Event::Proposed { proposal_index });
-			Ok(())
-		}
-
-		/// Let people vote for a proposal
-		#[pallet::call_index(5)]
-		#[pallet::weight(0)]
-		pub fn vote_on_proposal(
-			origin: OriginFor<T>,
-			proposal_index: ProposalIndex,
-			vote: Vote,
-		) -> DispatchResult {
-			let origin = ensure_signed(origin)?;
-			let mut current_vote =
-				<OngoingVotes<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
-			let voted = <UserVotes<T>>::get((proposal_index, origin.clone()));
-			ensure!(voted.is_none(), Error::<T>::AlreadyVoted);
-			if vote == Vote::Yes {
-				current_vote.yes_votes += 1;
-			} else {
-				current_vote.no_votes += 1;
-			};
-
-			UserVotes::<T>::insert((proposal_index, origin), vote);
-			OngoingVotes::<T>::insert(proposal_index, current_vote);
 			Ok(())
 		}
 
@@ -371,15 +412,13 @@ pub mod pallet {
 			proposal_index: ProposalIndex,
 		) -> DispatchResult {
 			T::RejectOrigin::ensure_origin(origin)?;
-			let proposal = <Proposals<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
-			let value = proposal.bond;
-			let imbalance =
-				<T as pallet::Config>::Currency::slash_reserved(&proposal.proposer, value).0;
-			T::OnSlash::on_unbalanced(imbalance);
-
-			Proposals::<T>::remove(proposal_index);
-
-			Self::deposit_event(Event::<T>::Rejected { proposal_index });
+			Self::reject_loan_proposal(proposal_index)?;
+			OngoingVotes::<T>::remove(proposal_index);
+			let mut evaluated_loans = Self::evaluated_loans();
+			let index = evaluated_loans.iter().position(|x| *x == proposal_index);
+			if index.is_some() {
+				evaluated_loans.remove(index.unwrap());
+			};
 			Ok(())
 		}
 
@@ -407,6 +446,12 @@ pub mod pallet {
 			let _signer = ensure_signed(origin.clone())?;
 			//T::ApproveOrigin::ensure_origin(origin.clone())?;
 			let proposal = <Proposals<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
+			let mut evaluated_loans = Self::evaluated_loans();
+			ensure!(evaluated_loans.contains(&proposal_index), Error::<T>::NotApproved);
+			let index = evaluated_loans.iter().position(|x| *x == proposal_index).unwrap();
+			evaluated_loans.remove(index);
+
+			EvaluatedLoans::<T>::put(evaluated_loans);
 			let err_amount =
 				<T as pallet::Config>::Currency::unreserve(&proposal.proposer, proposal.bond);
 			debug_assert!(err_amount.is_zero());
@@ -530,6 +575,46 @@ pub mod pallet {
 			Self::deposit_event(Event::<T>::LoanUpdated { loan_index: loan_id });
 			Ok(())
 		}
+
+		/// Let committee members vote for a proposal
+		#[pallet::call_index(5)]
+		#[pallet::weight(0)]
+		pub fn vote_on_proposal(
+			origin: OriginFor<T>,
+			proposal_index: ProposalIndex,
+			vote: Vote,
+		) -> DispatchResult {
+			let origin = ensure_signed(origin)?;
+			let current_members = Self::voting_committee();
+			ensure!(current_members.contains(&origin), Error::<T>::InsufficientPermission);
+			let mut current_vote =
+				<OngoingVotes<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
+			let voted = <UserVotes<T>>::get((proposal_index, origin.clone()));
+			ensure!(voted.is_none(), Error::<T>::AlreadyVoted);
+			if vote == Vote::Yes {
+				current_vote.yes_votes += 1;
+			} else {
+				current_vote.no_votes += 1;
+			};
+
+			UserVotes::<T>::insert((proposal_index, origin), vote);
+			OngoingVotes::<T>::insert(proposal_index, current_vote);
+			Ok(())
+		}
+
+		/// Adding a new address to the vote committee
+		#[pallet::call_index(6)]
+		#[pallet::weight(0)]
+		pub fn add_committee_member(
+			origin: OriginFor<T>,
+			member: T::AccountId,
+		) -> DispatchResult {
+			T::CommitteeOrigin::ensure_origin(origin)?;
+			let current_members = Self::voting_committee();
+			ensure!(!current_members.contains(&member), Error::<T>::AlreadyMember);
+			VotingCommittee::<T>::try_append(member).map_err(|_| Error::<T>::TooManyMembers)?;
+			Ok(())
+		}
 	}
 
 	//** Our helper functions.**//
@@ -545,6 +630,19 @@ pub mod pallet {
 				r = r.min(m);
 			}
 			r
+		}
+
+		fn reject_loan_proposal(proposal_index: ProposalIndex) -> DispatchResult {
+			let proposal = <Proposals<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
+			let value = proposal.bond;
+			let imbalance =
+				<T as pallet::Config>::Currency::slash_reserved(&proposal.proposer, value).0;
+			T::OnSlash::on_unbalanced(imbalance);
+
+			Proposals::<T>::remove(proposal_index);
+
+			Self::deposit_event(Event::<T>::Rejected { proposal_index });
+			Ok(())
 		}
 
 		// Work in progress, to be implmented in the future

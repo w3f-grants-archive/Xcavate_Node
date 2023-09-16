@@ -581,6 +581,8 @@ impl pallet_sudo::Config for Runtime {
 parameter_types! {
 	pub const CommunityLoanPalletId: PalletId = PalletId(*b"py/loana");
 	pub const MaxLoans: u32 = 10000;
+	pub const VotingTime: BlockNumber = 20;
+	pub const MaximumCommitteeMembers: u32 = 10;
 }
 
 /// Configure the pallet-community-loan-pool in pallets/community-loan-pool.
@@ -595,6 +597,10 @@ impl pallet_community_loan_pool::Config for Runtime {
 		EnsureRoot<AccountId>,
 		pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>,
 	>;
+	type CommitteeOrigin = EitherOfDiverse<
+		EnsureRoot<AccountId>,
+		pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>,
+	>;
 	type RuntimeEvent = RuntimeEvent;
 	type ProposalBond = ProposalBond;
 	type ProposalBondMinimum = ProposalBondMinimum;
@@ -605,6 +611,8 @@ impl pallet_community_loan_pool::Config for Runtime {
 	type WeightInfo = pallet_community_loan_pool::weights::SubstrateWeight<Runtime>;
 	#[cfg(feature = "runtime-benchmarks")]
 	type Helper = pallet_nft::NftHelper;
+	type VotingTime = VotingTime;
+	type MaxCommitteeMembers = MaximumCommitteeMembers;
 }
 
 parameter_types! {
