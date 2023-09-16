@@ -86,11 +86,12 @@ pub mod pallet {
 	/// A loan proposal
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
-	pub struct Proposal<AccountId, Balance> {
+	pub struct Proposal<AccountId, Balance, BlockNumber> {
 		proposer: AccountId,
 		amount: Balance,
 		beneficiary: AccountId,
 		bond: Balance,
+		created_at: BlockNumber,
 	}
 
 	/// loan info
@@ -111,6 +112,20 @@ pub mod pallet {
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
 	pub struct PalletIdStorage<AccountId> {
 		pallet_id: AccountId,
+	}
+
+	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
+	pub enum Vote {
+		Yes,
+		No,
+	}
+
+	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
+	pub struct VoteStats {
+		pub yes_votes: u64,
+		pub no_votes: u64,
 	}
 
 	#[pallet::pallet]
@@ -198,7 +213,7 @@ pub mod pallet {
 		_,
 		Twox64Concat,
 		ProposalIndex,
-		Proposal<T::AccountId, BalanceOf<T>>,
+		Proposal<T::AccountId, BalanceOf<T>, T::BlockNumber>,
 		OptionQuery,
 	>;
 
@@ -212,6 +227,18 @@ pub mod pallet {
 		LoanInfo<T::AccountId, BalanceOf<T>, T::CollectionId, T::ItemId>,
 		OptionQuery,
 	>;
+
+	/// Mapping of ongoing votes
+	#[pallet::storage]
+	#[pallet::getter(fn ongoing_votes)]
+	pub(super) type OngoingVotes<T: Config> =
+		StorageMap<_, Twox64Concat, ProposalIndex, VoteStats, OptionQuery>;
+
+	/// Mapping of user who voted for a proposal
+	#[pallet::storage]
+	#[pallet::getter(fn user_votes)]
+	pub(super) type UserVotes<T: Config> =
+		StorageMap<_, Twox64Concat, (ProposalIndex, T::AccountId), Vote, OptionQuery>;
 
 	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
@@ -244,6 +271,8 @@ pub mod pallet {
 		InsufficientPermission,
 		/// Max amount of ongoing loan reached
 		TooManyLoans,
+		/// User has already voted
+		AlreadyVoted,
 	}
 
 	#[pallet::event]
@@ -295,12 +324,40 @@ pub mod pallet {
 			let bond = Self::calculate_bond(amount);
 			<T as pallet::Config>::Currency::reserve(&origin, bond)
 				.map_err(|_| Error::<T>::InsufficientProposersBalance)?;
+			let current_block_number = <frame_system::Pallet<T>>::block_number();
 
-			let proposal = Proposal { proposer: origin, amount, beneficiary, bond };
+			let proposal =
+				Proposal { proposer: origin, amount, beneficiary, bond, created_at: current_block_number };
+			let vote_stats = VoteStats { yes_votes: 0, no_votes: 0 };
+			OngoingVotes::<T>::insert(proposal_index, vote_stats);
 			Proposals::<T>::insert(proposal_index, proposal);
 			ProposalCount::<T>::put(proposal_index);
 
 			Self::deposit_event(Event::Proposed { proposal_index });
+			Ok(())
+		}
+
+		/// Let people vote for a proposal
+		#[pallet::call_index(5)]
+		#[pallet::weight(0)]
+		pub fn vote_on_proposal(
+			origin: OriginFor<T>,
+			proposal_index: ProposalIndex,
+			vote: Vote,
+		) -> DispatchResult {
+			let origin = ensure_signed(origin)?;
+			let mut current_vote =
+				<OngoingVotes<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
+			let voted = <UserVotes<T>>::get((proposal_index, origin.clone()));
+			ensure!(voted.is_none(), Error::<T>::AlreadyVoted);
+			if vote == Vote::Yes {
+				current_vote.yes_votes += 1;
+			} else {
+				current_vote.no_votes += 1;
+			};
+
+			UserVotes::<T>::insert((proposal_index, origin), vote);
+			OngoingVotes::<T>::insert(proposal_index, current_vote);
 			Ok(())
 		}
 

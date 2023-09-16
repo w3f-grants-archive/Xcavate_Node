@@ -32,7 +32,10 @@ fn stake_with_several_people_works() {
 fn person_cant_stake_0_token() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_noop!(XcavateStaking::stake(RuntimeOrigin::signed(ALICE), 0), Error::<Test>::StakingWithNoValue);
+		assert_noop!(
+			XcavateStaking::stake(RuntimeOrigin::signed(ALICE), 0),
+			Error::<Test>::StakingWithNoValue
+		);
 	})
 }
 
@@ -53,6 +56,9 @@ fn unstake_works() {
 fn unstake_doesnt_work_for_nonstaker() {
 	new_test_ext().execute_with(|| {
 		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed(ALICE), 100));
-		assert_noop!(XcavateStaking::unstake(RuntimeOrigin::signed(BOB), 100), Error::<Test>::NoStaker);
+		assert_noop!(
+			XcavateStaking::unstake(RuntimeOrigin::signed(BOB), 100),
+			Error::<Test>::NoStaker
+		);
 	})
 }
