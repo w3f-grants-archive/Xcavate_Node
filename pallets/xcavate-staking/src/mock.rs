@@ -32,7 +32,9 @@ use frame_support::PalletId;
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
 
-type AccountId = u32;
+pub type AccountId = u32;
+
+pub type BlockNumber = u64;
 
 pub const ALICE: AccountId = 1;
 pub const BOB: AccountId = 2;
@@ -174,6 +176,8 @@ parameter_types! {
 	pub const ProposalBond: Permill = Permill::from_percent(5);
 	pub const CommunityLoanPalletIdPalletId: PalletId = PalletId(*b"py/cmmty");
 	pub const MaxLoans: u32 = 10000;
+	pub const VotingTime: BlockNumber = 20;
+	pub const MaximumCommitteeMembers: u32 = 10;
 }
 
 impl pallet_community_loan_pool::Config for Test {
@@ -181,6 +185,7 @@ impl pallet_community_loan_pool::Config for Test {
 	type Currency = Balances;
 	type ApproveOrigin = frame_system::EnsureRoot<u32>;
 	type RejectOrigin = frame_system::EnsureRoot<u32>;
+	type CommitteeOrigin = frame_system::EnsureRoot<u32>;
 	type RuntimeEvent = RuntimeEvent;
 	type ProposalBond = ProposalBond;
 	type ProposalBondMinimum = ConstU32<10000>;
@@ -191,6 +196,8 @@ impl pallet_community_loan_pool::Config for Test {
 	type WeightInfo = SubstrateWeight<Test>;
 	/* #[cfg(feature = "runtime-benchmarks")]
 	type Helper = NftHelper; */
+	type VotingTime = VotingTime;
+	type MaxCommitteeMembers = MaximumCommitteeMembers;
 }
 
 parameter_types! {

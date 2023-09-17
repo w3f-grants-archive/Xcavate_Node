@@ -104,7 +104,7 @@ pub mod pallet {
 		/// Balance was unlocked successfully.
 		Unlocked { staker: <T as frame_system::Config>::AccountId, amount: BalanceOf<T> },
 		/// Rewards were claimed successfully.
-		RewardsClaimed { amount: BalanceOf<T> },
+		RewardsClaimed { amount: BalanceOf<T>, apy: u64 },
 	}
 
 	// Errors inform users that something went wrong.
@@ -277,18 +277,18 @@ pub mod pallet {
 			if ongoing_loans.len() == 0 {
 				return 0
 			}
-			for i in ongoing_loans.clone() {
-				let loan_index = i;
-				let loan = pallet_community_loan_pool::Pallet::<T>::loans(loan_index).unwrap();
-				loan_apys += loan.loan_apy;
-			}
-			let average_loan_apy = loan_apys / ongoing_loans.len() as u64;
 			let total_amount_loan = pallet_community_loan_pool::Pallet::<T>::total_loan_amount();
 			if total_amount_loan == 0 {
 				return 0
 			}
-			total_amount_loan / Self::balance_to_u64(Self::total_stake()).unwrap() *
-				average_loan_apy
+			for i in ongoing_loans.clone() {
+				let loan_index = i;
+				let loan = pallet_community_loan_pool::Pallet::<T>::loans(loan_index).unwrap();
+				loan_apys += loan.loan_apy * TryInto::<u64>::try_into(loan.amount).ok().unwrap() * 10000 / total_amount_loan;
+			}
+			let average_loan_apy = loan_apys / 10000;
+			total_amount_loan * 100 / Self::balance_to_u64(Self::total_stake()).unwrap() *
+				average_loan_apy /100
 		}
 
 		pub fn claim_rewards() -> DispatchResult {
@@ -327,6 +327,7 @@ pub mod pallet {
 				TotalStake::<T>::put(new_total_stake);
 				Self::deposit_event(Event::<T>::RewardsClaimed {
 					amount: rewards.try_into().ok().unwrap(),
+					apy
 				});
 			}
 			Ok(())
