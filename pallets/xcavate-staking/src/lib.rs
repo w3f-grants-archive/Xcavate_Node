@@ -281,7 +281,7 @@ pub mod pallet {
 			if total_amount_loan == 0 {
 				return 0
 			}
-			for i in ongoing_loans.clone() {
+			for i in ongoing_loans{
 				let loan_index = i;
 				let loan = pallet_community_loan_pool::Pallet::<T>::loans(loan_index).unwrap();
 				loan_apys += loan.loan_apy * TryInto::<u64>::try_into(loan.amount).ok().unwrap() * 10000 / total_amount_loan;

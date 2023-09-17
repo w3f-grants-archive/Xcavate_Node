@@ -339,12 +339,12 @@ pub mod pallet {
 
 			ended_votings.iter().for_each(|item| {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
-				let mut voting_result = <OngoingVotes<T>>::take(item);
-				if voting_result.is_some() {
-					if voting_result.clone().unwrap().yes_votes > voting_result.unwrap().no_votes {
-						EvaluatedLoans::<T>::try_append(item);
+				let voting_result = <OngoingVotes<T>>::take(item);
+				if let Some(voting_result) = voting_result {
+					if voting_result.yes_votes > voting_result.no_votes {
+						EvaluatedLoans::<T>::try_append(item).unwrap_or_default();
 					} else {
-						Self::reject_loan_proposal(*item);
+						Self::reject_loan_proposal(*item).unwrap_or_default();
 					}
 					OngoingVotes::<T>::remove(item);
 				}			
@@ -660,6 +660,8 @@ pub mod pallet {
 				loan.amount += interest_balance;
 				loan.last_timestamp = current_timestamp;
 				Loans::<T>::insert(loan_index, loan.clone());
+				let new_value = Self::total_loan_amount() + interests;
+				TotalLoanAmount::<T>::put(new_value);
 				let dest = loan.contract_account_id;
 				let palled_id = Self::account_id();
 				let gas_limit: Weight = Weight::from_parts(5000000000, 5000000000);

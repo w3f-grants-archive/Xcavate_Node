@@ -22,6 +22,46 @@ fn propose_doesnt_work_not_enough_userbalance() {
 }
 
 #[test]
+fn add_committee_member_works() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), ALICE));
+		assert_eq!(CommunityLoanPool::voting_committee()[0], ALICE);
+	})
+}
+
+#[test]
+fn add_committee_member_fails_when_member_is_two_times_added() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), ALICE));
+		assert_eq!(CommunityLoanPool::voting_committee()[0], ALICE);
+		assert_noop!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), ALICE), Error::<Test>::AlreadyMember);
+	})
+}
+
+#[test]
+fn voting_works() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), ALICE));
+		assert_ok!(CommunityLoanPool::propose(RuntimeOrigin::signed(BOB), 100, BOB));
+		assert_ok!(CommunityLoanPool::vote_on_proposal(RuntimeOrigin::signed(ALICE), 1, crate::Vote::Yes));
+		assert_eq!(CommunityLoanPool::ongoing_votes(1).unwrap().yes_votes, 1);
+	})
+}
+
+#[test]
+fn voting_works_only_for_members() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), ALICE));
+		assert_ok!(CommunityLoanPool::propose(RuntimeOrigin::signed(BOB), 100, BOB));
+		assert_noop!(CommunityLoanPool::vote_on_proposal(RuntimeOrigin::signed(DAVE), 1, crate::Vote::Yes), Error::<Test>::InsufficientPermission);
+	})
+}
+
+#[test]
 fn reject_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
