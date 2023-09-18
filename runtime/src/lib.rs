@@ -23,7 +23,7 @@ use frame_support::{
 	},
 	PalletId,
 };
-// use acurast_p256_crypto::MultiSignature;
+use acurast_p256_crypto::MultiSignature;
 use pallet_acurast_fulfillment_receiver::Fulfillment;
 
 use frame_system::{
@@ -50,7 +50,7 @@ use sp_runtime::{
 		IdentifyAccount, NumberFor, One, OpaqueKeys, Verify,
 	},
 	transaction_validity::{TransactionPriority, TransactionSource, TransactionValidity},
-	ApplyExtrinsicResult, FixedU128, MultiSignature, Percent, DispatchResultWithInfo
+	ApplyExtrinsicResult, FixedU128, Percent, DispatchResultWithInfo
 };
 use sp_std::prelude::*;
 #[cfg(feature = "std")]
