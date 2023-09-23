@@ -74,3 +74,11 @@ db keystore network
 ### Connect with Polkadot-JS Apps Front-End
 
 After you start the Xcavate node locally, you can connect it with Polkadot-JS Apps front-end to interact with the chain. [Click here](https://polkadotjs-apps.web.app/#/accounts) to use the Polkadot-JS Apps.
+
+### Run Tests
+
+Run the following command for the rust unit tests in the Xcavate node.
+
+```sh
+cargo build --release
+```
