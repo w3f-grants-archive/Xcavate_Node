@@ -175,7 +175,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 
 /// Configure initial storage state for FRAME modules.
 fn testnet_genesis(
-	_wasm_binary: &[u8],
+	wasm_binary: &[u8],
 	initial_authorities: Vec<(
 		AccountId,
 		AccountId,
@@ -225,7 +225,10 @@ fn testnet_genesis(
 	const STASH: Balance = ENDOWMENT / 1000;
 
 	GenesisConfig {
-		system: SystemConfig { code: wasm_binary_unwrap().to_vec() },
+		system: SystemConfig { 
+			code: wasm_binary.to_vec(),
+			..Default::default()
+		},
 		balances: BalancesConfig {
 			balances: endowed_accounts
 				.iter()
@@ -255,6 +258,7 @@ fn testnet_genesis(
 		babe: BabeConfig {
 			authorities: Default::default(),
 			epoch_config: Some(BABE_GENESIS_EPOCH_CONFIG),
+			..Default::default()
 		},
 		session: SessionConfig {
 			keys: initial_authorities
