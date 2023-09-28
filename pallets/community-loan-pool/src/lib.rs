@@ -189,7 +189,7 @@ pub mod pallet {
 		type Helper: crate::BenchmarkHelper<Self::CollectionId, Self::ItemId>;
 
 		/// The amount of time given to vote for a proposal
-		type VotingTime: Get<Self::BlockNumber>;
+		type VotingTime: Get<BlockNumberFor<Self>>;
 
 		/// The maximum amount of commitee members
 		type MaxCommitteeMembers: Get<u32>;
@@ -239,7 +239,7 @@ pub mod pallet {
 		_,
 		Twox64Concat,
 		ProposalIndex,
-		Proposal<T::AccountId, BalanceOf<T>, T::BlockNumber>,
+		Proposal<T::AccountId, BalanceOf<T>, BlockNumberFor<T>>,
 		OptionQuery,
 	>;
 
