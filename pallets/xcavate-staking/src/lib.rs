@@ -54,7 +54,7 @@ pub mod pallet {
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 		/// The lockable currency type.
 		type Currency: Currency<Self::AccountId>
-			+ LockableCurrency<Self::AccountId, Moment = Self::BlockNumber>
+			+ LockableCurrency<Self::AccountId, Moment = BlockNumberFor<Self>>
 			+ ReservableCurrency<Self::AccountId>;
 		/// Minimum amount that should be left on staker account after staking.
 		/// Serves as a safeguard to prevent users from locking their entire free balance.

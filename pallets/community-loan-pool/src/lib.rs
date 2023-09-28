@@ -25,11 +25,13 @@ use frame_support::sp_runtime::{
 };
 
 use frame_support::{
-	inherent::Vec,
+	sp_runtime,
+//	inherent::Vec,
 	pallet_prelude::*,
-	traits::{Currency, Get, OnUnbalanced, ReservableCurrency, UnixTime},
+	traits::{Currency, Get, OnUnbalanced, ReservableCurrency, UnixTime, GenesisBuild},
 	PalletId,
 };
+use sp_std::vec::Vec;
 
 use sp_std::prelude::*;
 
@@ -48,9 +50,12 @@ pub type PositiveImbalanceOf<T> = <<T as Config>::Currency as Currency<
 pub type BalanceOf<T> =
 	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
-type BalanceOf1<T> = <<T as pallet_contracts::Config>::Currency as Currency<
-	<T as frame_system::Config>::AccountId,
->>::Balance;
+type BalanceOf1<T> =
+	<<T as pallet_contracts::Config>::Currency as frame_support::traits::fungible::Inspect<<T as frame_system::Config>::AccountId>>::Balance;
+
+// type BalanceOf1<T> = <<T as pallet_contracts::Config>::Currency as Currency<
+// 	<T as frame_system::Config>::AccountId,
+// >>::Balance;
 
 #[cfg(feature = "runtime-benchmarks")]
 pub struct NftHelper;
@@ -279,7 +284,7 @@ pub mod pallet {
 	}
 
 	#[pallet::genesis_build]
-	impl<T: Config> GenesisBuild<T> for GenesisConfig<T> {
+	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
 		fn build(&self) {
 			// Create Treasury account
 			let account_id = <Pallet<T>>::account_id();
@@ -462,7 +467,7 @@ pub mod pallet {
 			let loan_info = LoanInfo {
 				borrower: user.clone(),
 				amount: value,
-				collection_id,
+				collection_id: collection_id.clone(),
 				item_id,
 				loan_apy,
 				last_timestamp: timestamp,
@@ -476,7 +481,7 @@ pub mod pallet {
 			// calls the create collection function from the uniques pallet, and set the admin as
 			// the admin of the collection
 			pallet_uniques::Pallet::<T>::do_create_collection(
-				collection_id,
+				collection_id.clone(),
 				admin.clone(),
 				admin.clone(),
 				T::CollectionDeposit::get(),
@@ -484,12 +489,12 @@ pub mod pallet {
 				pallet_uniques::Event::Created {
 					creator: admin.clone(),
 					owner: admin.clone(),
-					collection: collection_id,
+					collection: collection_id.clone(),
 				},
 			)?;
 			// calls the mint collection function from the uniques pallet, mints a nft and puts
 			// the loan contract as the owner
-			pallet_uniques::Pallet::<T>::do_mint(collection_id, item_id, dest.clone(), |_| Ok(()))?;
+			pallet_uniques::Pallet::<T>::do_mint(collection_id.clone(), item_id, dest.clone(), |_| Ok(()))?;
 
 			let palled_id = Self::account_id();
 			let mut arg1_enc: Vec<u8> = admin.encode();
@@ -516,8 +521,10 @@ pub mod pallet {
 				gas_limit,
 				storage_deposit_limit,
 				data,
-				false,
-				pallet_contracts::Determinism::Deterministic,
+				pallet_contracts::DebugInfo::UnsafeDebug,
+				pallet_contracts::CollectEvents::UnsafeCollect,
+				pallet_contracts::Determinism::Enforced,
+//			pallet_contracts::Determinism::Deterministic,
 			)
 			.result?;
 			let new_value = Self::total_loan_amount() + Self::balance_to_u64(value).unwrap();
@@ -680,8 +687,10 @@ pub mod pallet {
 					gas_limit,
 					None,
 					data,
-					false,
-					pallet_contracts::Determinism::Deterministic,
+					pallet_contracts::DebugInfo::UnsafeDebug,
+					pallet_contracts::CollectEvents::UnsafeCollect,
+					pallet_contracts::Determinism::Enforced,
+//					pallet_contracts::Determinism::Deterministic,
 				)
 				.result?;
 				Self::deposit_event(Event::<T>::ApyCharged { loan_index });
