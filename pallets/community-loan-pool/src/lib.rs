@@ -28,7 +28,7 @@ use frame_support::{
 	sp_runtime,
 //	inherent::Vec,
 	pallet_prelude::*,
-	traits::{Currency, Get, OnUnbalanced, ReservableCurrency, UnixTime, GenesisBuild},
+	traits::{Currency, Get, OnUnbalanced, ReservableCurrency, UnixTime, GenesisBuild, ExistenceRequirement::KeepAlive},
 	PalletId,
 };
 use sp_std::vec::Vec;
@@ -147,6 +147,9 @@ pub mod pallet {
 
 		/// Origin who can add or remove committee members
 		type CommitteeOrigin: EnsureOrigin<Self::RuntimeOrigin>;
+
+		/// Origin who can delete loans
+		type DeleteOrigin: EnsureOrigin<Self::RuntimeOrigin>;
 
 		/// Fraction of a proposal's value that should be bonded in order to place the proposal.
 		/// An accepted proposal gets these back. A rejected proposal does not.
@@ -308,6 +311,10 @@ pub mod pallet {
 		AlreadyMember,
 		/// There are already enough committee members
 		TooManyMembers,
+		/// There are not enough funds available in the loan
+		NotEnoughFundsToWithdraw,
+		/// The loan is still ongoing
+		LoanStillOngoing,
 	}
 
 	#[pallet::event]
@@ -325,6 +332,9 @@ pub mod pallet {
 		ApyCharged { loan_index: LoanIndex },
 		/// Loan has been updated
 		LoanUpdated { loan_index: LoanIndex },
+		/// User withdraw money
+		Withdraw { loan_index: LoanIndex, amount: BalanceOf<T>}
+
 	}
 
 	// Work in progress, to be included in the future
@@ -503,6 +513,7 @@ pub mod pallet {
 			let signer = ensure_signed(origin.clone())?;
 			let loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			//ensure!(signer == loan.contract_account_id, Error::<T>::InsufficientPermission);
+			ensure!(loan.borrowed_amount.is_zero(), Error::<T>::LoanStillOngoing);
 
 			let collection_id = loan.collection_id;
 			let item_id = loan.item_id;
@@ -525,7 +536,34 @@ pub mod pallet {
 
 		#[pallet::call_index(4)]
 		#[pallet::weight(0)]
-		pub fn update_loan(
+		pub fn withdraw(
+			origin: OriginFor<T>,
+			loan_id: LoanIndex,
+			amount: BalanceOf<T>,
+		) -> DispatchResult {
+			let signer = ensure_signed(origin.clone())?;
+			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
+			ensure!(signer == loan.borrower, Error::<T>::InsufficientPermission);
+			ensure!(amount <= loan.available_amount, Error::<T>::NotEnoughFundsToWithdraw);
+			let loan_pallet = Self::account_id();
+			let sending_amount = Self::balance_to_u64(amount).unwrap();
+			<T as pallet::Config>::Currency::transfer(
+				&loan_pallet,
+				&signer,
+				(sending_amount * 1000000000000).try_into().ok().unwrap(),
+				KeepAlive,
+			)
+			.unwrap_or_default();
+			loan.borrowed_amount = loan.borrowed_amount.saturating_add(amount);
+			loan.available_amount = loan.available_amount.saturating_sub(amount);
+			Loans::<T>::insert(loan_id, loan);
+			Self::deposit_event(Event::<T>::Withdraw {loan_index: loan_id, amount});
+			Ok(())
+		}
+
+		#[pallet::call_index(5)]
+		#[pallet::weight(0)]
+		pub fn repay(
 			origin: OriginFor<T>,
 			loan_id: LoanIndex,
 			amount: BalanceOf<T>,
@@ -533,6 +571,15 @@ pub mod pallet {
 			let signer = ensure_signed(origin.clone())?;
 			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			//ensure!(signer == loan.contract_account_id, Error::<T>::InsufficientPermission);
+			let loan_pallet = Self::account_id();
+			let sending_amount = Self::balance_to_u64(amount).unwrap();
+			<T as pallet::Config>::Currency::transfer(
+				&signer,
+				&loan_pallet,
+				(sending_amount * 1000000000000).try_into().ok().unwrap(),
+				KeepAlive,
+			)
+			.unwrap_or_default();
 			loan.borrowed_amount = loan.borrowed_amount.saturating_sub(amount);
 			Loans::<T>::insert(loan_id, loan);
 			let new_value = Self::total_loan_amount() - Self::balance_to_u64(amount).unwrap();
@@ -542,7 +589,7 @@ pub mod pallet {
 		}
 
 		/// Let committee members vote for a proposal
-		#[pallet::call_index(5)]
+		#[pallet::call_index(6)]
 		#[pallet::weight(0)]
 		pub fn vote_on_proposal(
 			origin: OriginFor<T>,
@@ -568,7 +615,7 @@ pub mod pallet {
 		}
 
 		/// Adding a new address to the vote committee
-		#[pallet::call_index(6)]
+		#[pallet::call_index(7)]
 		#[pallet::weight(0)]
 		pub fn add_committee_member(
 			origin: OriginFor<T>,
