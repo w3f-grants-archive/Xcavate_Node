@@ -50,13 +50,6 @@ pub type PositiveImbalanceOf<T> = <<T as Config>::Currency as Currency<
 pub type BalanceOf<T> =
 	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
-type BalanceOf1<T> =
-	<<T as pallet_contracts::Config>::Currency as frame_support::traits::fungible::Inspect<<T as frame_system::Config>::AccountId>>::Balance;
-
-// type BalanceOf1<T> = <<T as pallet_contracts::Config>::Currency as Currency<
-// 	<T as frame_system::Config>::AccountId,
-// >>::Balance;
-
 #[cfg(feature = "runtime-benchmarks")]
 pub struct NftHelper;
 
@@ -104,12 +97,12 @@ pub mod pallet {
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
 	pub struct LoanInfo<AccountId, Balance, CollectionId, ItemId> {
 		pub borrower: AccountId,
-		pub amount: Balance,
+		pub available_amount: Balance,
+		pub borrowed_amount: Balance,
 		pub collection_id: CollectionId,
 		pub item_id: ItemId,
 		pub loan_apy: LoanApy,
 		pub last_timestamp: u64,
-		pub contract_account_id: AccountId,
 	}
 
 	/// AccountId storage
@@ -138,7 +131,7 @@ pub mod pallet {
 
 	#[pallet::config]
 	pub trait Config:
-		frame_system::Config + pallet_uniques::Config + pallet_contracts::Config
+		frame_system::Config + pallet_uniques::Config
 	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
@@ -440,13 +433,9 @@ pub mod pallet {
 			proposal_index: ProposalIndex,
 			collection_id: T::CollectionId,
 			collateral_price: BalanceOf<T>,
-			value_funds: BalanceOf1<T>,
 			item_id: T::ItemId,
 			loan_apy: LoanApy,
-			dest: T::AccountId,
 			admin: T::AccountId,
-			storage_deposit_limit: Option<BalanceOf1<T>>,
-			gas_limit: Weight,
 		) -> DispatchResult {
 			let _signer = ensure_signed(origin.clone())?;
 			//T::ApproveOrigin::ensure_origin(origin.clone())?;
@@ -466,12 +455,12 @@ pub mod pallet {
 
 			let loan_info = LoanInfo {
 				borrower: user.clone(),
-				amount: value,
+				available_amount: value,
+				borrowed_amount: Default::default(),
 				collection_id: collection_id.clone(),
 				item_id,
 				loan_apy,
 				last_timestamp: timestamp,
-				contract_account_id: dest.clone(),
 			};
 
 			let loan_index = Self::loan_count() + 1;
@@ -494,39 +483,8 @@ pub mod pallet {
 			)?;
 			// calls the mint collection function from the uniques pallet, mints a nft and puts
 			// the loan contract as the owner
-			pallet_uniques::Pallet::<T>::do_mint(collection_id.clone(), item_id, dest.clone(), |_| Ok(()))?;
+			pallet_uniques::Pallet::<T>::do_mint(collection_id.clone(), item_id, Self::account_id(), |_| Ok(()))?;
 
-			let palled_id = Self::account_id();
-			let mut arg1_enc: Vec<u8> = admin.encode();
-			let mut arg2_enc: Vec<u8> = user.encode();
-			let mut arg3_enc: Vec<u8> = collection_id.clone().encode();
-			let mut arg4_enc: Vec<u8> = item_id.clone().encode();
-			let mut arg5_enc: Vec<u8> = collateral_price.encode();
-			let mut arg6_enc: Vec<u8> = value.clone().encode();
-			let mut data = Vec::new();
-			let mut selector: Vec<u8> = [0x0E, 0xA6, 0xbd, 0x42].into();
-			data.append(&mut selector);
-			data.append(&mut arg1_enc);
-			data.append(&mut arg2_enc);
-			data.append(&mut arg3_enc);
-			data.append(&mut arg4_enc);
-			data.append(&mut arg5_enc);
-			data.append(&mut arg6_enc);
-
-			// Calls the creat loan function of the loan smart contract
-			pallet_contracts::Pallet::<T>::bare_call(
-				palled_id,
-				dest.clone(),
-				value_funds,
-				gas_limit,
-				storage_deposit_limit,
-				data,
-				pallet_contracts::DebugInfo::UnsafeDebug,
-				pallet_contracts::CollectEvents::UnsafeCollect,
-				pallet_contracts::Determinism::Enforced,
-//			pallet_contracts::Determinism::Deterministic,
-			)
-			.result?;
 			let new_value = Self::total_loan_amount() + Self::balance_to_u64(value).unwrap();
 			TotalLoanAmount::<T>::put(new_value);
 			Proposals::<T>::remove(proposal_index);
@@ -544,7 +502,7 @@ pub mod pallet {
 		pub fn delete_loan(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
 			let loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
-			ensure!(signer == loan.contract_account_id, Error::<T>::InsufficientPermission);
+			//ensure!(signer == loan.contract_account_id, Error::<T>::InsufficientPermission);
 
 			let collection_id = loan.collection_id;
 			let item_id = loan.item_id;
@@ -574,8 +532,8 @@ pub mod pallet {
 		) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
 			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
-			ensure!(signer == loan.contract_account_id, Error::<T>::InsufficientPermission);
-			loan.amount = loan.amount.saturating_sub(amount);
+			//ensure!(signer == loan.contract_account_id, Error::<T>::InsufficientPermission);
+			loan.borrowed_amount = loan.borrowed_amount.saturating_sub(amount);
 			Loans::<T>::insert(loan_id, loan);
 			let new_value = Self::total_loan_amount() - Self::balance_to_u64(amount).unwrap();
 			TotalLoanAmount::<T>::put(new_value);
@@ -660,39 +618,15 @@ pub mod pallet {
 				let mut loan = <Loans<T>>::take(loan_index).ok_or(Error::<T>::InvalidIndex)?;
 				let current_timestamp = T::TimeProvider::now().as_secs();
 				let time_difference = current_timestamp - loan.last_timestamp;
-				let loan_amount = Self::balance_to_u64(loan.amount).unwrap();
+				let loan_amount = Self::balance_to_u64(loan.available_amount + loan.borrowed_amount).unwrap();
 				let interests =
 					loan_amount * time_difference * loan.loan_apy / 365 / 60 / 60 / 24 / 100;
 				let interest_balance = Self::u64_to_balance_option(interests).unwrap();
-				loan.amount += interest_balance;
+				loan.borrowed_amount += interest_balance;
 				loan.last_timestamp = current_timestamp;
 				Loans::<T>::insert(loan_index, loan.clone());
 				let new_value = Self::total_loan_amount() + interests;
 				TotalLoanAmount::<T>::put(new_value);
-				let dest = loan.contract_account_id;
-				let palled_id = Self::account_id();
-				let gas_limit: Weight = Weight::from_parts(5000000000, 5000000000);
-				let value: BalanceOf1<T> = Default::default();
-				let mut arg1_enc: Vec<u8> = loan_index.encode();
-				let mut arg2_enc: Vec<u8> = interest_balance.encode();
-				let mut data = Vec::new();
-				let mut selector: Vec<u8> = [0xd3, 0x5e, 0x8d, 0x68].into();
-				data.append(&mut selector);
-				data.append(&mut arg1_enc);
-				data.append(&mut arg2_enc);
-				pallet_contracts::Pallet::<T>::bare_call(
-					palled_id.clone(),
-					dest.clone(),
-					value,
-					gas_limit,
-					None,
-					data,
-					pallet_contracts::DebugInfo::UnsafeDebug,
-					pallet_contracts::CollectEvents::UnsafeCollect,
-					pallet_contracts::Determinism::Enforced,
-//					pallet_contracts::Determinism::Deterministic,
-				)
-				.result?;
 				Self::deposit_event(Event::<T>::ApyCharged { loan_index });
 			}
 			Ok(())

@@ -284,7 +284,7 @@ pub mod pallet {
 			for i in ongoing_loans{
 				let loan_index = i;
 				let loan = pallet_community_loan_pool::Pallet::<T>::loans(loan_index).unwrap();
-				loan_apys += loan.loan_apy * TryInto::<u64>::try_into(loan.amount).ok().unwrap() * 10000 / total_amount_loan;
+				loan_apys += loan.loan_apy * TryInto::<u64>::try_into(loan.borrowed_amount + loan.available_amount).ok().unwrap() * 10000 / total_amount_loan;
 			}
 			let average_loan_apy = loan_apys / 10000;
 			total_amount_loan * 100 / Self::balance_to_u64(Self::total_stake()).unwrap() *
