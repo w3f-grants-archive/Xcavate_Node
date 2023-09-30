@@ -8,7 +8,7 @@ use frame_support::{
 use sp_core::{ConstU32, H256};
 use sp_runtime::{
 	testing::Header,
-	traits::{BlakeTwo256, IdentityLookup},
+	traits::{BlakeTwo256, IdentityLookup, AccountIdLookup},
 };
 
 use pallet_contracts::Schedule;
@@ -29,6 +29,8 @@ use sp_runtime::traits::One;
 
 use frame_support::PalletId;
 
+use sp_runtime::BuildStorage;
+
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -43,16 +45,12 @@ pub const DAVE: AccountId = 4;
 
 // Configure a mock runtime to test the pallet.
 frame_support::construct_runtime!(
-	pub enum Test where
-		Block = Block,
-		NodeBlock = Block,
-		UncheckedExtrinsic = UncheckedExtrinsic,
+	pub enum Test
 	{
-		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
-		Balances: pallet_balances,
+		System: frame_system::{Pallet, Call, Config<T>, Storage, Event<T>},
+		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
 		Uniques: pallet_uniques::{Pallet, Call, Storage, Event<T>},
 		CommunityLoanPool: pallet_community_loan_pool,
-		Contracts: pallet_contracts::{Pallet, Call, Storage, Event<T>},
 		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
 		Randomness: pallet_insecure_randomness_collective_flip::{Pallet, Storage},
 		TransactionPayment: pallet_transaction_payment::{Pallet, Storage, Event<T>},
@@ -60,31 +58,34 @@ frame_support::construct_runtime!(
 	}
 );
 
+parameter_types! {
+	pub const BlockHashCount: BlockNumber = 2400;
+}
+
 impl frame_system::Config for Test {
-	type BaseCallFilter = frame_support::traits::Everything;
-	type BlockWeights = ();
-	type BlockLength = ();
-	type DbWeight = ();
-	type RuntimeOrigin = RuntimeOrigin;
-	type RuntimeCall = RuntimeCall;
-	type Index = u64;
-	type BlockNumber = u64;
-	type Hash = H256;
-	type Hashing = BlakeTwo256;
-	type AccountId = AccountId;
-	type Lookup = IdentityLookup<Self::AccountId>;
-	type Header = Header;
-	type RuntimeEvent = RuntimeEvent;
-	type BlockHashCount = ConstU64<250>;
-	type Version = ();
-	type PalletInfo = PalletInfo;
-	type AccountData = pallet_balances::AccountData<u32>;
-	type OnNewAccount = ();
-	type OnKilledAccount = ();
-	type SystemWeightInfo = ();
-	type SS58Prefix = ConstU16<42>;
-	type OnSetCode = ();
-	type MaxConsumers = frame_support::traits::ConstU32<16>;
+    type RuntimeCall = RuntimeCall;
+    type Nonce = u32;
+    type Block = Block;
+    type Hash = sp_core::H256;
+    type Hashing = BlakeTwo256;
+    type AccountId = AccountId;
+    type Lookup = AccountIdLookup<AccountId, ()>;
+    type RuntimeEvent = RuntimeEvent;
+    type RuntimeOrigin = RuntimeOrigin;
+    type BlockHashCount = BlockHashCount;
+    type Version = ();
+    type PalletInfo = PalletInfo;
+    type AccountData = pallet_balances::AccountData<u32>;
+    type OnNewAccount = ();
+    type OnKilledAccount = ();
+    type DbWeight = ();
+    type BaseCallFilter = frame_support::traits::Everything;
+    type SystemWeightInfo = ();
+    type BlockWeights = ();
+    type BlockLength = ();
+    type SS58Prefix = ();
+    type OnSetCode = ();
+    type MaxConsumers = frame_support::traits::ConstU32<16>;
 }
 
 impl pallet_balances::Config for Test {
@@ -97,6 +98,11 @@ impl pallet_balances::Config for Test {
 	type MaxLocks = ();
 	type MaxReserves = ConstU32<50>;
 	type ReserveIdentifier = [u8; 8];
+	type RuntimeHoldReason = ();
+    type FreezeIdentifier = ();
+    // Holds are used with COLLATOR_LOCK_ID and DELEGATOR_LOCK_ID
+    type MaxHolds = ConstU32<2>;
+    type MaxFreezes = ConstU32<0>;
 }
 
 impl pallet_uniques::Config for Test {
@@ -118,6 +124,8 @@ impl pallet_uniques::Config for Test {
 	type WeightInfo = ();
 }
 
+impl pallet_insecure_randomness_collective_flip::Config for Test {}
+
 parameter_types! {
 	pub FeeMultiplier: Multiplier = Multiplier::one();
 }
@@ -129,37 +137,6 @@ impl pallet_transaction_payment::Config for Test {
 	type WeightToFee = IdentityFee<u32>;
 	type LengthToFee = IdentityFee<u32>;
 	type FeeMultiplierUpdate = ConstFeeMultiplier<FeeMultiplier>;
-}
-
-parameter_types! {
-	pub const ContractDeposit: u64 = 16;
-	pub const DeletionQueueDepth: u32 = 1024;
-	pub MySchedule: Schedule<Test> = <Schedule<Test>>::default();
-}
-
-impl pallet_insecure_randomness_collective_flip::Config for Test {}
-
-impl pallet_contracts::Config for Test {
-	type Time = Timestamp;
-	type Randomness = Randomness;
-	type Currency = Balances;
-	type RuntimeEvent = RuntimeEvent;
-	type RuntimeCall = RuntimeCall;
-	type CallFilter = Nothing;
-	type DepositPerItem = ();
-	type DepositPerByte = ();
-	type CallStack = [pallet_contracts::Frame<Self>; 5];
-	type WeightPrice = ();
-	type WeightInfo = ();
-	type ChainExtension = ();
-	type DeletionQueueDepth = ();
-	type DeletionWeightLimit = ();
-	type Schedule = MySchedule;
-	type AddressGenerator = pallet_contracts::DefaultAddressGenerator;
-	type MaxCodeLen = ConstU32<{ 123 * 1024 }>;
-	type MaxStorageKeyLen = ConstU32<128>;
-	type UnsafeUnstableInterface = ConstBool<false>;
-	type MaxDebugBufferLen = ConstU32<{ 2 * 1024 * 1024 }>;
 }
 
 parameter_types! {
@@ -186,6 +163,7 @@ impl pallet_community_loan_pool::Config for Test {
 	type ApproveOrigin = frame_system::EnsureRoot<u32>;
 	type RejectOrigin = frame_system::EnsureRoot<u32>;
 	type CommitteeOrigin = frame_system::EnsureRoot<u32>;
+	type DeleteOrigin = frame_system::EnsureRoot<u32>;
 	type RuntimeEvent = RuntimeEvent;
 	type ProposalBond = ProposalBond;
 	type ProposalBondMinimum = ConstU32<10000>;
@@ -194,8 +172,8 @@ impl pallet_community_loan_pool::Config for Test {
 	type MaxOngoingLoans = MaxLoans;
 	type TimeProvider = Timestamp;
 	type WeightInfo = SubstrateWeight<Test>;
-	/* #[cfg(feature = "runtime-benchmarks")]
-	type Helper = NftHelper; */
+	#[cfg(feature = "runtime-benchmarks")]
+	type Helper = NftHelper;
 	type VotingTime = VotingTime;
 	type MaxCommitteeMembers = MaximumCommitteeMembers;
 }
@@ -214,7 +192,9 @@ impl pallet_xcavate_staking::Config for Test {
 
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> sp_io::TestExternalities {
-	let mut test = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
+	let mut test = frame_system::GenesisConfig::<Test>::default()
+	.build_storage()
+	.unwrap();
 
 	pallet_balances::GenesisConfig::<Test> {
 		balances: vec![(ALICE, 20_000_000), (BOB, 15_000), (CHARLIE, 150_000), (DAVE, 5_000)],
