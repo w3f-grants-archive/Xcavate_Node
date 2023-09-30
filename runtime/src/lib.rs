@@ -593,6 +593,7 @@ parameter_types! {
 	pub const MaxLoans: u32 = 10000;
 	pub const VotingTime: BlockNumber = 20;
 	pub const MaximumCommitteeMembers: u32 = 10;
+	pub const MaxMilestones: u32 = 10;
 }
 
 /// Configure the pallet-community-loan-pool in pallets/community-loan-pool.
@@ -627,6 +628,7 @@ impl pallet_community_loan_pool::Config for Runtime {
 	type Helper = pallet_nft::NftHelper;
 	type VotingTime = VotingTime;
 	type MaxCommitteeMembers = MaximumCommitteeMembers;
+	type MaxMilestonesPerProject = MaxMilestones;
 }
 
 parameter_types! {

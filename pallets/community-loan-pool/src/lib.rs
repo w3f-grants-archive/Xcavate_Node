@@ -24,6 +24,8 @@ use frame_support::sp_runtime::{
 	Permill, RuntimeDebug,
 };
 
+use frame_support::sp_runtime::Percent;
+
 use frame_support::{
 	sp_runtime,
 //	inherent::Vec,
@@ -39,6 +41,8 @@ type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup
 
 pub type LoanApy = u64;
 
+pub type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
+
 pub type NegativeImbalanceOf<T> = <<T as Config>::Currency as Currency<
 	<T as frame_system::Config>::AccountId,
 >>::NegativeImbalance;
@@ -50,8 +54,17 @@ pub type PositiveImbalanceOf<T> = <<T as Config>::Currency as Currency<
 pub type BalanceOf<T> =
 	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
+pub type BoundedProposedMilestones<T> =
+    BoundedVec<ProposedMilestone, <T as Config>::MaxMilestonesPerProject>;
+
 #[cfg(feature = "runtime-benchmarks")]
 pub struct NftHelper;
+
+#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
+pub struct ProposedMilestone {
+	pub percentage_to_unlock: Percent,
+}
 
 #[cfg(feature = "runtime-benchmarks")]
 pub trait BenchmarkHelper<CollectionId, ItemId> {
@@ -84,10 +97,12 @@ pub mod pallet {
 	/// A loan proposal
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
-	pub struct Proposal<AccountId, Balance, BlockNumber> {
-		proposer: AccountId,
+	#[scale_info(skip_type_params(T))]
+	pub struct Proposal<Balance, BlockNumber, T: Config> {
+		proposer: AccountIdOf<T>,
 		amount: Balance,
-		beneficiary: AccountId,
+		milestones: BoundedProposedMilestones<T>,
+		beneficiary: AccountIdOf<T>,
 		bond: Balance,
 		created_at: BlockNumber,
 	}
@@ -95,10 +110,12 @@ pub mod pallet {
 	/// loan info
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
-	pub struct LoanInfo<AccountId, Balance, CollectionId, ItemId> {
-		pub borrower: AccountId,
+	#[scale_info(skip_type_params(T))]
+	pub struct LoanInfo<Balance, CollectionId, ItemId, T: Config> {
+		pub borrower: AccountIdOf<T>,
 		pub available_amount: Balance,
 		pub borrowed_amount: Balance,
+		pub milestones: BoundedProposedMilestones<T>,
 		pub collection_id: CollectionId,
 		pub item_id: ItemId,
 		pub loan_apy: LoanApy,
@@ -108,8 +125,8 @@ pub mod pallet {
 	/// AccountId storage
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
-	pub struct PalletIdStorage<AccountId> {
-		pallet_id: AccountId,
+	pub struct PalletIdStorage<T: Config>{
+		pallet_id: AccountIdOf<T>,
 	}
 
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
@@ -137,7 +154,7 @@ pub mod pallet {
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
 		/// The currency type.
-		type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
+		type Currency: Currency<AccountIdOf<Self>> + ReservableCurrency<AccountIdOf<Self>>;
 
 		/// Origin from which rejections must come.
 		type RejectOrigin: EnsureOrigin<Self::RuntimeOrigin>;
@@ -189,6 +206,8 @@ pub mod pallet {
 
 		/// The maximum amount of commitee members
 		type MaxCommitteeMembers: Get<u32>;
+
+		type MaxMilestonesPerProject: Get<u32>;
 	}
 
 	/* 	#[pallet::storage]
@@ -199,7 +218,7 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn voting_committee)]
 	pub(super) type VotingCommittee<T: Config> =
-		StorageValue<_, BoundedVec<T::AccountId, T::MaxOngoingLoans>, ValueQuery>;
+		StorageValue<_, BoundedVec<AccountIdOf<T>, T::MaxOngoingLoans>, ValueQuery>;
 
 	/// Number of proposals that have been made.
 	#[pallet::storage]
@@ -231,11 +250,11 @@ pub mod pallet {
 	/// Proposals that have been made.
 	#[pallet::storage]
 	#[pallet::getter(fn proposals)]
-	pub(super) type Proposals<T: Config> = StorageMap<
+	pub(super) type Proposals<T> = StorageMap<
 		_,
 		Twox64Concat,
 		ProposalIndex,
-		Proposal<T::AccountId, BalanceOf<T>, BlockNumberFor<T>>,
+		Proposal<BalanceOf<T>, BlockNumberFor<T>, T>,
 		OptionQuery,
 	>;
 
@@ -246,7 +265,7 @@ pub mod pallet {
 		_,
 		Twox64Concat,
 		LoanIndex,
-		LoanInfo<T::AccountId, BalanceOf<T>, T::CollectionId, T::ItemId>,
+		LoanInfo<BalanceOf<T>, T::CollectionId, T::ItemId, T>,
 		OptionQuery,
 	>;
 
@@ -260,7 +279,7 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn user_votes)]
 	pub(super) type UserVotes<T: Config> =
-		StorageMap<_, Twox64Concat, (ProposalIndex, T::AccountId), Vote, OptionQuery>;
+		StorageMap<_, Twox64Concat, (ProposalIndex, AccountIdOf<T>), Vote, OptionQuery>;
 
 	/// Stores the project keys and round types ending on a given block
 	#[pallet::storage]
@@ -377,6 +396,7 @@ pub mod pallet {
 		pub fn propose(
 			origin: OriginFor<T>,
 			amount: BalanceOf<T>,
+			proposed_milestones: BoundedProposedMilestones<T>,
 			beneficiary: AccountIdLookupOf<T>,
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
@@ -397,6 +417,7 @@ pub mod pallet {
 			let proposal = Proposal {
 				proposer: origin,
 				amount,
+				milestones: proposed_milestones,
 				beneficiary,
 				bond,
 				created_at: current_block_number,
@@ -445,7 +466,7 @@ pub mod pallet {
 			collateral_price: BalanceOf<T>,
 			item_id: T::ItemId,
 			loan_apy: LoanApy,
-			admin: T::AccountId,
+			admin: AccountIdOf<T>,
 		) -> DispatchResult {
 			let _signer = ensure_signed(origin.clone())?;
 			//T::ApproveOrigin::ensure_origin(origin.clone())?;
@@ -461,12 +482,14 @@ pub mod pallet {
 			debug_assert!(err_amount.is_zero());
 			let user = proposal.beneficiary;
 			let value = proposal.amount;
+			let milestones = proposal.milestones;
 			let timestamp = T::TimeProvider::now().as_secs();
 
 			let loan_info = LoanInfo {
 				borrower: user.clone(),
 				available_amount: value,
 				borrowed_amount: Default::default(),
+				milestones,
 				collection_id: collection_id.clone(),
 				item_id,
 				loan_apy,
@@ -619,7 +642,7 @@ pub mod pallet {
 		#[pallet::weight(0)]
 		pub fn add_committee_member(
 			origin: OriginFor<T>,
-			member: T::AccountId,
+			member: AccountIdOf<T>,
 		) -> DispatchResult {
 			T::CommitteeOrigin::ensure_origin(origin)?;
 			let current_members = Self::voting_committee();
@@ -632,7 +655,7 @@ pub mod pallet {
 	//** Our helper functions.**//
 
 	impl<T: Config> Pallet<T> {
-		pub fn account_id() -> T::AccountId {
+		pub fn account_id() -> AccountIdOf<T> {
 			T::PalletId::get().into_account_truncating()
 		}
 
