@@ -113,6 +113,7 @@ pub mod pallet {
 	#[scale_info(skip_type_params(T))]
 	pub struct LoanInfo<Balance, CollectionId, ItemId, T: Config> {
 		pub borrower: AccountIdOf<T>,
+		pub total_amount: Balance,
 		pub available_amount: Balance,
 		pub borrowed_amount: Balance,
 		pub milestones: BoundedProposedMilestones<T>,
@@ -230,6 +231,11 @@ pub mod pallet {
 	#[pallet::getter(fn proposal_count)]
 	pub(super) type ProposalCount<T> = StorageValue<_, ProposalIndex, ValueQuery>;
 
+	/// Number of milestone proposal that have benn made.
+	#[pallet::storage]
+	#[pallet::getter(fn milestone_proposal_count)]
+	pub(super) type MilestoneProposalCount<T> = StorageValue<_, ProposalIndex, ValueQuery>;
+
 	/// Proposals with won the voting
 	#[pallet::storage]
 	#[pallet::getter(fn evaluated_loans)]
@@ -255,6 +261,17 @@ pub mod pallet {
 		Twox64Concat,
 		ProposalIndex,
 		Proposal<BalanceOf<T>, BlockNumberFor<T>, T>,
+		OptionQuery,
+	>;
+
+	/// Milestone proposal that has been made.
+	#[pallet::storage]
+	#[pallet::getter(fn milestone_proposals)]
+	pub(super) type MilestoneProposals<T> = StorageMap<
+		_,
+		Twox64Concat,
+		ProposalIndex,
+		LoanIndex,
 		OptionQuery,
 	>;
 
@@ -334,6 +351,8 @@ pub mod pallet {
 		NotEnoughFundsToWithdraw,
 		/// The loan is still ongoing
 		LoanStillOngoing,
+		/// All milestones has been accomplished
+		NoMilestonesLeft,
 	}
 
 	#[pallet::event]
@@ -482,12 +501,15 @@ pub mod pallet {
 			debug_assert!(err_amount.is_zero());
 			let user = proposal.beneficiary;
 			let value = proposal.amount;
-			let milestones = proposal.milestones;
+			let mut milestones = proposal.milestones;
 			let timestamp = T::TimeProvider::now().as_secs();
-
+			let amount = Self::balance_to_u64(value).unwrap() * milestones[0].percentage_to_unlock.deconstruct() as u64;
+			milestones.remove(0);
+			let available_amount = Self::u64_to_balance_option(amount).unwrap();
 			let loan_info = LoanInfo {
 				borrower: user.clone(),
-				available_amount: value,
+				total_amount: value,
+				available_amount,
 				borrowed_amount: Default::default(),
 				milestones,
 				collection_id: collection_id.clone(),
@@ -523,6 +545,18 @@ pub mod pallet {
 			Proposals::<T>::remove(proposal_index);
 			LoanCount::<T>::put(loan_index);
 			Self::deposit_event(Event::<T>::Approved { proposal_index });
+			Ok(())
+		}
+
+		#[pallet::call_index(99)]
+		#[pallet::weight(0)]
+		pub fn propose_milestone(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult{
+			let origin = ensure_signed(origin)?;
+			let loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
+			ensure!(loan.milestones.len() > 0, Error::<T>::NoMilestonesLeft);
+			let milestone_proposal_index = Self::milestone_proposal_count() + 1;
+			MilestoneProposals::<T>::insert(milestone_proposal_index, loan_id);
+			MilestoneProposalCount::<T>::put(milestone_proposal_index);
 			Ok(())
 		}
 
