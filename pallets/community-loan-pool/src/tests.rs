@@ -211,3 +211,37 @@ fn approve_fails_invalid_index() {
 		);
 	})
 }
+
+#[test]
+fn milestone_works() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), ALICE));
+		assert_ok!(CommunityLoanPool::propose(
+			RuntimeOrigin::signed(BOB),
+			100,
+			get_milestones(10),
+			sp_runtime::MultiAddress::Id(BOB)
+		));
+		assert_ok!(CommunityLoanPool::vote_on_proposal(
+			RuntimeOrigin::signed(ALICE),
+			1,
+			crate::Vote::Yes
+		));
+		run_to_block(22);
+		assert_eq!(CommunityLoanPool::evaluated_loans().len(), 1);
+		assert_ok!(CommunityLoanPool::approve_proposal(
+			RuntimeOrigin::signed(ALICE),
+			1,
+			0,
+			100,
+			0,
+			10,
+			ALICE,
+		));
+		assert_ok!(CommunityLoanPool::propose_milestone(RuntimeOrigin::signed(BOB), 1));
+		assert_ok!(CommunityLoanPool::vote_on_milestone_proposal(RuntimeOrigin::signed(ALICE), 1, crate::Vote::Yes));
+		run_to_block(43);
+		assert_eq!(CommunityLoanPool::loans(1).unwrap().available_amount, 20);
+	})
+}
