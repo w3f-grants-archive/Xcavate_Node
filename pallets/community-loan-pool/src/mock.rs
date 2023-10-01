@@ -8,7 +8,7 @@ use frame_support::{
 use sp_core::{ConstU32, H256};
 use sp_runtime::{
 	testing::Header,
-	traits::{BlakeTwo256, IdentityLookup, AccountIdLookup},
+	traits::{AccountIdLookup, BlakeTwo256, IdentityLookup},
 };
 
 use pallet_contracts::Schedule;
@@ -58,29 +58,29 @@ parameter_types! {
 }
 
 impl frame_system::Config for Test {
-    type RuntimeCall = RuntimeCall;
-    type Nonce = u32;
-    type Block = Block;
-    type Hash = sp_core::H256;
-    type Hashing = BlakeTwo256;
-    type AccountId = AccountId;
-    type Lookup = AccountIdLookup<AccountId, ()>;
-    type RuntimeEvent = RuntimeEvent;
-    type RuntimeOrigin = RuntimeOrigin;
-    type BlockHashCount = BlockHashCount;
-    type Version = ();
-    type PalletInfo = PalletInfo;
-    type AccountData = pallet_balances::AccountData<u32>;
-    type OnNewAccount = ();
-    type OnKilledAccount = ();
-    type DbWeight = ();
-    type BaseCallFilter = frame_support::traits::Everything;
-    type SystemWeightInfo = ();
-    type BlockWeights = ();
-    type BlockLength = ();
-    type SS58Prefix = ();
-    type OnSetCode = ();
-    type MaxConsumers = frame_support::traits::ConstU32<16>;
+	type RuntimeCall = RuntimeCall;
+	type Nonce = u32;
+	type Block = Block;
+	type Hash = sp_core::H256;
+	type Hashing = BlakeTwo256;
+	type AccountId = AccountId;
+	type Lookup = AccountIdLookup<AccountId, ()>;
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeOrigin = RuntimeOrigin;
+	type BlockHashCount = BlockHashCount;
+	type Version = ();
+	type PalletInfo = PalletInfo;
+	type AccountData = pallet_balances::AccountData<u32>;
+	type OnNewAccount = ();
+	type OnKilledAccount = ();
+	type DbWeight = ();
+	type BaseCallFilter = frame_support::traits::Everything;
+	type SystemWeightInfo = ();
+	type BlockWeights = ();
+	type BlockLength = ();
+	type SS58Prefix = ();
+	type OnSetCode = ();
+	type MaxConsumers = frame_support::traits::ConstU32<16>;
 }
 
 impl pallet_balances::Config for Test {
@@ -94,10 +94,10 @@ impl pallet_balances::Config for Test {
 	type MaxReserves = ConstU32<50>;
 	type ReserveIdentifier = [u8; 8];
 	type RuntimeHoldReason = ();
-    type FreezeIdentifier = ();
-    // Holds are used with COLLATOR_LOCK_ID and DELEGATOR_LOCK_ID
-    type MaxHolds = ConstU32<2>;
-    type MaxFreezes = ConstU32<0>;
+	type FreezeIdentifier = ();
+	// Holds are used with COLLATOR_LOCK_ID and DELEGATOR_LOCK_ID
+	type MaxHolds = ConstU32<2>;
+	type MaxFreezes = ConstU32<0>;
 }
 
 impl pallet_uniques::Config for Test {
@@ -131,7 +131,6 @@ impl pallet_transaction_payment::Config for Test {
 	type LengthToFee = IdentityFee<u32>;
 	type FeeMultiplierUpdate = ConstFeeMultiplier<FeeMultiplier>;
 }
-
 
 impl pallet_insecure_randomness_collective_flip::Config for Test {}
 
@@ -176,9 +175,7 @@ impl pallet_community_loan_pool::Config for Test {
 
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> sp_io::TestExternalities {
-	let mut test = frame_system::GenesisConfig::<Test>::default()
-	.build_storage()
-	.unwrap();
+	let mut test = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
 
 	pallet_balances::GenesisConfig::<Test> {
 		balances: vec![(ALICE, 20_000_000), (BOB, 15_000), (CHARLIE, 150_000), (DAVE, 5_000)],

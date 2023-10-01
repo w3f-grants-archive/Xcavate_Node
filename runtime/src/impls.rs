@@ -8,7 +8,7 @@ use pallet_balances::CreditOf;
 pub struct CreditToBlockAuthor;
 impl HandleCredit<AccountId, Assets> for CreditToBlockAuthor {
 	fn handle_credit(credit: Credit<AccountId, Assets>) {
-//		fn handle_credit(credit: CreditOf<AccountId, Assets>) {
+		//		fn handle_credit(credit: CreditOf<AccountId, Assets>) {
 		if let Some(author) = pallet_authorship::Pallet::<Runtime>::author() {
 			// Drop the result which will trigger the `OnDrop` of the imbalance in case of error.
 			let _ = Assets::resolve(&author, credit);

@@ -27,10 +27,13 @@ use frame_support::sp_runtime::{
 use frame_support::sp_runtime::Percent;
 
 use frame_support::{
-	sp_runtime,
-//	inherent::Vec,
+	//	inherent::Vec,
 	pallet_prelude::*,
-	traits::{Currency, Get, OnUnbalanced, ReservableCurrency, UnixTime, GenesisBuild, ExistenceRequirement::KeepAlive},
+	sp_runtime,
+	traits::{
+		Currency, ExistenceRequirement::KeepAlive, GenesisBuild, Get, OnUnbalanced,
+		ReservableCurrency, UnixTime,
+	},
 	PalletId,
 };
 use sp_std::vec::Vec;
@@ -55,7 +58,7 @@ pub type BalanceOf<T> =
 	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
 pub type BoundedProposedMilestones<T> =
-    BoundedVec<ProposedMilestone, <T as Config>::MaxMilestonesPerProject>;
+	BoundedVec<ProposedMilestone, <T as Config>::MaxMilestonesPerProject>;
 
 #[cfg(feature = "runtime-benchmarks")]
 pub struct NftHelper;
@@ -126,7 +129,7 @@ pub mod pallet {
 	/// AccountId storage
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
-	pub struct PalletIdStorage<T: Config>{
+	pub struct PalletIdStorage<T: Config> {
 		pallet_id: AccountIdOf<T>,
 	}
 
@@ -148,9 +151,7 @@ pub mod pallet {
 	pub struct Pallet<T>(_);
 
 	#[pallet::config]
-	pub trait Config:
-		frame_system::Config + pallet_uniques::Config
-	{
+	pub trait Config: frame_system::Config + pallet_uniques::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
@@ -267,13 +268,8 @@ pub mod pallet {
 	/// Milestone proposal that has been made.
 	#[pallet::storage]
 	#[pallet::getter(fn milestone_proposals)]
-	pub(super) type MilestoneProposals<T> = StorageMap<
-		_,
-		Twox64Concat,
-		ProposalIndex,
-		LoanIndex,
-		OptionQuery,
-	>;
+	pub(super) type MilestoneProposals<T> =
+		StorageMap<_, Twox64Concat, ProposalIndex, LoanIndex, OptionQuery>;
 
 	/// Mapping of ongoing loans
 	#[pallet::storage]
@@ -292,6 +288,18 @@ pub mod pallet {
 	pub(super) type OngoingVotes<T: Config> =
 		StorageMap<_, Twox64Concat, ProposalIndex, VoteStats, OptionQuery>;
 
+	/// Mapping of ongoing votes
+	#[pallet::storage]
+	#[pallet::getter(fn ongoing_milestone_votes)]
+	pub(super) type OngoingMilestoneVotes<T: Config> =
+		StorageMap<_, Twox64Concat, ProposalIndex, VoteStats, OptionQuery>;
+
+	/// Mapping of user who voted for a proposal
+	#[pallet::storage]
+	#[pallet::getter(fn user_milestone_votes)]
+	pub(super) type UserMilestoneVotes<T: Config> =
+		StorageMap<_, Twox64Concat, (ProposalIndex, AccountIdOf<T>), Vote, OptionQuery>;
+
 	/// Mapping of user who voted for a proposal
 	#[pallet::storage]
 	#[pallet::getter(fn user_votes)]
@@ -301,6 +309,16 @@ pub mod pallet {
 	/// Stores the project keys and round types ending on a given block
 	#[pallet::storage]
 	pub type RoundsExpiring<T: Config> = StorageMap<
+		_,
+		Blake2_128Concat,
+		BlockNumberFor<T>,
+		BoundedVec<ProposalIndex, T::MaxOngoingLoans>,
+		ValueQuery,
+	>;
+
+	/// Stores the project keys and round types ending on a given block
+	#[pallet::storage]
+	pub type MilestoneRoundsExpiring<T: Config> = StorageMap<
 		_,
 		Blake2_128Concat,
 		BlockNumberFor<T>,
@@ -371,8 +389,7 @@ pub mod pallet {
 		/// Loan has been updated
 		LoanUpdated { loan_index: LoanIndex },
 		/// User withdraw money
-		Withdraw { loan_index: LoanIndex, amount: BalanceOf<T>}
-
+		Withdraw { loan_index: LoanIndex, amount: BalanceOf<T> },
 	}
 
 	// Work in progress, to be included in the future
@@ -393,8 +410,24 @@ pub mod pallet {
 						Self::reject_loan_proposal(*item).unwrap_or_default();
 					}
 					OngoingVotes::<T>::remove(item);
-				}			
+				}
 			});
+
+			let ended_milestone_votes = MilestoneRoundsExpiring::<T>::take(n);
+
+			ended_milestone_votes.iter().for_each(|item| {
+				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
+				let voting_result = <OngoingMilestoneVotes<T>>::take(item);
+				if let Some(voting_result) = voting_result {
+					if voting_result.yes_votes > voting_result.no_votes {
+
+					} else {
+
+					}
+					OngoingVotes::<T>::remove(item);
+				}
+			});
+
 			weight
 		}
 
@@ -503,7 +536,8 @@ pub mod pallet {
 			let value = proposal.amount;
 			let mut milestones = proposal.milestones;
 			let timestamp = T::TimeProvider::now().as_secs();
-			let amount = Self::balance_to_u64(value).unwrap() * milestones[0].percentage_to_unlock.deconstruct() as u64;
+			let amount = Self::balance_to_u64(value).unwrap()
+				* milestones[0].percentage_to_unlock.deconstruct() as u64;
 			milestones.remove(0);
 			let available_amount = Self::u64_to_balance_option(amount).unwrap();
 			let loan_info = LoanInfo {
@@ -538,7 +572,12 @@ pub mod pallet {
 			)?;
 			// calls the mint collection function from the uniques pallet, mints a nft and puts
 			// the loan contract as the owner
-			pallet_uniques::Pallet::<T>::do_mint(collection_id.clone(), item_id, Self::account_id(), |_| Ok(()))?;
+			pallet_uniques::Pallet::<T>::do_mint(
+				collection_id.clone(),
+				item_id,
+				Self::account_id(),
+				|_| Ok(()),
+			)?;
 
 			let new_value = Self::total_loan_amount() + Self::balance_to_u64(value).unwrap();
 			TotalLoanAmount::<T>::put(new_value);
@@ -550,11 +589,18 @@ pub mod pallet {
 
 		#[pallet::call_index(99)]
 		#[pallet::weight(0)]
-		pub fn propose_milestone(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult{
+		pub fn propose_milestone(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(loan.milestones.len() > 0, Error::<T>::NoMilestonesLeft);
 			let milestone_proposal_index = Self::milestone_proposal_count() + 1;
+			let current_block_number = <frame_system::Pallet<T>>::block_number();
+			let expiry_block = current_block_number.saturating_add(<T as Config>::VotingTime::get());
+
+			MilestoneRoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
+				keys.try_push(milestone_proposal_index).map_err(|_| Error::<T>::TooManyLoans)?;
+				Ok::<(), DispatchError>(())
+			})?;
 			MilestoneProposals::<T>::insert(milestone_proposal_index, loan_id);
 			MilestoneProposalCount::<T>::put(milestone_proposal_index);
 			Ok(())
@@ -614,7 +660,7 @@ pub mod pallet {
 			loan.borrowed_amount = loan.borrowed_amount.saturating_add(amount);
 			loan.available_amount = loan.available_amount.saturating_sub(amount);
 			Loans::<T>::insert(loan_id, loan);
-			Self::deposit_event(Event::<T>::Withdraw {loan_index: loan_id, amount});
+			Self::deposit_event(Event::<T>::Withdraw { loan_index: loan_id, amount });
 			Ok(())
 		}
 
@@ -671,6 +717,32 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Let committee vote on milestone proposal
+		#[pallet::call_index(50)]
+		#[pallet::weight(0)]
+		pub fn vote_on_milestone_proposal(
+			origin: OriginFor<T>,
+			proposal_index: ProposalIndex,
+			vote: Vote,
+		) -> DispatchResult {
+			let origin = ensure_signed(origin)?;
+			let current_members = Self::voting_committee();
+			ensure!(current_members.contains(&origin), Error::<T>::InsufficientPermission);
+			let mut current_vote =
+				<OngoingMilestoneVotes<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
+			let voted = <UserMilestoneVotes<T>>::get((proposal_index, origin.clone()));
+			ensure!(voted.is_none(), Error::<T>::AlreadyVoted);
+			if vote == Vote::Yes {
+				current_vote.yes_votes += 1;
+			} else {
+				current_vote.no_votes += 1;
+			};
+
+			UserMilestoneVotes::<T>::insert((proposal_index, origin), vote);
+			OngoingMilestoneVotes::<T>::insert(proposal_index, current_vote);
+			Ok(())
+		}
+
 		/// Adding a new address to the vote committee
 		#[pallet::call_index(7)]
 		#[pallet::weight(0)]
@@ -722,7 +794,8 @@ pub mod pallet {
 				let mut loan = <Loans<T>>::take(loan_index).ok_or(Error::<T>::InvalidIndex)?;
 				let current_timestamp = T::TimeProvider::now().as_secs();
 				let time_difference = current_timestamp - loan.last_timestamp;
-				let loan_amount = Self::balance_to_u64(loan.available_amount + loan.borrowed_amount).unwrap();
+				let loan_amount =
+					Self::balance_to_u64(loan.available_amount + loan.borrowed_amount).unwrap();
 				let interests =
 					loan_amount * time_difference * loan.loan_apy / 365 / 60 / 60 / 24 / 100;
 				let interest_balance = Self::u64_to_balance_option(interests).unwrap();

@@ -275,20 +275,24 @@ pub mod pallet {
 			let ongoing_loans = pallet_community_loan_pool::Pallet::<T>::ongoing_loans();
 			let mut loan_apys = 0;
 			if ongoing_loans.len() == 0 {
-				return 0
+				return 0;
 			}
 			let total_amount_loan = pallet_community_loan_pool::Pallet::<T>::total_loan_amount();
 			if total_amount_loan == 0 {
-				return 0
+				return 0;
 			}
-			for i in ongoing_loans{
+			for i in ongoing_loans {
 				let loan_index = i;
 				let loan = pallet_community_loan_pool::Pallet::<T>::loans(loan_index).unwrap();
-				loan_apys += loan.loan_apy * TryInto::<u64>::try_into(loan.borrowed_amount + loan.available_amount).ok().unwrap() * 10000 / total_amount_loan;
+				loan_apys += loan.loan_apy
+					* TryInto::<u64>::try_into(loan.borrowed_amount + loan.available_amount)
+						.ok()
+						.unwrap() * 10000 / total_amount_loan;
 			}
 			let average_loan_apy = loan_apys / 10000;
-			total_amount_loan * 100 / Self::balance_to_u64(Self::total_stake()).unwrap() *
-				average_loan_apy /100
+			total_amount_loan * 100 / Self::balance_to_u64(Self::total_stake()).unwrap()
+				* average_loan_apy
+				/ 100
 		}
 
 		pub fn claim_rewards() -> DispatchResult {
@@ -300,8 +304,8 @@ pub mod pallet {
 				let apy = Self::calculate_current_apy();
 				let current_timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
 				let locked_amount = Self::balance_to_u64(ledger.locked).unwrap();
-				let rewards = locked_amount * apy * (current_timestamp - ledger.timestamp) /
-					365 / 60 / 60 / 24 / 100;
+				let rewards = locked_amount * apy * (current_timestamp - ledger.timestamp)
+					/ 365 / 60 / 60 / 24 / 100;
 				let new_locked_amount = locked_amount + rewards;
 				ledger.locked = Self::u64_to_balance_option(new_locked_amount).unwrap();
 				ledger.timestamp = current_timestamp;
@@ -327,7 +331,7 @@ pub mod pallet {
 				TotalStake::<T>::put(new_total_stake);
 				Self::deposit_event(Event::<T>::RewardsClaimed {
 					amount: rewards.try_into().ok().unwrap(),
-					apy
+					apy,
 				});
 			}
 			Ok(())
