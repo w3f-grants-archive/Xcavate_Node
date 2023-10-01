@@ -3,6 +3,25 @@ use frame_support::{
 	assert_noop, assert_ok,
 	traits::{OnFinalize, OnInitialize},
 };
+use frame_support::sp_runtime::Percent;
+
+
+use crate::{ProposedMilestone, BoundedProposedMilestones};
+use crate::Config;
+
+fn get_milestones(mut n: u32) -> BoundedProposedMilestones<Test> {
+	let max = <Test as Config>::MaxMilestonesPerProject::get();
+	if n > max {
+		n = max
+	}
+	(0..n)
+		.map(|_| ProposedMilestone {
+			percentage_to_unlock: Percent::from_percent((100 / n) as u8),
+		})
+		.collect::<Vec<ProposedMilestone>>()
+		.try_into()
+		.expect("bound is ensured; qed")
+}
 
 fn run_to_block(n: u64) {
 	while System::block_number() < n {
@@ -24,6 +43,7 @@ fn propose_works() {
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed(ALICE),
 			100,
+			get_milestones(10),
 			sp_runtime::MultiAddress::Id(BOB)
 		));
 		System::assert_last_event(Event::Proposed { proposal_index: 1 }.into());
@@ -38,6 +58,7 @@ fn propose_doesnt_work_not_enough_userbalance() {
 			CommunityLoanPool::propose(
 				RuntimeOrigin::signed(DAVE),
 				100,
+				get_milestones(10),
 				sp_runtime::MultiAddress::Id(BOB)
 			),
 			Error::<Test>::InsufficientProposersBalance
@@ -76,6 +97,7 @@ fn voting_works() {
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed(BOB),
 			100,
+			get_milestones(10),
 			sp_runtime::MultiAddress::Id(BOB)
 		));
 		assert_ok!(CommunityLoanPool::vote_on_proposal(
@@ -101,6 +123,7 @@ fn vote_rejected_with_no_votes() {
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed(BOB),
 			100,
+			get_milestones(10),
 			sp_runtime::MultiAddress::Id(BOB)
 		));
 		assert_ok!(CommunityLoanPool::vote_on_proposal(
@@ -124,6 +147,7 @@ fn voting_works_only_for_members() {
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed(BOB),
 			100,
+			get_milestones(10),
 			sp_runtime::MultiAddress::Id(BOB)
 		));
 		assert_noop!(
@@ -141,6 +165,7 @@ fn vote_evaluated_after_yes_votes() {
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed(BOB),
 			100,
+			get_milestones(10),
 			sp_runtime::MultiAddress::Id(BOB)
 		));
 		assert_ok!(CommunityLoanPool::vote_on_proposal(
@@ -160,6 +185,7 @@ fn reject_works() {
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed(ALICE),
 			100,
+			get_milestones(10),
 			sp_runtime::MultiAddress::Id(BOB)
 		));
 		assert_ok!(CommunityLoanPool::reject_proposal(RuntimeOrigin::root(), 1));
