@@ -420,9 +420,10 @@ pub mod pallet {
 				let voting_result = <OngoingMilestoneVotes<T>>::take(item);
 				if let Some(voting_result) = voting_result {
 					if voting_result.yes_votes > voting_result.no_votes {
-
-					} else {
-
+						let loan_id = <MilestoneProposals<T>>::take(item);
+						if let Some(loan_id) = loan_id {
+							Self::updating_available_amount(loan_id);
+						}
 					}
 					OngoingVotes::<T>::remove(item);
 				}
@@ -537,7 +538,7 @@ pub mod pallet {
 			let mut milestones = proposal.milestones;
 			let timestamp = T::TimeProvider::now().as_secs();
 			let amount = Self::balance_to_u64(value).unwrap()
-				* milestones[0].percentage_to_unlock.deconstruct() as u64;
+				* milestones[0].percentage_to_unlock.deconstruct() as u64 / 100;
 			milestones.remove(0);
 			let available_amount = Self::u64_to_balance_option(amount).unwrap();
 			let loan_info = LoanInfo {
@@ -591,7 +592,7 @@ pub mod pallet {
 		#[pallet::weight(0)]
 		pub fn propose_milestone(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
-			let loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
+			let loan = Self::loans(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(loan.milestones.len() > 0, Error::<T>::NoMilestonesLeft);
 			let milestone_proposal_index = Self::milestone_proposal_count() + 1;
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
@@ -601,6 +602,8 @@ pub mod pallet {
 				keys.try_push(milestone_proposal_index).map_err(|_| Error::<T>::TooManyLoans)?;
 				Ok::<(), DispatchError>(())
 			})?;
+			let vote_stats = VoteStats { yes_votes: 0, no_votes: 0 };
+			OngoingMilestoneVotes::<T>::insert(milestone_proposal_index, vote_stats);
 			MilestoneProposals::<T>::insert(milestone_proposal_index, loan_id);
 			MilestoneProposalCount::<T>::put(milestone_proposal_index);
 			Ok(())
@@ -806,6 +809,20 @@ pub mod pallet {
 				TotalLoanAmount::<T>::put(new_value);
 				Self::deposit_event(Event::<T>::ApyCharged { loan_index });
 			}
+			Ok(())
+		}
+
+		pub fn updating_available_amount(loan_id: LoanIndex) -> DispatchResult {
+			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
+			let loan_total_amount = loan.total_amount;
+			let mut loan_milestones = loan.milestones;
+			let added_available_amount = Self::balance_to_u64(loan_total_amount).unwrap() 
+				* loan_milestones[0].percentage_to_unlock.deconstruct() as u64 / 100;
+			loan_milestones.remove(0);
+			let new_available_amount = loan.available_amount.saturating_add(Self::u64_to_balance_option(added_available_amount).unwrap());
+			loan.milestones = loan_milestones;
+			loan.available_amount = new_available_amount;
+			Loans::<T>::insert(loan_id, loan);
 			Ok(())
 		}
 
