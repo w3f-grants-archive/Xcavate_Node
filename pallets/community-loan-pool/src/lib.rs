@@ -31,12 +31,11 @@ use frame_support::{
 	pallet_prelude::*,
 	sp_runtime,
 	traits::{
-		Currency, ExistenceRequirement::KeepAlive, GenesisBuild, Get, OnUnbalanced,
+		Currency, ExistenceRequirement::KeepAlive, Get, OnUnbalanced,
 		ReservableCurrency, UnixTime,
 	},
 	PalletId,
 };
-use sp_std::vec::Vec;
 
 use sp_std::prelude::*;
 
@@ -517,7 +516,7 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			proposal_index: ProposalIndex,
 			collection_id: T::CollectionId,
-			collateral_price: BalanceOf<T>,
+			//collateral_price: BalanceOf<T>,
 			item_id: T::ItemId,
 			loan_apy: LoanApy,
 			admin: AccountIdOf<T>,
@@ -592,7 +591,7 @@ pub mod pallet {
 		#[pallet::call_index(3)]
 		#[pallet::weight(0)]
 		pub fn propose_milestone(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
-			let origin = ensure_signed(origin)?;
+			let _origin = ensure_signed(origin)?;
 			let loan = Self::loans(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(loan.milestones.len() > 0, Error::<T>::NoMilestonesLeft);
 			let milestone_proposal_index = Self::milestone_proposal_count() + 1;
@@ -617,7 +616,7 @@ pub mod pallet {
 		#[pallet::call_index(4)]
 		#[pallet::weight(0)]
 		pub fn delete_loan(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
-			let signer = ensure_signed(origin.clone())?;
+			let _signer = ensure_signed(origin.clone())?;
 			let loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			//ensure!(signer == loan.contract_account_id, Error::<T>::InsufficientPermission);
 			ensure!(loan.borrowed_amount.is_zero(), Error::<T>::LoanStillOngoing);

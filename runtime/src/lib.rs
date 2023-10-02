@@ -18,7 +18,7 @@ use frame_support::{
 	ord_parameter_types,
 	pallet_prelude::{DispatchClass, Get},
 	traits::{
-		tokens::nonfungibles_v2::Inspect, AsEnsureOriginWithArg, ConstU16, EitherOfDiverse,
+		tokens::nonfungibles_v2::Inspect, AsEnsureOriginWithArg, EitherOfDiverse,
 		EqualPrivilegeOnly,
 	},
 	PalletId,
@@ -459,7 +459,7 @@ where
 					admin.into(),
 				);
 				match call_result {
-					Err(e) => return Err(e),
+					Err(e) => Err(e),
 					Ok(_) => Ok(RetVal::Converging(0)),
 				}
 			},
@@ -480,7 +480,7 @@ where
 					dest.into(),
 				);
 				match call_result {
-					Err(e) => return Err(e),
+					Err(e) => Err(e),
 					Ok(_) => Ok(RetVal::Converging(0)),
 				}
 			},
@@ -501,7 +501,7 @@ where
 					Some(check_owner.into()),
 				);
 				match call_result {
-					Err(e) => return Err(e),
+					Err(e) => Err(e),
 					Ok(_) => Ok(RetVal::Converging(0)),
 				}
 			},
@@ -1387,9 +1387,9 @@ impl pallet_scheduler::Config for Runtime {
 
 parameter_types! {
 	pub const PreimageMaxSize: u32 = 4096 * 1024;
-	pub const PreimageBaseDeposit: Balance = 1 * DOLLARS;
+	pub const PreimageBaseDeposit: Balance = DOLLARS;
 	// One cent: $10,000 / MB
-	pub const PreimageByteDeposit: Balance = 1 * CENTS;
+	pub const PreimageByteDeposit: Balance = CENTS;
 }
 
 impl pallet_preimage::Config for Runtime {

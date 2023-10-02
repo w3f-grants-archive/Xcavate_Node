@@ -1,7 +1,6 @@
 use crate::{AccountId, Assets, Runtime};
 use frame_support::traits::fungibles::{Balanced, Credit};
 use pallet_asset_tx_payment::HandleCredit;
-use pallet_balances::CreditOf;
 
 /// A `HandleCredit` implementation that naively transfers the fees to the block author.
 /// Will drop and burn the assets in case the transfer fails.

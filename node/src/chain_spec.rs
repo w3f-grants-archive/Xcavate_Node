@@ -1,5 +1,5 @@
 use node_template_runtime::{
-	constants::currency::DOLLARS, opaque::SessionKeys, wasm_binary_unwrap, AccountId, AssetsConfig,
+	constants::currency::DOLLARS, opaque::SessionKeys, AccountId, AssetsConfig,
 	BabeConfig, Balance, BalancesConfig, CouncilConfig, DemocracyConfig, GenesisConfig,
 	MaxNominations, SessionConfig, Signature, StakerStatus, StakingConfig, SudoConfig,
 	SystemConfig, TechnicalCommitteeConfig, BABE_GENESIS_EPOCH_CONFIG, WASM_BINARY,
@@ -212,7 +212,6 @@ fn testnet_genesis(
 			let nominations = initial_authorities
 				.as_slice()
 				.choose_multiple(&mut rng, count)
-				.into_iter()
 				.map(|choice| choice.0.clone())
 				.collect::<Vec<_>>();
 			(x.clone(), x.clone(), STASH, StakerStatus::Nominator(nominations))
@@ -230,7 +229,7 @@ fn testnet_genesis(
 			balances: endowed_accounts
 				.iter()
 				.cloned()
-				.map(|x| (x.0.clone(), x.1.clone()))
+				.map(|x| (x.0.clone(), x.1))
 				.collect(),
 		},
 		aura: Default::default(),
