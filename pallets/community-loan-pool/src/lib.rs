@@ -500,6 +500,7 @@ pub mod pallet {
 			let index = evaluated_loans.iter().position(|x| *x == proposal_index);
 			if index.is_some() {
 				evaluated_loans.remove(index.unwrap());
+				EvaluatedLoans::<T>::put(evaluated_loans);
 			};
 			Ok(())
 		}
@@ -588,7 +589,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::call_index(99)]
+		#[pallet::call_index(3)]
 		#[pallet::weight(0)]
 		pub fn propose_milestone(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
@@ -613,7 +614,7 @@ pub mod pallet {
 		///
 		/// May only be called from the loan contract.
 
-		#[pallet::call_index(3)]
+		#[pallet::call_index(4)]
 		#[pallet::weight(0)]
 		pub fn delete_loan(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
@@ -640,7 +641,7 @@ pub mod pallet {
 		///
 		/// May only be called from the loan contract.
 
-		#[pallet::call_index(4)]
+		#[pallet::call_index(5)]
 		#[pallet::weight(0)]
 		pub fn withdraw(
 			origin: OriginFor<T>,
@@ -667,7 +668,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::call_index(5)]
+		#[pallet::call_index(6)]
 		#[pallet::weight(0)]
 		pub fn repay(
 			origin: OriginFor<T>,
@@ -695,7 +696,7 @@ pub mod pallet {
 		}
 
 		/// Let committee members vote for a proposal
-		#[pallet::call_index(6)]
+		#[pallet::call_index(7)]
 		#[pallet::weight(0)]
 		pub fn vote_on_proposal(
 			origin: OriginFor<T>,
@@ -721,7 +722,7 @@ pub mod pallet {
 		}
 
 		/// Let committee vote on milestone proposal
-		#[pallet::call_index(50)]
+		#[pallet::call_index(8)]
 		#[pallet::weight(0)]
 		pub fn vote_on_milestone_proposal(
 			origin: OriginFor<T>,
@@ -747,7 +748,7 @@ pub mod pallet {
 		}
 
 		/// Adding a new address to the vote committee
-		#[pallet::call_index(7)]
+		#[pallet::call_index(9)]
 		#[pallet::weight(0)]
 		pub fn add_committee_member(
 			origin: OriginFor<T>,
