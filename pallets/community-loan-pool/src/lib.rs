@@ -31,8 +31,7 @@ use frame_support::{
 	pallet_prelude::*,
 	sp_runtime,
 	traits::{
-		Currency, ExistenceRequirement::KeepAlive, Get, OnUnbalanced,
-		ReservableCurrency, UnixTime,
+		Currency, ExistenceRequirement::KeepAlive, Get, OnUnbalanced, ReservableCurrency, UnixTime,
 	},
 	PalletId,
 };
@@ -59,6 +58,8 @@ pub type BalanceOf<T> =
 pub type BoundedProposedMilestones<T> =
 	BoundedVec<ProposedMilestone, <T as Config>::MaxMilestonesPerProject>;
 
+pub const BASEINTERESTRATE: f32 = 5.25;
+
 #[cfg(feature = "runtime-benchmarks")]
 pub struct NftHelper;
 
@@ -70,8 +71,8 @@ pub struct ProposedMilestone {
 
 #[cfg(feature = "runtime-benchmarks")]
 pub trait BenchmarkHelper<CollectionId, ItemId> {
-	fn to_collection(i: u32) -> CollectionId;
-	fn to_nft(i: u32) -> ItemId;
+	pub fn to_collection(i: u32) -> CollectionId;
+	pub fn to_nft(i: u32) -> ItemId;
 }
 
 #[cfg(feature = "runtime-benchmarks")]
@@ -105,6 +106,7 @@ pub mod pallet {
 		amount: Balance,
 		milestones: BoundedProposedMilestones<T>,
 		beneficiary: AccountIdOf<T>,
+		apr_rate: LoanApy,
 		bond: Balance,
 		created_at: BlockNumber,
 	}
@@ -231,16 +233,20 @@ pub mod pallet {
 	#[pallet::getter(fn proposal_count)]
 	pub(super) type ProposalCount<T> = StorageValue<_, ProposalIndex, ValueQuery>;
 
+ 	/// Number of proposals that have been made.
+	#[pallet::storage]
+	#[pallet::getter(fn collection_count)]
+	pub(super) type CollectionCount<T: Config> = StorageValue<_, T::CollectionId, ValueQuery>; 
+
+	/// Number of proposals that have been made.
+	#[pallet::storage]
+	#[pallet::getter(fn nft_count)]
+	pub(super) type NftCount<T: Config> = StorageValue<_, T::ItemId, ValueQuery>; 
+
 	/// Number of milestone proposal that have benn made.
 	#[pallet::storage]
 	#[pallet::getter(fn milestone_proposal_count)]
 	pub(super) type MilestoneProposalCount<T> = StorageValue<_, ProposalIndex, ValueQuery>;
-
-	/// Proposals with won the voting
-	#[pallet::storage]
-	#[pallet::getter(fn evaluated_loans)]
-	pub(super) type EvaluatedLoans<T: Config> =
-		StorageValue<_, BoundedVec<ProposalIndex, T::MaxOngoingLoans>, ValueQuery>;
 
 	/// Total amount of loan funds
 	#[pallet::storage]
@@ -404,7 +410,7 @@ pub mod pallet {
 				let voting_result = <OngoingVotes<T>>::take(item);
 				if let Some(voting_result) = voting_result {
 					if voting_result.yes_votes > voting_result.no_votes {
-						EvaluatedLoans::<T>::try_append(item).unwrap_or_default();
+						Self::approve_loan_proposal(*item).unwrap_or_default();
 					} else {
 						Self::reject_loan_proposal(*item).unwrap_or_default();
 					}
@@ -450,6 +456,8 @@ pub mod pallet {
 			amount: BalanceOf<T>,
 			proposed_milestones: BoundedProposedMilestones<T>,
 			beneficiary: AccountIdLookupOf<T>,
+			developer_experience: u64,
+			loan_term: u64,
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let beneficiary = T::Lookup::lookup(beneficiary)?;
@@ -465,12 +473,13 @@ pub mod pallet {
 				keys.try_push(proposal_index).map_err(|_| Error::<T>::TooManyLoans)?;
 				Ok::<(), DispatchError>(())
 			})?;
-
+			let apr_rate = Self::calculate_apr(developer_experience, loan_term);
 			let proposal = Proposal {
 				proposer: origin,
 				amount,
 				milestones: proposed_milestones,
 				beneficiary,
+				apr_rate,
 				bond,
 				created_at: current_block_number,
 			};
@@ -486,7 +495,7 @@ pub mod pallet {
 		/// Reject a proposed spend. The original deposit will be slashed.
 		///
 		/// May only be called from `T::RejectOrigin`.
-		#[pallet::call_index(1)]
+/* 		#[pallet::call_index(1)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::reject_proposal())]
 		pub fn reject_proposal(
 			origin: OriginFor<T>,
@@ -502,91 +511,7 @@ pub mod pallet {
 				EvaluatedLoans::<T>::put(evaluated_loans);
 			};
 			Ok(())
-		}
-
-		/// Approve a proposed spend. The original deposit will be released.
-		/// It will call the create_loan function in the contract and deposit the loan amount in
-		/// the contract.
-		///
-		/// May only be called from `T::ApproveOrigin`.
-
-		#[pallet::call_index(2)]
-		#[pallet::weight(0)]
-		pub fn approve_proposal(
-			origin: OriginFor<T>,
-			proposal_index: ProposalIndex,
-			collection_id: T::CollectionId,
-			//collateral_price: BalanceOf<T>,
-			item_id: T::ItemId,
-			loan_apy: LoanApy,
-			admin: AccountIdOf<T>,
-		) -> DispatchResult {
-			let _signer = ensure_signed(origin.clone())?;
-			//T::ApproveOrigin::ensure_origin(origin.clone())?;
-			let proposal = <Proposals<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
-			let mut evaluated_loans = Self::evaluated_loans();
-			ensure!(evaluated_loans.contains(&proposal_index), Error::<T>::NotApproved);
-			let index = evaluated_loans.iter().position(|x| *x == proposal_index).unwrap();
-			evaluated_loans.remove(index);
-
-			EvaluatedLoans::<T>::put(evaluated_loans);
-			let err_amount =
-				<T as pallet::Config>::Currency::unreserve(&proposal.proposer, proposal.bond);
-			debug_assert!(err_amount.is_zero());
-			let user = proposal.beneficiary;
-			let value = proposal.amount;
-			let mut milestones = proposal.milestones;
-			let timestamp = T::TimeProvider::now().as_secs();
-			let amount = Self::balance_to_u64(value).unwrap()
-				* milestones[0].percentage_to_unlock.deconstruct() as u64 / 100;
-			milestones.remove(0);
-			let available_amount = Self::u64_to_balance_option(amount).unwrap();
-			let loan_info = LoanInfo {
-				borrower: user.clone(),
-				total_amount: value,
-				available_amount,
-				borrowed_amount: Default::default(),
-				milestones,
-				collection_id: collection_id.clone(),
-				item_id,
-				loan_apy,
-				last_timestamp: timestamp,
-			};
-
-			let loan_index = Self::loan_count() + 1;
-
-			Loans::<T>::insert(loan_index, loan_info);
-			OngoingLoans::<T>::try_append(loan_index).map_err(|_| Error::<T>::TooManyLoans)?;
-			// calls the create collection function from the uniques pallet, and set the admin as
-			// the admin of the collection
-			pallet_uniques::Pallet::<T>::do_create_collection(
-				collection_id.clone(),
-				admin.clone(),
-				admin.clone(),
-				T::CollectionDeposit::get(),
-				false,
-				pallet_uniques::Event::Created {
-					creator: admin.clone(),
-					owner: admin.clone(),
-					collection: collection_id.clone(),
-				},
-			)?;
-			// calls the mint collection function from the uniques pallet, mints a nft and puts
-			// the loan contract as the owner
-			pallet_uniques::Pallet::<T>::do_mint(
-				collection_id.clone(),
-				item_id,
-				Self::account_id(),
-				|_| Ok(()),
-			)?;
-
-			let new_value = Self::total_loan_amount() + Self::balance_to_u64(value).unwrap();
-			TotalLoanAmount::<T>::put(new_value);
-			Proposals::<T>::remove(proposal_index);
-			LoanCount::<T>::put(loan_index);
-			Self::deposit_event(Event::<T>::Approved { proposal_index });
-			Ok(())
-		}
+		} */
 
 		#[pallet::call_index(3)]
 		#[pallet::weight(0)]
@@ -596,7 +521,8 @@ pub mod pallet {
 			ensure!(loan.milestones.len() > 0, Error::<T>::NoMilestonesLeft);
 			let milestone_proposal_index = Self::milestone_proposal_count() + 1;
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
-			let expiry_block = current_block_number.saturating_add(<T as Config>::VotingTime::get());
+			let expiry_block =
+				current_block_number.saturating_add(<T as Config>::VotingTime::get());
 
 			MilestoneRoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
 				keys.try_push(milestone_proposal_index).map_err(|_| Error::<T>::TooManyLoans)?;
@@ -789,6 +715,71 @@ pub mod pallet {
 			Ok(())
 		}
 
+		fn approve_loan_proposal(proposal_index: ProposalIndex) -> DispatchResult
+		{
+			let proposal = <Proposals<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
+			let err_amount =
+				<T as pallet::Config>::Currency::unreserve(&proposal.proposer, proposal.bond);
+			debug_assert!(err_amount.is_zero());
+			let user = proposal.beneficiary;
+			let value = proposal.amount;
+			let mut milestones = proposal.milestones;
+			let timestamp = T::TimeProvider::now().as_secs();
+			let amount = Self::balance_to_u64(value).unwrap()
+				* milestones[0].percentage_to_unlock.deconstruct() as u64
+				/ 100;
+			milestones.remove(0);
+			let available_amount = Self::u64_to_balance_option(amount).unwrap();
+			let loan_apy = proposal.apr_rate;
+			let collection_id = Self::collection_count();
+			let item_id: T::ItemId = Self::nft_count();
+			let loan_info = LoanInfo {
+				borrower: user.clone(),
+				total_amount: value,
+				available_amount,
+				borrowed_amount: Default::default(),
+				milestones,
+				collection_id: collection_id.clone(),
+				item_id,
+				loan_apy,
+				last_timestamp: timestamp,
+			};
+
+			let loan_index = Self::loan_count() + 1;
+
+			Loans::<T>::insert(loan_index, loan_info);
+			OngoingLoans::<T>::try_append(loan_index).map_err(|_| Error::<T>::TooManyLoans)?;
+			// calls the create collection function from the uniques pallet, and set the admin as
+			// the admin of the collection
+			pallet_uniques::Pallet::<T>::do_create_collection(
+				collection_id.clone(),
+				Self::account_id(),
+				Self::account_id(),
+				T::CollectionDeposit::get(),
+				false,
+				pallet_uniques::Event::Created {
+					creator: Self::account_id(),
+					owner: Self::account_id(),
+					collection: collection_id.clone(),
+				},
+			)?;
+			// calls the mint collection function from the uniques pallet, mints a nft and puts
+			// the loan contract as the owner
+			pallet_uniques::Pallet::<T>::do_mint(
+				collection_id.clone(),
+				item_id,
+				Self::account_id(),
+				|_| Ok(()),
+			)?;
+
+			let new_value = Self::total_loan_amount() + Self::balance_to_u64(value).unwrap();
+			TotalLoanAmount::<T>::put(new_value);
+			Proposals::<T>::remove(proposal_index);
+			LoanCount::<T>::put(loan_index);
+			Self::deposit_event(Event::<T>::Approved { proposal_index });
+			Ok(())
+		}
+
 		// Work in progress, to be implmented in the future
 		pub fn charge_apy() -> DispatchResult {
 			let ongoing_loans = Self::ongoing_loans();
@@ -800,7 +791,7 @@ pub mod pallet {
 				let loan_amount =
 					Self::balance_to_u64(loan.available_amount + loan.borrowed_amount).unwrap();
 				let interests =
-					loan_amount * time_difference * loan.loan_apy / 365 / 60 / 60 / 24 / 100;
+					loan_amount * time_difference * loan.loan_apy / 365 / 60 / 60 / 24 / 100 / 100;
 				let interest_balance = Self::u64_to_balance_option(interests).unwrap();
 				loan.borrowed_amount += interest_balance;
 				loan.last_timestamp = current_timestamp;
@@ -816,14 +807,36 @@ pub mod pallet {
 			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			let loan_total_amount = loan.total_amount;
 			let mut loan_milestones = loan.milestones;
-			let added_available_amount = Self::balance_to_u64(loan_total_amount).unwrap() 
-				* loan_milestones[0].percentage_to_unlock.deconstruct() as u64 / 100;
+			let added_available_amount = Self::balance_to_u64(loan_total_amount).unwrap()
+				* loan_milestones[0].percentage_to_unlock.deconstruct() as u64
+				/ 100;
 			loan_milestones.remove(0);
-			let new_available_amount = loan.available_amount.saturating_add(Self::u64_to_balance_option(added_available_amount).unwrap());
+			let new_available_amount = loan
+				.available_amount
+				.saturating_add(Self::u64_to_balance_option(added_available_amount).unwrap());
 			loan.milestones = loan_milestones;
 			loan.available_amount = new_available_amount;
 			Loans::<T>::insert(loan_id, loan);
 			Ok(())
+		}
+
+		fn calculate_apr(experience: u64, loan_term: u64) -> u64 {
+			let experinece_number: f32 = match experience {
+				1..=5 => 1.7,
+				6..=15 => 1.5,
+				15..=20 => 1.3,
+				_ => 1.2,
+			};
+
+			let loan_term_number: f32 = match loan_term {
+				1..=12 => 1.4,
+				13..=24 => 1.3,
+				_ => 1.2,
+			};
+
+			let apr = BASEINTERESTRATE * experinece_number * loan_term_number;
+			let interest_points = apr * 100.0;
+			interest_points as u64
 		}
 
 		pub fn balance_to_u64(input: BalanceOf<T>) -> Option<u64> {

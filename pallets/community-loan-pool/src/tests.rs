@@ -1,13 +1,12 @@
 use crate::{mock::*, Error, Event};
+use frame_support::sp_runtime::Percent;
 use frame_support::{
 	assert_noop, assert_ok,
 	traits::{OnFinalize, OnInitialize},
 };
-use frame_support::sp_runtime::Percent;
 
-
-use crate::{ProposedMilestone, BoundedProposedMilestones};
 use crate::Config;
+use crate::{BoundedProposedMilestones, ProposedMilestone};
 
 fn get_milestones(mut n: u32) -> BoundedProposedMilestones<Test> {
 	let max = <Test as Config>::MaxMilestonesPerProject::get();
@@ -15,9 +14,7 @@ fn get_milestones(mut n: u32) -> BoundedProposedMilestones<Test> {
 		n = max
 	}
 	(0..n)
-		.map(|_| ProposedMilestone {
-			percentage_to_unlock: Percent::from_percent((100 / n) as u8),
-		})
+		.map(|_| ProposedMilestone { percentage_to_unlock: Percent::from_percent((100 / n) as u8) })
 		.collect::<Vec<ProposedMilestone>>()
 		.try_into()
 		.expect("bound is ensured; qed")
@@ -198,14 +195,7 @@ fn approve_fails_invalid_index() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_noop!(
-			CommunityLoanPool::approve_proposal(
-				RuntimeOrigin::signed(ALICE),
-				0,
-				0,
-				0,
-				10,
-				ALICE,
-			),
+			CommunityLoanPool::approve_proposal(RuntimeOrigin::signed(ALICE), 0, 0, 0, 10, ALICE,),
 			Error::<Test>::InvalidIndex
 		);
 	})
@@ -238,7 +228,11 @@ fn milestone_works() {
 			ALICE,
 		));
 		assert_ok!(CommunityLoanPool::propose_milestone(RuntimeOrigin::signed(BOB), 1));
-		assert_ok!(CommunityLoanPool::vote_on_milestone_proposal(RuntimeOrigin::signed(ALICE), 1, crate::Vote::Yes));
+		assert_ok!(CommunityLoanPool::vote_on_milestone_proposal(
+			RuntimeOrigin::signed(ALICE),
+			1,
+			crate::Vote::Yes
+		));
 		run_to_block(43);
 		assert_eq!(CommunityLoanPool::loans(1).unwrap().available_amount, 20);
 	})

@@ -1,21 +1,13 @@
 use super::*;
 
 use crate as pallet_community_loan_pool;
-use frame_support::{
-	parameter_types,
-	traits::{AsEnsureOriginWithArg, ConstBool, ConstU16, ConstU64, Nothing},
-};
-use sp_core::{ConstU32, H256};
-use sp_runtime::{
-	testing::Header,
-	traits::{AccountIdLookup, BlakeTwo256, IdentityLookup},
-};
-
-use pallet_contracts::Schedule;
+use frame_support::{parameter_types, traits::AsEnsureOriginWithArg};
+use sp_core::ConstU32;
+use sp_runtime::traits::{AccountIdLookup, BlakeTwo256};
 
 use pallet_transaction_payment::CurrencyAdapter;
 
-use frame_support::traits::{ConstU8, OnInitialize};
+use frame_support::traits::ConstU8;
 
 use frame_support::weights::IdentityFee;
 
@@ -25,14 +17,11 @@ use sp_runtime::traits::One;
 
 use sp_runtime::BuildStorage;
 
-pub type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 pub type Block = frame_system::mocking::MockBlock<Test>;
 
 pub type AccountId = u32;
 
 pub type BlockNumber = u64;
-
-pub type Balance = u128;
 
 pub const ALICE: AccountId = 1;
 pub const BOB: AccountId = 2;

@@ -1,8 +1,8 @@
 use node_template_runtime::{
-	constants::currency::DOLLARS, opaque::SessionKeys, AccountId, AssetsConfig,
-	BabeConfig, Balance, BalancesConfig, CouncilConfig, DemocracyConfig, GenesisConfig,
-	MaxNominations, SessionConfig, Signature, StakerStatus, StakingConfig, SudoConfig,
-	SystemConfig, TechnicalCommitteeConfig, BABE_GENESIS_EPOCH_CONFIG, WASM_BINARY,
+	constants::currency::DOLLARS, opaque::SessionKeys, AccountId, AssetsConfig, BabeConfig,
+	Balance, BalancesConfig, CouncilConfig, DemocracyConfig, GenesisConfig, MaxNominations,
+	SessionConfig, Signature, StakerStatus, StakingConfig, SudoConfig, SystemConfig,
+	TechnicalCommitteeConfig, BABE_GENESIS_EPOCH_CONFIG, WASM_BINARY,
 };
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use sc_service::{ChainType, Properties};
@@ -226,11 +226,7 @@ fn testnet_genesis(
 	GenesisConfig {
 		system: SystemConfig { code: wasm_binary.to_vec(), ..Default::default() },
 		balances: BalancesConfig {
-			balances: endowed_accounts
-				.iter()
-				.cloned()
-				.map(|x| (x.0.clone(), x.1))
-				.collect(),
+			balances: endowed_accounts.iter().cloned().map(|x| (x.0.clone(), x.1)).collect(),
 		},
 		aura: Default::default(),
 		grandpa: Default::default(),
