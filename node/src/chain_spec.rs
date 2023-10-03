@@ -1,5 +1,5 @@
 use node_template_runtime::{
-	constants::currency::DOLLARS, opaque::SessionKeys, wasm_binary_unwrap, AccountId, AssetsConfig,
+	constants::currency::DOLLARS, opaque::SessionKeys, AccountId, AssetsConfig,
 	BabeConfig, Balance, BalancesConfig, CouncilConfig, DemocracyConfig, GenesisConfig,
 	MaxNominations, SessionConfig, Signature, StakerStatus, StakingConfig, SudoConfig,
 	SystemConfig, TechnicalCommitteeConfig, BABE_GENESIS_EPOCH_CONFIG, WASM_BINARY,
@@ -87,7 +87,7 @@ pub fn get_endowed_accounts_with_balance() -> Vec<(AccountId, u128)> {
 	accounts_with_balance.iter().for_each(|tup1| {
 		for tup2 in additional_accounts_with_balance.iter() {
 			if tup1.0 == tup2.0 {
-				return
+				return;
 			}
 		}
 		accounts.push(tup1.to_owned());
@@ -212,7 +212,6 @@ fn testnet_genesis(
 			let nominations = initial_authorities
 				.as_slice()
 				.choose_multiple(&mut rng, count)
-				.into_iter()
 				.map(|choice| choice.0.clone())
 				.collect::<Vec<_>>();
 			(x.clone(), x.clone(), STASH, StakerStatus::Nominator(nominations))
@@ -225,15 +224,12 @@ fn testnet_genesis(
 	const STASH: Balance = ENDOWMENT / 1000;
 
 	GenesisConfig {
-		system: SystemConfig { 
-			code: wasm_binary.to_vec(),
-			..Default::default()
-		},
+		system: SystemConfig { code: wasm_binary.to_vec(), ..Default::default() },
 		balances: BalancesConfig {
 			balances: endowed_accounts
 				.iter()
 				.cloned()
-				.map(|x| (x.0.clone(), x.1.clone()))
+				.map(|x| (x.0.clone(), x.1))
 				.collect(),
 		},
 		aura: Default::default(),

@@ -13,12 +13,12 @@ mod voter_bags;
 use constants::{currency::*, time::*};
 use frame_election_provider_support::{onchain, ExtendedBalance, SequentialPhragmen, VoteWeight};
 use frame_support::{
-	dispatch::{PostDispatchInfo, Pays },
+	dispatch::{Pays, PostDispatchInfo},
 	instances::{Instance1, Instance2},
 	ord_parameter_types,
 	pallet_prelude::{DispatchClass, Get},
 	traits::{
-		tokens::nonfungibles_v2::Inspect, AsEnsureOriginWithArg, ConstU16, EitherOfDiverse,
+		tokens::nonfungibles_v2::Inspect, AsEnsureOriginWithArg, EitherOfDiverse,
 		EqualPrivilegeOnly,
 	},
 	PalletId,
@@ -29,10 +29,9 @@ use pallet_acurast_fulfillment_receiver::Fulfillment;
 
 use frame_system::{
 	limits::BlockWeights as SystemBlockWeights, EnsureRoot, EnsureSigned, EnsureSignedBy,
-	EnsureWithSuccess,
-	EventRecord
+	EnsureWithSuccess, EventRecord,
 };
-use polkadot_primitives::{Nonce};
+use polkadot_primitives::Nonce;
 
 use node_primitives::Moment;
 use pallet_grandpa::AuthorityId as GrandpaId;
@@ -54,7 +53,7 @@ use sp_runtime::{
 		IdentifyAccount, NumberFor, One, OpaqueKeys, Verify,
 	},
 	transaction_validity::{TransactionPriority, TransactionSource, TransactionValidity},
-	ApplyExtrinsicResult, FixedU128, MultiSignature, Percent, DispatchResultWithInfo
+	ApplyExtrinsicResult, DispatchResultWithInfo, FixedU128, MultiSignature, Percent,
 };
 use sp_std::prelude::*;
 #[cfg(feature = "std")]
@@ -65,6 +64,7 @@ pub mod impls;
 use impls::CreditToBlockAuthor;
 
 // A few exports that help ease life for downstream crates.
+use frame_election_provider_support::bounds::{ElectionBounds, ElectionBoundsBuilder};
 pub use frame_support::{
 	construct_runtime, parameter_types,
 	traits::{
@@ -81,17 +81,16 @@ pub use frame_support::{
 pub use frame_system::Call as SystemCall;
 pub use pallet_balances::Call as BalancesCall;
 use pallet_election_provider_multi_phase::SolutionAccuracyOf;
+/// Import the nft pallet
+use pallet_nfts::PalletFeatures;
 #[cfg(any(feature = "std", test))]
 pub use pallet_staking::StakerStatus;
 pub use pallet_timestamp::Call as TimestampCall;
 use pallet_transaction_payment::{ConstFeeMultiplier, CurrencyAdapter, Multiplier};
+use sp_core::H256;
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
-use frame_election_provider_support::bounds::{ElectionBounds, ElectionBoundsBuilder};
-/// Import the nft pallet
-use pallet_nfts::PalletFeatures;
-use sp_core::H256;
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -460,7 +459,7 @@ where
 					admin.into(),
 				);
 				match call_result {
-					Err(e) => return Err(e),
+					Err(e) => Err(e),
 					Ok(_) => Ok(RetVal::Converging(0)),
 				}
 			},
@@ -481,7 +480,7 @@ where
 					dest.into(),
 				);
 				match call_result {
-					Err(e) => return Err(e),
+					Err(e) => Err(e),
 					Ok(_) => Ok(RetVal::Converging(0)),
 				}
 			},
@@ -502,7 +501,7 @@ where
 					Some(check_owner.into()),
 				);
 				match call_result {
-					Err(e) => return Err(e),
+					Err(e) => Err(e),
 					Ok(_) => Ok(RetVal::Converging(0)),
 				}
 			},
@@ -593,6 +592,7 @@ parameter_types! {
 	pub const MaxLoans: u32 = 10000;
 	pub const VotingTime: BlockNumber = 20;
 	pub const MaximumCommitteeMembers: u32 = 10;
+	pub const MaxMilestones: u32 = 10;
 }
 
 /// Configure the pallet-community-loan-pool in pallets/community-loan-pool.
@@ -611,6 +611,10 @@ impl pallet_community_loan_pool::Config for Runtime {
 		EnsureRoot<AccountId>,
 		pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>,
 	>;
+	type DeleteOrigin = EitherOfDiverse<
+		EnsureRoot<AccountId>,
+		pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>,
+	>;
 	type RuntimeEvent = RuntimeEvent;
 	type ProposalBond = ProposalBond;
 	type ProposalBondMinimum = ProposalBondMinimum;
@@ -623,6 +627,7 @@ impl pallet_community_loan_pool::Config for Runtime {
 	type Helper = pallet_nft::NftHelper;
 	type VotingTime = VotingTime;
 	type MaxCommitteeMembers = MaximumCommitteeMembers;
+	type MaxMilestonesPerProject = MaxMilestones;
 }
 
 parameter_types! {
@@ -743,7 +748,7 @@ impl pallet_contracts::Config for Runtime {
 	type MaxDebugBufferLen = ConstU32<{ 2 * 1024 * 1024 }>;
 	type DefaultDepositLimit = DefaultDepositLimit;
 	type MaxDelegateDependencies = ConstU32<32>;
-  	type CodeHashLockupDepositPercent = CodeHashLockupDepositPercent;
+	type CodeHashLockupDepositPercent = CodeHashLockupDepositPercent;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type Migrations = ();
 	type Debug = ();
@@ -967,7 +972,7 @@ impl pallet_collective::Config<CouncilCollective> for Runtime {
 	type DefaultVote = pallet_collective::PrimeDefaultVote;
 	type WeightInfo = pallet_collective::weights::SubstrateWeight<Runtime>;
 	type SetMembersOrigin = EnsureRoot<Self::AccountId>;
-	type MaxProposalWeight = MaxCollectivesProposalWeight; 
+	type MaxProposalWeight = MaxCollectivesProposalWeight;
 }
 
 parameter_types! {
@@ -987,7 +992,7 @@ impl pallet_collective::Config<TechnicalCollective> for Runtime {
 	type DefaultVote = pallet_collective::PrimeDefaultVote;
 	type WeightInfo = pallet_collective::weights::SubstrateWeight<Runtime>;
 	type SetMembersOrigin = EnsureRoot<Self::AccountId>;
-	type MaxProposalWeight = MaxCollectivesProposalWeight; 
+	type MaxProposalWeight = MaxCollectivesProposalWeight;
 }
 
 const ALLIANCE_MOTION_DURATION_IN_BLOCKS: BlockNumber = 5 * DAYS;
@@ -1009,7 +1014,7 @@ impl pallet_collective::Config<AllianceCollective> for Runtime {
 	type DefaultVote = pallet_collective::PrimeDefaultVote;
 	type WeightInfo = pallet_collective::weights::SubstrateWeight<Runtime>;
 	type SetMembersOrigin = EnsureRoot<Self::AccountId>;
-	type MaxProposalWeight = MaxCollectivesProposalWeight; 
+	type MaxProposalWeight = MaxCollectivesProposalWeight;
 }
 
 parameter_types! {
@@ -1112,8 +1117,8 @@ impl Get<Option<(usize, ExtendedBalance)>> for OffchainRandomBalancing {
 			max => {
 				let seed = sp_io::offchain::random_seed();
 				let random = <u32>::decode(&mut TrailingZeroInput::new(&seed))
-					.expect("input is padded with zeroes; qed") %
-					max.saturating_add(1);
+					.expect("input is padded with zeroes; qed")
+					% max.saturating_add(1);
 				random as usize
 			},
 		};
@@ -1382,9 +1387,9 @@ impl pallet_scheduler::Config for Runtime {
 
 parameter_types! {
 	pub const PreimageMaxSize: u32 = 4096 * 1024;
-	pub const PreimageBaseDeposit: Balance = 1 * DOLLARS;
+	pub const PreimageBaseDeposit: Balance = DOLLARS;
 	// One cent: $10,000 / MB
-	pub const PreimageByteDeposit: Balance = 1 * CENTS;
+	pub const PreimageByteDeposit: Balance = CENTS;
 }
 
 impl pallet_preimage::Config for Runtime {
@@ -1512,7 +1517,6 @@ impl pallet_preimage::Config for Runtime {
 // }
 
 // TODO:
-
 
 pub struct OnAcurastFulfillment;
 impl pallet_acurast_fulfillment_receiver::traits::OnFulfillment<Runtime> for OnAcurastFulfillment {
