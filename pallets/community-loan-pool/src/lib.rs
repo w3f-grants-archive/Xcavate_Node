@@ -233,16 +233,6 @@ pub mod pallet {
 	#[pallet::getter(fn proposal_count)]
 	pub(super) type ProposalCount<T> = StorageValue<_, ProposalIndex, ValueQuery>;
 
-/*  	/// Number of proposals that have been made.
-	#[pallet::storage]
-	#[pallet::getter(fn collection_count)]
-	pub(super) type CollectionCount<T: Config> = StorageValue<_, T::CollectionId, ValueQuery>; 
-
-	/// Number of proposals that have been made.
-	#[pallet::storage]
-	#[pallet::getter(fn nft_count)]
-	pub(super) type NftCount<T: Config> = StorageValue<_, T::ItemId, ValueQuery>;  */
-
 	/// Number of milestone proposal that have benn made.
 	#[pallet::storage]
 	#[pallet::getter(fn milestone_proposal_count)]
@@ -383,6 +373,8 @@ pub mod pallet {
 	pub enum Event<T: Config> {
 		/// New Proposal
 		Proposed { proposal_index: ProposalIndex },
+		/// New Milestone Proposal
+		MilestoneProposed { proposal_index: ProposalIndex },
 		/// Proposal has been approved
 		Approved { proposal_index: ProposalIndex },
 		/// Proposal has been rejected
@@ -395,6 +387,14 @@ pub mod pallet {
 		LoanUpdated { loan_index: LoanIndex },
 		/// User withdraw money
 		Withdraw { loan_index: LoanIndex, amount: BalanceOf<T> },
+		/// Voted on a proposal
+		VotedOnProposal { proposal_index: ProposalIndex, member: AccountIdOf<T>, vote: Vote },
+		/// Voted on a milestone
+		VotedOnMilestone { proposal_index: ProposalIndex, member: AccountIdOf<T>, vote: Vote },
+		/// A new committee member has been added
+		CommiteeMemberAdded { new_member: AccountIdOf<T> },
+		/// Milestone Proposal has been approved
+		MilestoneApproved { loan_id: LoanIndex },
 	}
 
 	// Work in progress, to be included in the future
@@ -493,28 +493,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Reject a proposed spend. The original deposit will be slashed.
-		///
-		/// May only be called from `T::RejectOrigin`.
-/* 		#[pallet::call_index(1)]
-		#[pallet::weight(<T as pallet::Config>::WeightInfo::reject_proposal())]
-		pub fn reject_proposal(
-			origin: OriginFor<T>,
-			proposal_index: ProposalIndex,
-		) -> DispatchResult {
-			T::RejectOrigin::ensure_origin(origin)?;
-			Self::reject_loan_proposal(proposal_index)?;
-			OngoingVotes::<T>::remove(proposal_index);
-			let mut evaluated_loans = Self::evaluated_loans();
-			let index = evaluated_loans.iter().position(|x| *x == proposal_index);
-			if index.is_some() {
-				evaluated_loans.remove(index.unwrap());
-				EvaluatedLoans::<T>::put(evaluated_loans);
-			};
-			Ok(())
-		} */
-
-		#[pallet::call_index(3)]
+		#[pallet::call_index(1)]
 		#[pallet::weight(0)]
 		pub fn propose_milestone(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
 			let _origin = ensure_signed(origin)?;
@@ -533,6 +512,7 @@ pub mod pallet {
 			OngoingMilestoneVotes::<T>::insert(milestone_proposal_index, vote_stats);
 			MilestoneProposals::<T>::insert(milestone_proposal_index, loan_id);
 			MilestoneProposalCount::<T>::put(milestone_proposal_index);
+			Self::deposit_event(Event::MilestoneProposed { proposal_index: milestone_proposal_index });
 			Ok(())
 		}
 
@@ -540,7 +520,7 @@ pub mod pallet {
 		///
 		/// May only be called from the loan contract.
 
-		#[pallet::call_index(4)]
+		#[pallet::call_index(2)]
 		#[pallet::weight(0)]
 		pub fn delete_loan(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
 			let _signer = ensure_signed(origin.clone())?;
@@ -567,7 +547,7 @@ pub mod pallet {
 		///
 		/// May only be called from the loan contract.
 
-		#[pallet::call_index(5)]
+		#[pallet::call_index(3)]
 		#[pallet::weight(0)]
 		pub fn withdraw(
 			origin: OriginFor<T>,
@@ -594,7 +574,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::call_index(6)]
+		#[pallet::call_index(4)]
 		#[pallet::weight(0)]
 		pub fn repay(
 			origin: OriginFor<T>,
@@ -622,7 +602,7 @@ pub mod pallet {
 		}
 
 		/// Let committee members vote for a proposal
-		#[pallet::call_index(7)]
+		#[pallet::call_index(5)]
 		#[pallet::weight(0)]
 		pub fn vote_on_proposal(
 			origin: OriginFor<T>,
@@ -642,13 +622,14 @@ pub mod pallet {
 				current_vote.no_votes += 1;
 			};
 
-			UserVotes::<T>::insert((proposal_index, origin), vote);
+			UserVotes::<T>::insert((proposal_index, origin.clone()), vote.clone());
 			OngoingVotes::<T>::insert(proposal_index, current_vote);
+			Self::deposit_event(Event::<T>::VotedOnProposal{proposal_index, member: origin, vote});
 			Ok(())
 		}
 
 		/// Let committee vote on milestone proposal
-		#[pallet::call_index(8)]
+		#[pallet::call_index(6)]
 		#[pallet::weight(0)]
 		pub fn vote_on_milestone_proposal(
 			origin: OriginFor<T>,
@@ -668,13 +649,14 @@ pub mod pallet {
 				current_vote.no_votes += 1;
 			};
 
-			UserMilestoneVotes::<T>::insert((proposal_index, origin), vote);
+			UserMilestoneVotes::<T>::insert((proposal_index, origin.clone()), vote.clone());
 			OngoingMilestoneVotes::<T>::insert(proposal_index, current_vote);
+			Self::deposit_event(Event::<T>::VotedOnMilestone{proposal_index, member: origin, vote});
 			Ok(())
 		}
 
 		/// Adding a new address to the vote committee
-		#[pallet::call_index(9)]
+		#[pallet::call_index(7)]
 		#[pallet::weight(0)]
 		pub fn add_committee_member(
 			origin: OriginFor<T>,
@@ -683,7 +665,8 @@ pub mod pallet {
 			T::CommitteeOrigin::ensure_origin(origin)?;
 			let current_members = Self::voting_committee();
 			ensure!(!current_members.contains(&member), Error::<T>::AlreadyMember);
-			VotingCommittee::<T>::try_append(member).map_err(|_| Error::<T>::TooManyMembers)?;
+			VotingCommittee::<T>::try_append(member.clone()).map_err(|_| Error::<T>::TooManyMembers)?;
+			Self::deposit_event(Event::<T>::CommiteeMemberAdded{new_member: member});
 			Ok(())
 		}
 	}
@@ -820,6 +803,7 @@ pub mod pallet {
 			loan.milestones = loan_milestones;
 			loan.available_amount = new_available_amount;
 			Loans::<T>::insert(loan_id, loan);
+			Self::deposit_event(Event::<T>::MilestoneApproved { loan_id });
 			Ok(())
 		}
 
