@@ -233,7 +233,7 @@ pub mod pallet {
 	#[pallet::getter(fn proposal_count)]
 	pub(super) type ProposalCount<T> = StorageValue<_, ProposalIndex, ValueQuery>;
 
- 	/// Number of proposals that have been made.
+/*  	/// Number of proposals that have been made.
 	#[pallet::storage]
 	#[pallet::getter(fn collection_count)]
 	pub(super) type CollectionCount<T: Config> = StorageValue<_, T::CollectionId, ValueQuery>; 
@@ -241,7 +241,7 @@ pub mod pallet {
 	/// Number of proposals that have been made.
 	#[pallet::storage]
 	#[pallet::getter(fn nft_count)]
-	pub(super) type NftCount<T: Config> = StorageValue<_, T::ItemId, ValueQuery>; 
+	pub(super) type NftCount<T: Config> = StorageValue<_, T::ItemId, ValueQuery>;  */
 
 	/// Number of milestone proposal that have benn made.
 	#[pallet::storage]
@@ -399,7 +399,8 @@ pub mod pallet {
 
 	// Work in progress, to be included in the future
 	#[pallet::hooks]
-	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> 
+	where <T as pallet_uniques::Config>::CollectionId: From<u32>,  <T as pallet_uniques::Config>::ItemId: From<u32>{
 		fn on_initialize(n: frame_system::pallet_prelude::BlockNumberFor<T>) -> Weight {
 			let mut weight = T::DbWeight::get().reads_writes(1, 1);
 
@@ -716,6 +717,8 @@ pub mod pallet {
 		}
 
 		fn approve_loan_proposal(proposal_index: ProposalIndex) -> DispatchResult
+		where <T as pallet_uniques::Config>::CollectionId: From<u32>,
+		<T as pallet_uniques::Config>::ItemId: From<u32>
 		{
 			let proposal = <Proposals<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
 			let err_amount =
@@ -731,8 +734,8 @@ pub mod pallet {
 			milestones.remove(0);
 			let available_amount = Self::u64_to_balance_option(amount).unwrap();
 			let loan_apy = proposal.apr_rate;
-			let collection_id = Self::collection_count();
-			let item_id: T::ItemId = Self::nft_count();
+			let collection_id: T::CollectionId = proposal_index.into();
+			let item_id: T::ItemId = proposal_index.into();
 			let loan_info = LoanInfo {
 				borrower: user.clone(),
 				total_amount: value,
