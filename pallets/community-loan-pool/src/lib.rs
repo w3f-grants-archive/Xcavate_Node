@@ -811,7 +811,7 @@ pub mod pallet {
 			let experinece_number: f32 = match experience {
 				1..=5 => 1.7,
 				6..=15 => 1.5,
-				15..=20 => 1.3,
+				16..=20 => 1.3,
 				_ => 1.2,
 			};
 

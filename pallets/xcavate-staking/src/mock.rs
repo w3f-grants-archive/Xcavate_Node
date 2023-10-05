@@ -173,8 +173,6 @@ impl pallet_community_loan_pool::Config for Test {
 	type MaxOngoingLoans = MaxLoans;
 	type TimeProvider = Timestamp;
 	type WeightInfo = SubstrateWeight<Test>;
-	#[cfg(feature = "runtime-benchmarks")]
-	type Helper = NftHelper;
 	type VotingTime = VotingTime;
 	type MaxCommitteeMembers = MaximumCommitteeMembers;
 	type MaxMilestonesPerProject = MaxMilestones;

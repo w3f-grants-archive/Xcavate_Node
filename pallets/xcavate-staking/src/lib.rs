@@ -193,25 +193,6 @@ pub mod pallet {
 
 		#[pallet::call_index(1)]
 		#[pallet::weight(1_000)]
-		pub fn extend_lock(
-			origin: OriginFor<T>,
-			#[pallet::compact] value: BalanceOf<T>,
-		) -> DispatchResultWithPostInfo {
-			let user = ensure_signed(origin)?;
-
-			<T as pallet::Config>::Currency::extend_lock(
-				EXAMPLE_ID,
-				&user,
-				value,
-				WithdrawReasons::all(),
-			);
-
-			Self::deposit_event(Event::ExtendedLock { staker: user, amount: value });
-			Ok(().into())
-		}
-
-		#[pallet::call_index(2)]
-		#[pallet::weight(1_000)]
 		pub fn unstake(
 			origin: OriginFor<T>,
 			#[pallet::compact] value: BalanceOf<T>,
