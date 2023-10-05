@@ -592,7 +592,7 @@ parameter_types! {
 	pub const MaxLoans: u32 = 10000;
 	pub const VotingTime: BlockNumber = 20;
 	pub const MaximumCommitteeMembers: u32 = 10;
-	pub const MaxMilestones: u32 = 10;
+	pub const MaxMilestones: u32 = 8;
 }
 
 /// Configure the pallet-community-loan-pool in pallets/community-loan-pool.
