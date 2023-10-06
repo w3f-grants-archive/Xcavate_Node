@@ -590,7 +590,7 @@ impl pallet_sudo::Config for Runtime {
 parameter_types! {
 	pub const CommunityLoanPalletId: PalletId = PalletId(*b"py/loana");
 	pub const MaxLoans: u32 = 10000;
-	pub const VotingTime: BlockNumber = 20;
+	pub const VotingTime: BlockNumber = 10;
 	pub const MaximumCommitteeMembers: u32 = 10;
 	pub const MaxMilestones: u32 = 8;
 }

@@ -276,6 +276,12 @@ pub mod pallet {
 	pub(super) type MilestoneProposals<T> =
 		StorageMap<_, Twox64Concat, ProposalIndex, LoanIndex, OptionQuery>;
 
+	/// Deletion proposal that has been made.
+	#[pallet::storage]
+	#[pallet::getter(fn deletion_proposals)]
+	pub(super) type DeletionProposals<T> =
+		StorageMap<_, Twox64Concat, ProposalIndex, LoanIndex, OptionQuery>;
+
 	/// Mapping of ongoing loans
 	#[pallet::storage]
 	#[pallet::getter(fn loans)]
@@ -299,16 +305,28 @@ pub mod pallet {
 	pub(super) type OngoingMilestoneVotes<T: Config> =
 		StorageMap<_, Twox64Concat, ProposalIndex, VoteStats, OptionQuery>;
 
+	/// Mapping of ongoing deletion votes
+	#[pallet::storage]
+	#[pallet::getter(fn ongoing_deletion_votes)]
+	pub(super) type OngoingDeletionVotes<T: Config> = 
+		StorageMap<_, Twox64Concat, ProposalIndex, VoteStats, OptionQuery>;
+
 	/// Mapping of user who voted for a proposal
 	#[pallet::storage]
 	#[pallet::getter(fn user_milestone_votes)]
 	pub(super) type UserMilestoneVotes<T: Config> =
 		StorageMap<_, Twox64Concat, (ProposalIndex, AccountIdOf<T>), Vote, OptionQuery>;
 
-	/// Mapping of user who voted for a proposal
+	/// Mapping of user who voted for a milestone proposal
 	#[pallet::storage]
 	#[pallet::getter(fn user_votes)]
 	pub(super) type UserVotes<T: Config> =
+		StorageMap<_, Twox64Concat, (ProposalIndex, AccountIdOf<T>), Vote, OptionQuery>;
+
+	/// Mapping of user who voted for a deletion proposal
+	#[pallet::storage]
+	#[pallet::getter(fn user_deletion_votes)]
+	pub(super) type UserDeletionVotes<T: Config> =
 		StorageMap<_, Twox64Concat, (ProposalIndex, AccountIdOf<T>), Vote, OptionQuery>;
 
 	/// Stores the project keys and round types ending on a given block
@@ -397,6 +415,8 @@ pub mod pallet {
 		Proposed { proposal_index: ProposalIndex },
 		/// New Milestone Proposal
 		MilestoneProposed { proposal_index: ProposalIndex },
+		/// New Deletion Proposal
+		DeletionProposed {proposal_index: ProposalIndex, loan_index: LoanIndex},
 		/// Proposal has been approved
 		Approved { proposal_index: ProposalIndex },
 		/// Proposal has been rejected
@@ -413,10 +433,14 @@ pub mod pallet {
 		VotedOnProposal { proposal_index: ProposalIndex, member: AccountIdOf<T>, vote: Vote },
 		/// Voted on a milestone
 		VotedOnMilestone { proposal_index: ProposalIndex, member: AccountIdOf<T>, vote: Vote },
+		/// Voted on a deletion
+		VotedOnDeletion { proposal_index: ProposalIndex, member: AccountIdOf<T>, vote: Vote },
 		/// A new committee member has been added
 		CommiteeMemberAdded { new_member: AccountIdOf<T> },
 		/// Milestone Proposal has been approved
 		MilestoneApproved { loan_id: LoanIndex },
+		Test {},
+		Test1 {loan_id: LoanIndex},
 	}
 
 	
@@ -453,7 +477,25 @@ pub mod pallet {
 							Self::updating_available_amount(loan_id);
 						}
 					}
-					OngoingVotes::<T>::remove(item);
+					OngoingMilestoneVotes::<T>::remove(item);
+				}
+			});
+
+			let ended_deletion_votes = DeletionRoundsExpiring::<T>::take(n);
+
+			ended_deletion_votes.iter().for_each(|item| {
+				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
+				Self::deposit_event(Event::Test {});
+				let voting_result = <OngoingDeletionVotes<T>>::take(item);
+				if let Some(voting_result) = voting_result {
+					if voting_result.yes_votes > voting_result.no_votes {
+						let loan_id = <DeletionProposals<T>>::take(item);
+						if let Some(loan_id) = loan_id {
+							Self::deposit_event(Event::Test1 {loan_id});
+							Self::delete_loan(loan_id);
+						}
+					}
+					OngoingDeletionVotes::<T>::remove(item);
 				}
 			});
 
@@ -541,46 +583,26 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::call_index(100)]
+		#[pallet::call_index(2)]
 		#[pallet::weight(0)]
 		pub fn propose_deletion(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
-			let origin = ensure_signed(origin.clon())?;
+			let origin = ensure_signed(origin.clone())?;
 			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
-			ensure!(signer == loan.borrower, Error::<T>::InsufficientPermission);
+			ensure!(origin == loan.borrower, Error::<T>::InsufficientPermission);
 			ensure!(loan.borrowed_amount.is_zero(), Error::<T>::LoanStillOngoing);
 			let deletion_proposal_index = Self::deletion_proposal_count() + 1;
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
 			let expiry_block = current_block_number.saturating_add(<T as Config>::VotingTime::get());
-		}
 
-
-		/// Delete the loan after the loan is paid back. The collateral nft will be deleted.
-		///
-		/// May only be called from a member of the voting committee
-
-		#[pallet::call_index(2)]
-		#[pallet::weight(0)]
-		pub fn delete_loan(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
-			let origin = ensure_signed(origin.clone())?;
-			let loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
-			//ensure!(signer == loan.contract_account_id, Error::<T>::InsufficientPermission);
-			ensure!(loan.borrowed_amount.is_zero(), Error::<T>::LoanStillOngoing);
-
-			let current_members = Self::voting_committee();
-			ensure!(current_members.contains(&origin), Error::<T>::InsufficientPermission);
-
-			let collection_id = loan.collection_id;
-			let item_id = loan.item_id;
-
-			pallet_nfts::Pallet::<T>::do_burn(collection_id, item_id, |_| Ok(()))?;
-
-			let mut loans = Self::ongoing_loans();
-			let index = loans.iter().position(|x| *x == loan_id).unwrap();
-			loans.remove(index);
-
-			OngoingLoans::<T>::put(loans);
-			Loans::<T>::remove(loan_id);
-			Self::deposit_event(Event::<T>::Deleted { loan_index: loan_id });
+			DeletionRoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
+				keys.try_push(deletion_proposal_index).map_err(|_| Error::<T>::TooManyLoans)?;
+				Ok::<(), DispatchError>(())
+			})?;
+			let vote_stats = VoteStats {yes_votes: 0, no_votes: 0};
+			OngoingDeletionVotes::<T>::insert(deletion_proposal_index, vote_stats);
+			DeletionProposals::<T>::insert(deletion_proposal_index, loan_id);
+			DeletionProposalCount::<T>::put(deletion_proposal_index);
+			Self::deposit_event(Event::<T>::DeletionProposed {proposal_index: deletion_proposal_index, loan_index: loan_id});
 			Ok(())
 		}
 
@@ -700,8 +722,34 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Adding a new address to the vote committee
+		/// Let committee vote on deletion proposal
 		#[pallet::call_index(7)]
+		#[pallet::weight(0)]
+		pub fn vote_on_deletion_proposal(
+			origin: OriginFor<T>,
+			proposal_index: ProposalIndex,
+			vote: Vote,
+		) -> DispatchResult {
+			let origin = ensure_signed(origin)?;
+			let current_members = Self::voting_committee();
+			ensure!(current_members.contains(&origin), Error::<T>::InsufficientPermission);
+			let mut current_vote = <OngoingDeletionVotes<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
+			let voted = <UserDeletionVotes<T>>::get((proposal_index, origin.clone()));
+			ensure!(voted.is_none(), Error::<T>::AlreadyVoted);
+			if vote == Vote::Yes {
+				current_vote.yes_votes +=1;
+			} else {
+				current_vote.no_votes += 1;
+			};
+
+			UserDeletionVotes::<T>::insert((proposal_index, origin.clone()), vote.clone());
+			OngoingDeletionVotes::<T>::insert(proposal_index, current_vote);
+			Self::deposit_event(Event::<T>::VotedOnDeletion { proposal_index, member: origin, vote });
+			Ok(())
+		}
+
+		/// Adding a new address to the vote committee
+		#[pallet::call_index(8)]
 		#[pallet::weight(0)]
 		pub fn add_committee_member(
 			origin: OriginFor<T>,
@@ -712,6 +760,17 @@ pub mod pallet {
 			ensure!(!current_members.contains(&member), Error::<T>::AlreadyMember);
 			VotingCommittee::<T>::try_append(member.clone()).map_err(|_| Error::<T>::TooManyMembers)?;
 			Self::deposit_event(Event::<T>::CommiteeMemberAdded{new_member: member});
+			Ok(())
+		}
+
+		#[pallet::call_index(9)]
+		#[pallet::weight(0)]
+		pub fn delete(
+			origin: OriginFor<T>,
+			loan_id: LoanIndex,
+		) -> DispatchResult {
+			let origin = ensure_signed(origin)?;
+			Self::delete_loan(loan_id);
 			Ok(())
 		}
 	}
@@ -814,7 +873,7 @@ pub mod pallet {
 		}
 
 		// Work in progress, to be implmented in the future
-		pub fn charge_apy() -> DispatchResult {
+		fn charge_apy() -> DispatchResult {
 			let ongoing_loans = Self::ongoing_loans();
 			for i in ongoing_loans {
 				let loan_index = i;
@@ -836,7 +895,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		pub fn updating_available_amount(loan_id: LoanIndex) -> DispatchResult {
+		fn updating_available_amount(loan_id: LoanIndex) -> DispatchResult {
 			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			let loan_total_amount = loan.total_amount;
 			let mut loan_milestones = loan.milestones;
@@ -851,6 +910,23 @@ pub mod pallet {
 			loan.available_amount = new_available_amount;
 			Loans::<T>::insert(loan_id, loan);
 			Self::deposit_event(Event::<T>::MilestoneApproved { loan_id });
+			Ok(())
+		}
+
+		fn delete_loan(loan_id: LoanIndex) -> DispatchResult {
+			Self::deposit_event(Event::Test1 {loan_id});
+			let loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
+			ensure!(loan.borrowed_amount.is_zero(), Error::<T>::LoanStillOngoing);
+			let collection_id = loan.collection_id;
+			let item_id = loan.item_id;
+			pallet_nfts::Pallet::<T>::do_burn(collection_id, item_id, |_| Ok(()))?;
+			let mut loans = Self::ongoing_loans();
+			let index = loans.iter().position(|x| *x == loan_id).unwrap();
+			loans.remove(index);
+
+			OngoingLoans::<T>::put(loans);
+			Loans::<T>::remove(loan_id);
+			Self::deposit_event(Event::<T>::Deleted { loan_index: loan_id });
 			Ok(())
 		}
 
