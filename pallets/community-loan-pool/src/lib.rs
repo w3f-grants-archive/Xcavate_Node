@@ -38,7 +38,7 @@ use frame_support::{
 	PalletId,
 };
 
-pub use pallet_nfts::{CollectionSettings, CollectionSetting, CollectionConfig, MintSettings};
+pub use pallet_nfts::{CollectionSettings, CollectionSetting, CollectionConfig, MintSettings, ItemSettings, ItemConfig};
 
 use sp_std::prelude::*;
 
@@ -218,12 +218,9 @@ pub mod pallet {
 		/// The maximum amount of commitee members
 		type MaxCommitteeMembers: Get<u32>;
 
+		/// The maximum of milestones for a lone
 		type MaxMilestonesPerProject: Get<u32>;
 	}
-
-	/* 	#[pallet::storage]
-	#[pallet::getter(fn loan_pool_account)]
-	pub(super) type LoanPoolAccount<T> = StorageValue<_, PalletIdStorage<T::AccountId>, ValueQuery>; */
 
 	/// Vec of admins who are able to vote
 	#[pallet::storage]
@@ -241,10 +238,15 @@ pub mod pallet {
 	#[pallet::getter(fn proposal_count)]
 	pub(super) type ProposalCount<T> = StorageValue<_, ProposalIndex, ValueQuery>;
 
-	/// Number of milestone proposal that have benn made.
+	/// Number of milestone proposal that have been made.
 	#[pallet::storage]
 	#[pallet::getter(fn milestone_proposal_count)]
 	pub(super) type MilestoneProposalCount<T> = StorageValue<_, ProposalIndex, ValueQuery>;
+
+	/// Number of deletion proposal that have been made
+	#[pallet::storage]
+	#[pallet::getter(fn deletion_proposal_count)]
+	pub(super) type DeletionProposalCount<T> = StorageValue<_, ProposalIndex, ValueQuery>;
 
 	/// Total amount of loan funds
 	#[pallet::storage]
@@ -329,6 +331,16 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	/// Stores the project keys and round types ending on a given block
+	#[pallet::storage]
+	pub type DeletionRoundsExpiring<T: Config> = StorageMap<
+		_,
+		Blake2_128Concat,
+		BlockNumberFor<T>,
+		BoundedVec<ProposalIndex, T::MaxOngoingLoans>,
+		ValueQuery,
+	>;
+
 	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
 	pub struct GenesisConfig<T: Config> {
@@ -374,6 +386,8 @@ pub mod pallet {
 		LoanStillOngoing,
 		/// All milestones has been accomplished
 		NoMilestonesLeft,
+		/// Milestones of the loan have to be 100 % in Sum
+		MilestonesHaveToCoverLone,
 	}
 
 	#[pallet::event]
@@ -405,7 +419,7 @@ pub mod pallet {
 		MilestoneApproved { loan_id: LoanIndex },
 	}
 
-	// Work in progress, to be included in the future
+	
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> 
 	where <T as pallet_nfts::Config>::CollectionId: From<u32>,  <T as pallet_nfts::Config>::ItemId: From<u32>{
@@ -470,6 +484,8 @@ pub mod pallet {
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let beneficiary = T::Lookup::lookup(beneficiary)?;
+			let sum: u64 = proposed_milestones.iter().map(|i| i.percentage_to_unlock.deconstruct() as u64 ).sum();
+			ensure!(100 == sum, Error::<T>::MilestonesHaveToCoverLone);
 			let proposal_index = Self::proposal_count() + 1;
 			let bond = Self::calculate_bond(amount);
 			<T as pallet::Config>::Currency::reserve(&origin, bond)
@@ -501,6 +517,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Applying for the next milestone in the ongoing loan. 
 		#[pallet::call_index(1)]
 		#[pallet::weight(0)]
 		pub fn propose_milestone(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
@@ -524,17 +541,33 @@ pub mod pallet {
 			Ok(())
 		}
 
+		#[pallet::call_index(100)]
+		#[pallet::weight(0)]
+		pub fn propose_deletion(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
+			let origin = ensure_signed(origin.clon())?;
+			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
+			ensure!(signer == loan.borrower, Error::<T>::InsufficientPermission);
+			ensure!(loan.borrowed_amount.is_zero(), Error::<T>::LoanStillOngoing);
+			let deletion_proposal_index = Self::deletion_proposal_count() + 1;
+			let current_block_number = <frame_system::Pallet<T>>::block_number();
+			let expiry_block = current_block_number.saturating_add(<T as Config>::VotingTime::get());
+		}
+
+
 		/// Delete the loan after the loan is paid back. The collateral nft will be deleted.
 		///
-		/// May only be called from the loan contract.
+		/// May only be called from a member of the voting committee
 
 		#[pallet::call_index(2)]
 		#[pallet::weight(0)]
 		pub fn delete_loan(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
-			let _signer = ensure_signed(origin.clone())?;
+			let origin = ensure_signed(origin.clone())?;
 			let loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			//ensure!(signer == loan.contract_account_id, Error::<T>::InsufficientPermission);
 			ensure!(loan.borrowed_amount.is_zero(), Error::<T>::LoanStillOngoing);
+
+			let current_members = Self::voting_committee();
+			ensure!(current_members.contains(&origin), Error::<T>::InsufficientPermission);
 
 			let collection_id = loan.collection_id;
 			let item_id = loan.item_id;
@@ -551,9 +584,9 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Updates the loan after an amount of the loan got repaid.
+		/// Withdraw an certain amount of the loan from the pallet.
 		///
-		/// May only be called from the loan contract.
+		/// May only be called from the loan borrower.
 
 		#[pallet::call_index(3)]
 		#[pallet::weight(0)]
@@ -581,6 +614,10 @@ pub mod pallet {
 			Self::deposit_event(Event::<T>::Withdraw { loan_index: loan_id, amount });
 			Ok(())
 		}
+
+		/// Repays a certain amount of the loan from the pallet.
+		///
+		/// May only be called from the loan borrower.
 
 		#[pallet::call_index(4)]
 		#[pallet::weight(0)]
@@ -762,8 +799,10 @@ pub mod pallet {
 			pallet_nfts::Pallet::<T>::do_mint(
 				collection_id.clone(),
 				item_id,
+				Some(Self::account_id()),
 				Self::account_id(),
-				|_| Ok(()),
+				Self::default_item_config(),
+				|_, _| Ok(()),
 			)?;
 
 			let new_value = Self::total_loan_amount() + Self::balance_to_u64(value).unwrap();
@@ -854,6 +893,10 @@ pub mod pallet {
 				max_supply: None,
 				mint_settings: MintSettings::default(),
 			}
+		}
+
+		fn default_item_config() -> ItemConfig {
+			ItemConfig { settings: ItemSettings::all_enabled() }
 		}
 	}
 }
