@@ -24,6 +24,8 @@ use frame_support::sp_runtime::{
 	Permill, RuntimeDebug,
 };
 
+use enumflags2::BitFlags;
+
 use frame_support::sp_runtime::Percent;
 
 use frame_support::{
@@ -35,6 +37,8 @@ use frame_support::{
 	},
 	PalletId,
 };
+
+pub use pallet_nfts::{CollectionSettings, CollectionSetting, CollectionConfig, MintSettings};
 
 use sp_std::prelude::*;
 
@@ -54,6 +58,10 @@ pub type PositiveImbalanceOf<T> = <<T as Config>::Currency as Currency<
 
 pub type BalanceOf<T> =
 	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+
+type BalanceOf1<T> = <<T as pallet_nfts::Config>::Currency as Currency<
+	<T as frame_system::Config>::AccountId,
+>>::Balance;
 
 pub type BoundedProposedMilestones<T> =
 	BoundedVec<ProposedMilestone, <T as Config>::MaxMilestonesPerProject>;
@@ -152,7 +160,7 @@ pub mod pallet {
 	pub struct Pallet<T>(_);
 
 	#[pallet::config]
-	pub trait Config: frame_system::Config + pallet_uniques::Config {
+	pub trait Config: frame_system::Config + pallet_nfts::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
@@ -400,7 +408,7 @@ pub mod pallet {
 	// Work in progress, to be included in the future
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> 
-	where <T as pallet_uniques::Config>::CollectionId: From<u32>,  <T as pallet_uniques::Config>::ItemId: From<u32>{
+	where <T as pallet_nfts::Config>::CollectionId: From<u32>,  <T as pallet_nfts::Config>::ItemId: From<u32>{
 		fn on_initialize(n: frame_system::pallet_prelude::BlockNumberFor<T>) -> Weight {
 			let mut weight = T::DbWeight::get().reads_writes(1, 1);
 
@@ -531,7 +539,7 @@ pub mod pallet {
 			let collection_id = loan.collection_id;
 			let item_id = loan.item_id;
 
-			pallet_uniques::Pallet::<T>::do_burn(collection_id, item_id, |_, _| Ok(()))?;
+			pallet_nfts::Pallet::<T>::do_burn(collection_id, item_id, |_| Ok(()))?;
 
 			let mut loans = Self::ongoing_loans();
 			let index = loans.iter().position(|x| *x == loan_id).unwrap();
@@ -700,8 +708,8 @@ pub mod pallet {
 		}
 
 		fn approve_loan_proposal(proposal_index: ProposalIndex) -> DispatchResult
-		where <T as pallet_uniques::Config>::CollectionId: From<u32>,
-		<T as pallet_uniques::Config>::ItemId: From<u32>
+		where <T as pallet_nfts::Config>::CollectionId: From<u32>,
+		<T as pallet_nfts::Config>::ItemId: From<u32>
 		{
 			let proposal = <Proposals<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
 			let err_amount =
@@ -737,13 +745,13 @@ pub mod pallet {
 			OngoingLoans::<T>::try_append(loan_index).map_err(|_| Error::<T>::TooManyLoans)?;
 			// calls the create collection function from the uniques pallet, and set the admin as
 			// the admin of the collection
-			pallet_uniques::Pallet::<T>::do_create_collection(
+			pallet_nfts::Pallet::<T>::do_create_collection(
 				collection_id.clone(),
 				Self::account_id(),
 				Self::account_id(),
+				Self::default_collection_config(),
 				T::CollectionDeposit::get(),
-				false,
-				pallet_uniques::Event::Created {
+				pallet_nfts::Event::Created {
 					creator: Self::account_id(),
 					owner: Self::account_id(),
 					collection: collection_id.clone(),
@@ -751,7 +759,7 @@ pub mod pallet {
 			)?;
 			// calls the mint collection function from the uniques pallet, mints a nft and puts
 			// the loan contract as the owner
-			pallet_uniques::Pallet::<T>::do_mint(
+			pallet_nfts::Pallet::<T>::do_mint(
 				collection_id.clone(),
 				item_id,
 				Self::account_id(),
@@ -832,6 +840,20 @@ pub mod pallet {
 
 		pub fn u64_to_balance_option(input: u64) -> Option<BalanceOf<T>> {
 			input.try_into().ok()
+		}
+
+		fn default_collection_config() -> CollectionConfig::<BalanceOf1<T>, BlockNumberFor<T>, T::CollectionId> {
+			Self::collection_config_from_disabled_settings(CollectionSetting::DepositRequired.into())
+		}
+
+		fn collection_config_from_disabled_settings(
+			settings: BitFlags<CollectionSetting>,
+		) -> CollectionConfig::<BalanceOf1<T>, BlockNumberFor<T>, T::CollectionId> {
+			CollectionConfig {
+				settings: CollectionSettings::from_disabled(settings),
+				max_supply: None,
+				mint_settings: MintSettings::default(),
+			}
 		}
 	}
 }

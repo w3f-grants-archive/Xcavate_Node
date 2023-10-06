@@ -5431,12 +5431,14 @@ dependencies = [
 name = "pallet-community-loan-pool"
 version = "4.0.0-dev"
 dependencies = [
+ "enumflags2",
  "frame-benchmarking",
  "frame-support",
  "frame-system",
  "pallet-balances",
  "pallet-contracts",
  "pallet-insecure-randomness-collective-flip",
+ "pallet-nfts",
  "pallet-timestamp",
  "pallet-transaction-payment",
  "pallet-uniques",
