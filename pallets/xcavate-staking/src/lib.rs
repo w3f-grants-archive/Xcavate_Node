@@ -258,7 +258,8 @@ pub mod pallet {
 			if ongoing_loans.len() == 0 {
 				return 0;
 			}
-			let total_amount_loan = pallet_community_loan_pool::Pallet::<T>::total_loan_amount() as u128;
+			let total_amount_loan =
+				pallet_community_loan_pool::Pallet::<T>::total_loan_amount() as u128;
 			if total_amount_loan == 0 {
 				return 0;
 			}
@@ -272,8 +273,8 @@ pub mod pallet {
 			}
 			let average_loan_apy = loan_apys / 10000;
 			total_amount_loan * 100 / Self::balance_to_u128(Self::total_stake()).unwrap()
-				* average_loan_apy / 100
-				/ 100
+				* average_loan_apy
+				/ 100 / 100
 		}
 
 		pub fn claim_rewards() -> DispatchResult {
@@ -282,7 +283,7 @@ pub mod pallet {
 				let staker = i;
 				let mut ledger = Self::ledger(staker.clone()).unwrap();
 				//ensure!(ledger.locked > 0, Error::<T>::NoStakedAmount);
-				let apy = Self::calculate_current_apy() as u128;
+				let apy = Self::calculate_current_apy();
 				let current_timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
 				let locked_amount = Self::balance_to_u128(ledger.locked).unwrap();
 				let rewards = locked_amount * apy * (current_timestamp - ledger.timestamp) as u128

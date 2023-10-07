@@ -133,6 +133,7 @@ pub mod pallet {
 		pub item_id: ItemId,
 		pub loan_apy: LoanApy,
 		pub last_timestamp: u64,
+		pub withdraw_lock: bool,
 	}
 
 	/// AccountId storage
@@ -406,6 +407,8 @@ pub mod pallet {
 		NoMilestonesLeft,
 		/// Milestones of the loan have to be 100 % in Sum
 		MilestonesHaveToCoverLone,
+		/// Withdrawl is locked during ongoing voting for deletion
+		DeletionVotingOngoing,
 	}
 
 	#[pallet::event]
@@ -484,13 +487,18 @@ pub mod pallet {
 			ended_deletion_votes.iter().for_each(|item| {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
 				let voting_result = <OngoingDeletionVotes<T>>::take(item);
+				let loan_id = <DeletionProposals<T>>::take(item);
 				if let Some(voting_result) = voting_result {
 					if voting_result.yes_votes > voting_result.no_votes {
-						let loan_id = <DeletionProposals<T>>::take(item);
+						
 						if let Some(loan_id) = loan_id {
 							Self::delete_loan(loan_id);
 						}
+					} else if let Some(loan_id) = loan_id {
+						Self::open_withdrawl(loan_id);
 					}
+						
+					
 					OngoingDeletionVotes::<T>::remove(item);
 				}
 			});
@@ -583,13 +591,13 @@ pub mod pallet {
 		#[pallet::weight(0)]
 		pub fn propose_deletion(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
 			let origin = ensure_signed(origin.clone())?;
-			let loan = Self::loans(loan_id).ok_or(Error::<T>::InvalidIndex)?;
+			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(origin == loan.borrower, Error::<T>::InsufficientPermission);
 			ensure!(loan.borrowed_amount.is_zero(), Error::<T>::LoanStillOngoing);
 			let deletion_proposal_index = Self::deletion_proposal_count() + 1;
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
 			let expiry_block = current_block_number.saturating_add(<T as Config>::VotingTime::get());
-
+			loan.withdraw_lock = true;
 			DeletionRoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
 				keys.try_push(deletion_proposal_index).map_err(|_| Error::<T>::TooManyLoans)?;
 				Ok::<(), DispatchError>(())
@@ -598,6 +606,7 @@ pub mod pallet {
 			OngoingDeletionVotes::<T>::insert(deletion_proposal_index, vote_stats);
 			DeletionProposals::<T>::insert(deletion_proposal_index, loan_id);
 			DeletionProposalCount::<T>::put(deletion_proposal_index);
+			Loans::<T>::insert(loan_id, loan);
 			Self::deposit_event(Event::<T>::DeletionProposed {proposal_index: deletion_proposal_index, loan_index: loan_id});
 			Ok(())
 		}
@@ -617,6 +626,7 @@ pub mod pallet {
 			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(signer == loan.borrower, Error::<T>::InsufficientPermission);
 			ensure!(amount <= loan.available_amount, Error::<T>::NotEnoughFundsToWithdraw);
+			ensure!(!loan.withdraw_lock, Error::<T>::DeletionVotingOngoing);
 			let loan_pallet = Self::account_id();
 			let sending_amount = Self::balance_to_u64(amount).unwrap();
 			<T as pallet::Config>::Currency::transfer(
@@ -814,10 +824,11 @@ pub mod pallet {
 				available_amount,
 				borrowed_amount: Default::default(),
 				milestones,
-				collection_id: collection_id.clone(),
+				collection_id,
 				item_id,
 				loan_apy,
 				last_timestamp: timestamp,
+				withdraw_lock: Default::default(),
 			};
 
 			let loan_index = Self::loan_count() + 1;
@@ -827,7 +838,7 @@ pub mod pallet {
 			// calls the create collection function from the uniques pallet, and set the admin as
 			// the admin of the collection
 			pallet_nfts::Pallet::<T>::do_create_collection(
-				collection_id.clone(),
+				collection_id,
 				Self::account_id(),
 				Self::account_id(),
 				Self::default_collection_config(),
@@ -835,13 +846,13 @@ pub mod pallet {
 				pallet_nfts::Event::Created {
 					creator: Self::account_id(),
 					owner: Self::account_id(),
-					collection: collection_id.clone(),
+					collection: collection_id,
 				},
 			)?;
 			// calls the mint collection function from the uniques pallet, mints a nft and puts
 			// the loan contract as the owner
 			pallet_nfts::Pallet::<T>::do_mint(
-				collection_id.clone(),
+				collection_id,
 				item_id,
 				Some(Self::account_id()),
 				Self::account_id(),
@@ -910,6 +921,13 @@ pub mod pallet {
 			OngoingLoans::<T>::put(loans);
 			Loans::<T>::remove(loan_id);
 			Self::deposit_event(Event::<T>::Deleted { loan_index: loan_id });
+			Ok(())
+		}
+
+		fn open_withdrawl(loan_id: LoanIndex) -> DispatchResult {
+			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
+			loan.withdraw_lock = false;
+			Loans::<T>::insert(loan_id, loan);
 			Ok(())
 		}
 
