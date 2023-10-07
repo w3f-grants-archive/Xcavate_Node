@@ -104,7 +104,7 @@ pub mod pallet {
 		/// Balance was unlocked successfully.
 		Unlocked { staker: <T as frame_system::Config>::AccountId, amount: BalanceOf<T> },
 		/// Rewards were claimed successfully.
-		RewardsClaimed { amount: BalanceOf<T>, apy: u64 },
+		RewardsClaimed { amount: BalanceOf<T>, apy: u128 },
 	}
 
 	// Errors inform users that something went wrong.
@@ -237,14 +237,14 @@ pub mod pallet {
 				Ledger::<T>::remove(staker);
 				<T as pallet::Config>::Currency::remove_lock(EXAMPLE_ID, staker);
 			} else {
-				let locking_amount = Self::balance_to_u64(ledger.locked).unwrap() * 1000000000000;
-				if Self::u64_to_balance_option(locking_amount).is_none() {
+				let locking_amount = Self::balance_to_u128(ledger.locked).unwrap() * 1000000000000;
+				if Self::u128_to_balance_option(locking_amount).is_none() {
 					Ledger::<T>::insert(staker, ledger);
 				} else {
 					<T as pallet::Config>::Currency::set_lock(
 						EXAMPLE_ID,
 						staker,
-						Self::u64_to_balance_option(locking_amount).unwrap(),
+						Self::u128_to_balance_option(locking_amount).unwrap(),
 						WithdrawReasons::all(),
 					);
 					Ledger::<T>::insert(staker, ledger);
@@ -252,27 +252,27 @@ pub mod pallet {
 			}
 		}
 
-		fn calculate_current_apy() -> u64 {
+		fn calculate_current_apy() -> u128 {
 			let ongoing_loans = pallet_community_loan_pool::Pallet::<T>::ongoing_loans();
 			let mut loan_apys = 0;
 			if ongoing_loans.len() == 0 {
 				return 0;
 			}
-			let total_amount_loan = pallet_community_loan_pool::Pallet::<T>::total_loan_amount();
+			let total_amount_loan = pallet_community_loan_pool::Pallet::<T>::total_loan_amount() as u128;
 			if total_amount_loan == 0 {
 				return 0;
 			}
 			for i in ongoing_loans {
 				let loan_index = i;
 				let loan = pallet_community_loan_pool::Pallet::<T>::loans(loan_index).unwrap();
-				loan_apys += loan.loan_apy
-					* TryInto::<u64>::try_into(loan.borrowed_amount + loan.available_amount)
+				loan_apys += loan.loan_apy as u128
+					* TryInto::<u128>::try_into(loan.borrowed_amount + loan.available_amount)
 						.ok()
 						.unwrap() * 10000 / total_amount_loan;
 			}
 			let average_loan_apy = loan_apys / 10000;
-			total_amount_loan * 100 / Self::balance_to_u64(Self::total_stake()).unwrap()
-				* average_loan_apy
+			total_amount_loan * 100 / Self::balance_to_u128(Self::total_stake()).unwrap()
+				* average_loan_apy / 100
 				/ 100
 		}
 
@@ -282,13 +282,13 @@ pub mod pallet {
 				let staker = i;
 				let mut ledger = Self::ledger(staker.clone()).unwrap();
 				//ensure!(ledger.locked > 0, Error::<T>::NoStakedAmount);
-				let apy = Self::calculate_current_apy();
+				let apy = Self::calculate_current_apy() as u128;
 				let current_timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
-				let locked_amount = Self::balance_to_u64(ledger.locked).unwrap();
-				let rewards = locked_amount * apy * (current_timestamp - ledger.timestamp)
+				let locked_amount = Self::balance_to_u128(ledger.locked).unwrap();
+				let rewards = locked_amount * apy * (current_timestamp - ledger.timestamp) as u128
 					/ 365 / 60 / 60 / 24 / 100;
 				let new_locked_amount = locked_amount + rewards;
-				ledger.locked = Self::u64_to_balance_option(new_locked_amount).unwrap();
+				ledger.locked = Self::u128_to_balance_option(new_locked_amount).unwrap();
 				ledger.timestamp = current_timestamp;
 				Ledger::<T>::insert(staker.clone(), ledger.clone());
 				let loan_pool_account = pallet_community_loan_pool::Pallet::<T>::account_id();
@@ -300,7 +300,7 @@ pub mod pallet {
 				)
 				.unwrap_or_default();
 				let locking_amount =
-					Self::u64_to_balance_option(new_locked_amount * 1000000000000).unwrap();
+					Self::u128_to_balance_option(new_locked_amount * 1000000000000).unwrap();
 				<T as pallet::Config>::Currency::set_lock(
 					EXAMPLE_ID,
 					&staker,
@@ -308,7 +308,7 @@ pub mod pallet {
 					WithdrawReasons::all(),
 				);
 				let total_stake = Self::total_stake();
-				let new_total_stake = total_stake + Self::u64_to_balance_option(rewards).unwrap();
+				let new_total_stake = total_stake + Self::u128_to_balance_option(rewards).unwrap();
 				TotalStake::<T>::put(new_total_stake);
 				Self::deposit_event(Event::<T>::RewardsClaimed {
 					amount: rewards.try_into().ok().unwrap(),
@@ -318,11 +318,11 @@ pub mod pallet {
 			Ok(())
 		}
 
-		pub fn balance_to_u64(input: BalanceOf<T>) -> Option<u64> {
-			TryInto::<u64>::try_into(input).ok()
+		pub fn balance_to_u128(input: BalanceOf<T>) -> Option<u128> {
+			TryInto::<u128>::try_into(input).ok()
 		}
 
-		pub fn u64_to_balance_option(input: u64) -> Option<BalanceOf<T>> {
+		pub fn u128_to_balance_option(input: u128) -> Option<BalanceOf<T>> {
 			input.try_into().ok()
 		}
 	}

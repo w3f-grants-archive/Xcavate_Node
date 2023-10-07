@@ -439,8 +439,6 @@ pub mod pallet {
 		CommiteeMemberAdded { new_member: AccountIdOf<T> },
 		/// Milestone Proposal has been approved
 		MilestoneApproved { loan_id: LoanIndex },
-		Test {},
-		Test1 {loan_id: LoanIndex},
 	}
 
 	
@@ -485,13 +483,11 @@ pub mod pallet {
 
 			ended_deletion_votes.iter().for_each(|item| {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
-				Self::deposit_event(Event::Test {});
 				let voting_result = <OngoingDeletionVotes<T>>::take(item);
 				if let Some(voting_result) = voting_result {
 					if voting_result.yes_votes > voting_result.no_votes {
 						let loan_id = <DeletionProposals<T>>::take(item);
 						if let Some(loan_id) = loan_id {
-							Self::deposit_event(Event::Test1 {loan_id});
 							Self::delete_loan(loan_id);
 						}
 					}
@@ -587,7 +583,7 @@ pub mod pallet {
 		#[pallet::weight(0)]
 		pub fn propose_deletion(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
 			let origin = ensure_signed(origin.clone())?;
-			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
+			let loan = Self::loans(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(origin == loan.borrower, Error::<T>::InsufficientPermission);
 			ensure!(loan.borrowed_amount.is_zero(), Error::<T>::LoanStillOngoing);
 			let deletion_proposal_index = Self::deletion_proposal_count() + 1;
@@ -626,7 +622,7 @@ pub mod pallet {
 			<T as pallet::Config>::Currency::transfer(
 				&loan_pallet,
 				&signer,
-				(sending_amount * 1000000000000).try_into().ok().unwrap(),
+				(sending_amount as u128* 1000000000000).try_into().ok().unwrap(),
 				KeepAlive,
 			)
 			.unwrap_or_default();
@@ -760,17 +756,6 @@ pub mod pallet {
 			ensure!(!current_members.contains(&member), Error::<T>::AlreadyMember);
 			VotingCommittee::<T>::try_append(member.clone()).map_err(|_| Error::<T>::TooManyMembers)?;
 			Self::deposit_event(Event::<T>::CommiteeMemberAdded{new_member: member});
-			Ok(())
-		}
-
-		#[pallet::call_index(9)]
-		#[pallet::weight(0)]
-		pub fn delete(
-			origin: OriginFor<T>,
-			loan_id: LoanIndex,
-		) -> DispatchResult {
-			let origin = ensure_signed(origin)?;
-			Self::delete_loan(loan_id);
 			Ok(())
 		}
 	}
@@ -914,7 +899,6 @@ pub mod pallet {
 		}
 
 		fn delete_loan(loan_id: LoanIndex) -> DispatchResult {
-			Self::deposit_event(Event::Test1 {loan_id});
 			let loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(loan.borrowed_amount.is_zero(), Error::<T>::LoanStillOngoing);
 			let collection_id = loan.collection_id;
@@ -923,7 +907,6 @@ pub mod pallet {
 			let mut loans = Self::ongoing_loans();
 			let index = loans.iter().position(|x| *x == loan_id).unwrap();
 			loans.remove(index);
-
 			OngoingLoans::<T>::put(loans);
 			Loans::<T>::remove(loan_id);
 			Self::deposit_event(Event::<T>::Deleted { loan_index: loan_id });
