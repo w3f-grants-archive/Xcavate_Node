@@ -647,7 +647,7 @@ impl pallet_xcavate_staking::Config for Runtime {
 parameter_types! {
 	pub Features: PalletFeatures = PalletFeatures::all_enabled();
 	pub const MaxAttributesPerCall: u32 = 10;
-	pub const CollectionDeposit: Balance = 100 * DOLLARS;
+	pub const CollectionDeposit: Balance = DOLLARS;
 	pub const ItemDeposit: Balance = DOLLARS;
 	pub const MetadataDepositBase: Balance = 10 * DOLLARS;
 	pub const MetadataDepositPerByte: Balance = DOLLARS;
