@@ -38,10 +38,10 @@ fn propose_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(CommunityLoanPool::propose(
-			RuntimeOrigin::signed(ALICE),
+			RuntimeOrigin::signed([0;32].into()),
 			100,
 			get_milestones(10),
-			sp_runtime::MultiAddress::Id(BOB),
+			sp_runtime::MultiAddress::Id([1;32].into()),
 			13,
 			20
 		));
@@ -55,10 +55,10 @@ fn propose_doesnt_work_not_enough_userbalance() {
 		System::set_block_number(1);
 		assert_noop!(
 			CommunityLoanPool::propose(
-				RuntimeOrigin::signed(DAVE),
+				RuntimeOrigin::signed([6;32].into()),
 				100,
 				get_milestones(10),
-				sp_runtime::MultiAddress::Id(BOB),
+				sp_runtime::MultiAddress::Id([1;32].into()),
 				13,
 				20
 			),
@@ -71,8 +71,8 @@ fn propose_doesnt_work_not_enough_userbalance() {
 fn add_committee_member_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), ALICE));
-		assert_eq!(CommunityLoanPool::voting_committee()[0], ALICE);
+		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0;32].into()));
+		assert_eq!(CommunityLoanPool::voting_committee()[0], [0;32].into());
 	})
 }
 
@@ -80,10 +80,10 @@ fn add_committee_member_works() {
 fn add_committee_member_fails_when_member_is_two_times_added() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), ALICE));
-		assert_eq!(CommunityLoanPool::voting_committee()[0], ALICE);
+		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0;32].into()));
+		assert_eq!(CommunityLoanPool::voting_committee()[0], [0;32].into());
 		assert_noop!(
-			CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), ALICE),
+			CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0;32].into()),
 			Error::<Test>::AlreadyMember
 		);
 	})
@@ -93,23 +93,23 @@ fn add_committee_member_fails_when_member_is_two_times_added() {
 fn voting_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), ALICE));
-		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), BOB));
+		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0;32].into()));
+		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [1;32].into()));
 		assert_ok!(CommunityLoanPool::propose(
-			RuntimeOrigin::signed(BOB),
+			RuntimeOrigin::signed([1;32].into()),
 			100,
 			get_milestones(10),
-			sp_runtime::MultiAddress::Id(BOB),
+			sp_runtime::MultiAddress::Id([1;32].into()),
 			13,
 			20
 		));
 		assert_ok!(CommunityLoanPool::vote_on_proposal(
-			RuntimeOrigin::signed(ALICE),
+			RuntimeOrigin::signed([0;32].into()),
 			1,
 			crate::Vote::Yes
 		));
 		assert_ok!(CommunityLoanPool::vote_on_proposal(
-			RuntimeOrigin::signed(BOB),
+			RuntimeOrigin::signed([1;32].into()),
 			1,
 			crate::Vote::Yes
 		));
@@ -121,24 +121,24 @@ fn voting_works() {
 fn vote_rejected_with_no_votes() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), ALICE));
-		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), BOB));
+		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0;32].into()));
+		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [1;32].into()));
 		assert_ok!(CommunityLoanPool::propose(
-			RuntimeOrigin::signed(BOB),
+			RuntimeOrigin::signed([1;32].into()),
 			100,
 			get_milestones(10),
-			sp_runtime::MultiAddress::Id(BOB),
+			sp_runtime::MultiAddress::Id([1;32].into()),
 			13,
 			20
 		));
 		assert_ok!(CommunityLoanPool::vote_on_proposal(
-			RuntimeOrigin::signed(ALICE),
+			RuntimeOrigin::signed([0;32].into()),
 			1,
 			crate::Vote::No
 		));
 		run_to_block(22);
 		assert_noop!(
-			CommunityLoanPool::vote_on_proposal(RuntimeOrigin::signed(BOB), 1, crate::Vote::No),
+			CommunityLoanPool::vote_on_proposal(RuntimeOrigin::signed([1;32].into()), 1, crate::Vote::No),
 			Error::<Test>::InvalidIndex
 		);
 	})
@@ -148,17 +148,17 @@ fn vote_rejected_with_no_votes() {
 fn voting_works_only_for_members() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), ALICE));
+		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0;32].into()));
 		assert_ok!(CommunityLoanPool::propose(
-			RuntimeOrigin::signed(BOB),
+			RuntimeOrigin::signed([1;32].into()),
 			100,
 			get_milestones(10),
-			sp_runtime::MultiAddress::Id(BOB),
+			sp_runtime::MultiAddress::Id([1;32].into()),
 			13,
 			20
 		));
 		assert_noop!(
-			CommunityLoanPool::vote_on_proposal(RuntimeOrigin::signed(DAVE), 1, crate::Vote::Yes),
+			CommunityLoanPool::vote_on_proposal(RuntimeOrigin::signed([2;32].into()), 1, crate::Vote::Yes),
 			Error::<Test>::InsufficientPermission
 		);
 	})
@@ -168,17 +168,17 @@ fn voting_works_only_for_members() {
 fn vote_evaluated_after_yes_votes() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), ALICE));
+		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0;32].into()));
 		assert_ok!(CommunityLoanPool::propose(
-			RuntimeOrigin::signed(BOB),
+			RuntimeOrigin::signed([1;32].into()),
 			100,
 			get_milestones(10),
-			sp_runtime::MultiAddress::Id(BOB),
+			sp_runtime::MultiAddress::Id([1;32].into()),
 			13,
 			20
 		));
 		assert_ok!(CommunityLoanPool::vote_on_proposal(
-			RuntimeOrigin::signed(ALICE),
+			RuntimeOrigin::signed([0;32].into()),
 			1,
 			crate::Vote::Yes
 		));
@@ -191,24 +191,24 @@ fn vote_evaluated_after_yes_votes() {
 fn milestone_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), ALICE));
+		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0;32].into()));
 		assert_ok!(CommunityLoanPool::propose(
-			RuntimeOrigin::signed(BOB),
+			RuntimeOrigin::signed([1;32].into()),
 			100,
 			get_milestones(10),
-			sp_runtime::MultiAddress::Id(BOB),
+			sp_runtime::MultiAddress::Id([1;32].into()),
 			13,
 			20
 		));
 		assert_ok!(CommunityLoanPool::vote_on_proposal(
-			RuntimeOrigin::signed(ALICE),
+			RuntimeOrigin::signed([0;32].into()),
 			1,
 			crate::Vote::Yes
 		));
 		run_to_block(22);
-		assert_ok!(CommunityLoanPool::propose_milestone(RuntimeOrigin::signed(BOB), 1));
+		assert_ok!(CommunityLoanPool::propose_milestone(RuntimeOrigin::signed([1;32].into()), 1));
 		assert_ok!(CommunityLoanPool::vote_on_milestone_proposal(
-			RuntimeOrigin::signed(ALICE),
+			RuntimeOrigin::signed([0;32].into()),
 			1,
 			crate::Vote::Yes
 		));

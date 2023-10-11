@@ -52,6 +52,7 @@ std = [
 	"scale-info/std",
 	"serde",
 	"pallet-uniques/std",
+	"pallet-nfts/std",
 	"pallet-contracts/std",
 	"pallet-balances/std",
 	"pallet-timestamp/std",
