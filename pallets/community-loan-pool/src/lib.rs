@@ -265,6 +265,11 @@ pub mod pallet {
 	#[pallet::getter(fn total_loan_amount)]
 	pub(super) type TotalLoanAmount<T> = StorageValue<_, u64, ValueQuery>;
 
+	/// Amount of founds that is still on the pallet but is reserved for loan
+	#[pallet::storage]
+	#[pallet::getter(fn reserved_loan_amount)]
+	pub(super) type ReservedLoanAmount<T> = StorageValue<_, u64, ValueQuery>;
+
 	/// All currently ongoing loans
 	#[pallet::storage]
 	#[pallet::getter(fn ongoing_loans)]
@@ -428,11 +433,13 @@ pub mod pallet {
 		/// All milestones has been accomplished
 		NoMilestonesLeft,
 		/// Milestones of the loan have to be 100 % in Sum
-		MilestonesHaveToCoverLone,
+		MilestonesHaveToCoverLoan,
 		/// Withdrawl is locked during ongoing voting for deletion
 		DeletionVotingOngoing,
 		/// The beneficiary didn't borrow that much funds
 		WantsToRepayTooMuch,
+		/// There are not enough funds available in the loan pallet
+		NotEnoughLoanFundsAvailable
 	}
 
 	#[pallet::event]
@@ -558,11 +565,14 @@ pub mod pallet {
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let beneficiary = T::Lookup::lookup(beneficiary)?;
+			let total_loan_amount = Self::u64_to_balance_option(Self::reserved_loan_amount()).unwrap();
+			let decimal = Self::u64_to_balance_option(1000000000000).unwrap();
+			ensure!(<T as pallet::Config>::Currency::free_balance(&Self::account_id()) / decimal >= total_loan_amount.saturating_add(amount), Error::<T>::NotEnoughLoanFundsAvailable);
 			let sum: u64 = proposed_milestones
 				.iter()
 				.map(|i| i.percentage_to_unlock.deconstruct() as u64)
 				.sum();
-			ensure!(100 == sum, Error::<T>::MilestonesHaveToCoverLone);
+			ensure!(100 == sum, Error::<T>::MilestonesHaveToCoverLoan);
 			let proposal_index = Self::proposal_count() + 1;
 			let bond = Self::calculate_bond(amount);
 			<T as pallet::Config>::Currency::reserve(&origin, bond)
@@ -683,6 +693,8 @@ pub mod pallet {
 			loan.borrowed_amount = loan.borrowed_amount.saturating_add(amount);
 			loan.available_amount = loan.available_amount.saturating_sub(amount);
 			Loans::<T>::insert(loan_id, loan);
+			let reserved_value = Self::reserved_loan_amount() - Self::balance_to_u64(amount).unwrap();
+			ReservedLoanAmount::<T>::put(reserved_value);
 			Self::deposit_event(Event::<T>::Withdraw { loan_index: loan_id, amount });
 			Ok(())
 		}
@@ -864,6 +876,9 @@ pub mod pallet {
 			<T as pallet_nfts::Config>::ItemId: From<u32>,
 		{
 			let proposal = <Proposals<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
+			let total_loan_amount = Self::u64_to_balance_option(Self::total_loan_amount()).unwrap();
+			let decimal = Self::u64_to_balance_option(1000000000000).unwrap();
+			ensure!(<T as pallet::Config>::Currency::free_balance(&Self::account_id()) / decimal >= total_loan_amount.saturating_add(proposal.amount), Error::<T>::NotEnoughLoanFundsAvailable);
 			let err_amount =
 				<T as pallet::Config>::Currency::unreserve(&proposal.proposer, proposal.bond);
 			debug_assert!(err_amount.is_zero());
@@ -924,6 +939,8 @@ pub mod pallet {
 
 			let new_value = Self::total_loan_amount() + Self::balance_to_u64(value).unwrap();
 			TotalLoanAmount::<T>::put(new_value);
+			let reserved_value = Self::reserved_loan_amount() + Self::balance_to_u64(value).unwrap();
+			ReservedLoanAmount::<T>::put(reserved_value);
 			Proposals::<T>::remove(proposal_index);
 			LoanCount::<T>::put(loan_index);
 			Self::deposit_event(Event::<T>::Approved { proposal_index });
