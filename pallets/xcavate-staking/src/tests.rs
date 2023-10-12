@@ -5,8 +5,8 @@ use frame_support::{assert_noop, assert_ok};
 fn stake_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([0;32].into()), 100));
-		System::assert_last_event(Event::Locked { staker: [0;32].into(), amount: 100 }.into());
+		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([0; 32].into()), 100));
+		System::assert_last_event(Event::Locked { staker: [0; 32].into(), amount: 100 }.into());
 		let total_stake = XcavateStaking::total_stake();
 		assert_eq!(total_stake, 100);
 		let stakers = XcavateStaking::active_stakers();
@@ -18,9 +18,9 @@ fn stake_works() {
 fn stake_with_several_people_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([0;32].into()), 100));
-		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([1;32].into()), 400));
-		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([2;32].into()), 500));
+		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([0; 32].into()), 100));
+		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([1; 32].into()), 400));
+		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([2; 32].into()), 500));
 		let total_stake = XcavateStaking::total_stake();
 		assert_eq!(total_stake, 1000);
 		let stakers = XcavateStaking::active_stakers();
@@ -33,7 +33,7 @@ fn person_cant_stake_0_token() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_noop!(
-			XcavateStaking::stake(RuntimeOrigin::signed([0;32].into()), 0),
+			XcavateStaking::stake(RuntimeOrigin::signed([0; 32].into()), 0),
 			Error::<Test>::StakingWithNoValue
 		);
 	})
@@ -43,8 +43,8 @@ fn person_cant_stake_0_token() {
 fn unstake_works() {
 	new_test_ext().execute_with(|| {
 		//System::set_block_number(1);
-		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([0;32].into()), 100));
-		assert_ok!(XcavateStaking::unstake(RuntimeOrigin::signed([0;32].into()), 100));
+		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([0; 32].into()), 100));
+		assert_ok!(XcavateStaking::unstake(RuntimeOrigin::signed([0; 32].into()), 100));
 		let total_stake = XcavateStaking::total_stake();
 		assert_eq!(total_stake, 0);
 		let stakers = XcavateStaking::active_stakers();
@@ -55,9 +55,9 @@ fn unstake_works() {
 #[test]
 fn unstake_doesnt_work_for_nonstaker() {
 	new_test_ext().execute_with(|| {
-		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([0;32].into()), 100));
+		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([0; 32].into()), 100));
 		assert_noop!(
-			XcavateStaking::unstake(RuntimeOrigin::signed([1;32].into()), 100),
+			XcavateStaking::unstake(RuntimeOrigin::signed([1; 32].into()), 100),
 			Error::<Test>::NoStaker
 		);
 	})

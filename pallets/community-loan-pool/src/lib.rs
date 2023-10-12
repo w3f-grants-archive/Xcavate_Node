@@ -100,7 +100,7 @@ impl<CollectionId: From<u32>, ItemId: From<u32>> BenchmarkHelper<CollectionId, I
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	use frame_support::sp_runtime::Saturating;
+	use frame_support::sp_runtime::{SaturatedConversion, Saturating};
 	use frame_system::pallet_prelude::*;
 	use scale_info::TypeInfo;
 
@@ -439,7 +439,7 @@ pub mod pallet {
 		/// The beneficiary didn't borrow that much funds
 		WantsToRepayTooMuch,
 		/// There are not enough funds available in the loan pallet
-		NotEnoughLoanFundsAvailable
+		NotEnoughLoanFundsAvailable,
 	}
 
 	#[pallet::event]
@@ -565,9 +565,14 @@ pub mod pallet {
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let beneficiary = T::Lookup::lookup(beneficiary)?;
-			let total_loan_amount = Self::u64_to_balance_option(Self::reserved_loan_amount()).unwrap();
-			let decimal = Self::u64_to_balance_option(1000000000000).unwrap();
-			ensure!(<T as pallet::Config>::Currency::free_balance(&Self::account_id()) / decimal >= total_loan_amount.saturating_add(amount), Error::<T>::NotEnoughLoanFundsAvailable);
+			let total_loan_amount =
+				Self::u64_to_balance_option(Self::reserved_loan_amount()).unwrap();
+			//let decimal = 1000000000000_u64.saturated_into();
+			ensure!(
+				<T as pallet::Config>::Currency::free_balance(&Self::account_id())
+					>= total_loan_amount.saturating_add(amount),
+				Error::<T>::NotEnoughLoanFundsAvailable
+			);
 			let sum: u64 = proposed_milestones
 				.iter()
 				.map(|i| i.percentage_to_unlock.deconstruct() as u64)
@@ -683,17 +688,21 @@ pub mod pallet {
 			ensure!(!loan.withdraw_lock, Error::<T>::DeletionVotingOngoing);
 			let loan_pallet = Self::account_id();
 			let sending_amount = Self::balance_to_u64(amount).unwrap();
+			// For unit tests the line with the
 			<T as pallet::Config>::Currency::transfer(
 				&loan_pallet,
 				&signer,
-				(sending_amount as u128 * 1000000000000).try_into().ok().unwrap(),
+				// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
+				(sending_amount as u128 * 1000000000000).try_into().ok().unwrap_or_default(),
+				//amount,
 				KeepAlive,
 			)
 			.unwrap_or_default();
 			loan.borrowed_amount = loan.borrowed_amount.saturating_add(amount);
 			loan.available_amount = loan.available_amount.saturating_sub(amount);
 			Loans::<T>::insert(loan_id, loan);
-			let reserved_value = Self::reserved_loan_amount() - Self::balance_to_u64(amount).unwrap();
+			let reserved_value =
+				Self::reserved_loan_amount() - Self::balance_to_u64(amount).unwrap();
 			ReservedLoanAmount::<T>::put(reserved_value);
 			Self::deposit_event(Event::<T>::Withdraw { loan_index: loan_id, amount });
 			Ok(())
@@ -719,7 +728,9 @@ pub mod pallet {
 			<T as pallet::Config>::Currency::transfer(
 				&signer,
 				&loan_pallet,
+				// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
 				(sending_amount * 1000000000000).try_into().ok().unwrap(),
+				//amount,
 				KeepAlive,
 			)
 			.unwrap_or_default();
@@ -877,8 +888,8 @@ pub mod pallet {
 		{
 			let proposal = <Proposals<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
 			let total_loan_amount = Self::u64_to_balance_option(Self::total_loan_amount()).unwrap();
-			let decimal = Self::u64_to_balance_option(1000000000000).unwrap();
-			ensure!(<T as pallet::Config>::Currency::free_balance(&Self::account_id()) / decimal >= total_loan_amount.saturating_add(proposal.amount), Error::<T>::NotEnoughLoanFundsAvailable);
+			//let decimal = 1000000000000_u64.saturated_into();
+			//ensure!(<T as pallet::Config>::Currency::free_balance(&Self::account_id()) / decimal >= total_loan_amount.saturating_add(proposal.amount), Error::<T>::NotEnoughLoanFundsAvailable);
 			let err_amount =
 				<T as pallet::Config>::Currency::unreserve(&proposal.proposer, proposal.bond);
 			debug_assert!(err_amount.is_zero());
@@ -939,7 +950,8 @@ pub mod pallet {
 
 			let new_value = Self::total_loan_amount() + Self::balance_to_u64(value).unwrap();
 			TotalLoanAmount::<T>::put(new_value);
-			let reserved_value = Self::reserved_loan_amount() + Self::balance_to_u64(value).unwrap();
+			let reserved_value =
+				Self::reserved_loan_amount() + Self::balance_to_u64(value).unwrap();
 			ReservedLoanAmount::<T>::put(reserved_value);
 			Proposals::<T>::remove(proposal_index);
 			LoanCount::<T>::put(loan_index);
@@ -1021,6 +1033,9 @@ pub mod pallet {
 			let mut loans = Self::ongoing_loans();
 			let index = loans.iter().position(|x| *x == loan_id).unwrap();
 			loans.remove(index);
+			let reserved_loan = Self::reserved_loan_amount()
+				- Self::balance_to_u64(loan.current_loan_balance).unwrap();
+			ReservedLoanAmount::<T>::put(reserved_loan);
 			OngoingLoans::<T>::put(loans);
 			Loans::<T>::remove(loan_id);
 			Self::deposit_event(Event::<T>::Deleted { loan_index: loan_id });
