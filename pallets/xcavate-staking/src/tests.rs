@@ -1,5 +1,21 @@
 use crate::{mock::*, Error, Event};
-use frame_support::{assert_noop, assert_ok};
+use frame_support::{
+	assert_noop, assert_ok,
+	traits::{OnFinalize, OnInitialize},
+};
+
+fn run_to_block(n: u64) {
+	while System::block_number() < n {
+		if System::block_number() > 0 {
+			CommunityLoanPool::on_finalize(System::block_number());
+			System::on_finalize(System::block_number());
+		}
+		System::reset_events();
+		System::set_block_number(System::block_number() + 1);
+		System::on_initialize(System::block_number());
+		CommunityLoanPool::on_initialize(System::block_number());
+	}
+}
 
 #[test]
 fn stake_works() {

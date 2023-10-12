@@ -135,6 +135,7 @@ pub mod pallet {
 			//let block = n.saturated_into::<u64>();
 			/* if block % 10 == 0 { */
 			Self::claim_rewards().unwrap_or_default();
+			Self::check_relation_to_loan().unwrap_or_default();
 			/* } */
 		}
 	}
@@ -272,9 +273,7 @@ pub mod pallet {
 						.unwrap() * 10000 / total_amount_loan;
 			}
 			let average_loan_apy = loan_apys / 10000;
-			total_amount_loan * 100 / Self::balance_to_u128(Self::total_stake()).unwrap()
-				* average_loan_apy
-				/ 100 / 100
+			average_loan_apy - 200
 		}
 
 		pub fn claim_rewards() -> DispatchResult {
@@ -287,7 +286,8 @@ pub mod pallet {
 				let current_timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
 				let locked_amount = Self::balance_to_u128(ledger.locked).unwrap();
 				let rewards = locked_amount * apy * (current_timestamp - ledger.timestamp) as u128
-					/ 365 / 60 / 60 / 24 / 100;
+					/ 365 / 60 / 60 / 24 / 100
+					/ 100;
 				let new_locked_amount = locked_amount + rewards;
 				ledger.locked = Self::u128_to_balance_option(new_locked_amount).unwrap();
 				ledger.timestamp = current_timestamp;
@@ -316,6 +316,53 @@ pub mod pallet {
 					apy,
 				});
 			}
+			Ok(())
+		}
+
+		fn check_relation_to_loan() -> DispatchResult {
+			let mut total_amount_loan =
+				pallet_community_loan_pool::Pallet::<T>::total_loan_amount() as u128;
+			let mut total_stake = Self::balance_to_u128(Self::total_stake()).unwrap();
+			while total_stake > total_amount_loan {
+				let stakers = Self::active_stakers();
+				let last_staker = &Self::active_stakers()[stakers.len() - 1];
+				let mut ledger = Self::ledger(&last_staker).unwrap();
+				if Self::balance_to_u128(ledger.locked).unwrap()
+					< total_stake.saturating_sub(total_amount_loan)
+				{
+					Self::unstake_staker(last_staker.clone(), ledger.locked);
+				} else {
+					let value = total_stake.saturating_sub(total_amount_loan);
+					Self::unstake_staker(
+						last_staker.clone(),
+						Self::u128_to_balance_option(value).unwrap(),
+					);
+				};
+				total_amount_loan =
+					pallet_community_loan_pool::Pallet::<T>::total_loan_amount() as u128;
+				total_stake = Self::balance_to_u128(Self::total_stake()).unwrap();
+			}
+			Ok(())
+		}
+
+		fn unstake_staker(staker: T::AccountId, value: BalanceOf<T>) -> DispatchResult {
+			let mut ledger = Self::ledger(&staker).unwrap();
+
+			ledger.locked = ledger.locked.saturating_sub(value);
+
+			if ledger.locked.is_zero() {
+				let mut active_staker = Self::active_stakers();
+				let index = active_staker.iter().position(|x| *x == staker.clone()).unwrap();
+				active_staker.remove(index);
+				ActiveStakers::<T>::put(active_staker);
+			}
+
+			Self::update_ledger(&staker, ledger);
+
+			let total_stake = Self::total_stake();
+			TotalStake::<T>::put(total_stake - value);
+
+			Self::deposit_event(Event::Unlocked { staker, amount: value });
 			Ok(())
 		}
 
