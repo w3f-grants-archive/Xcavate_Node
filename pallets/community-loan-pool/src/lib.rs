@@ -440,6 +440,8 @@ pub mod pallet {
 		WantsToRepayTooMuch,
 		/// There are not enough funds available in the loan pallet
 		NotEnoughLoanFundsAvailable,
+		/// The Milestones for the proposal have already been set
+		MilestonesAlreadySet,
 	}
 
 	#[pallet::event]
@@ -475,6 +477,8 @@ pub mod pallet {
 		MilestoneApproved { loan_id: LoanIndex },
 		/// Milestone Proposal has been rejected
 		MilestoneRejected { proposal_index: ProposalIndex },
+		/// Milestones have been set for a proposal
+		MilestonesSet { proposal_index: ProposalIndex },
 	}
 
 	#[pallet::hooks]
@@ -558,7 +562,6 @@ pub mod pallet {
 		pub fn propose(
 			origin: OriginFor<T>,
 			amount: BalanceOf<T>,
-			proposed_milestones: BoundedProposedMilestones<T>,
 			beneficiary: AccountIdLookupOf<T>,
 			developer_experience: u64,
 			loan_term: u64,
@@ -573,11 +576,6 @@ pub mod pallet {
 					>= total_loan_amount.saturating_add(amount),
 				Error::<T>::NotEnoughLoanFundsAvailable
 			);
-			let sum: u64 = proposed_milestones
-				.iter()
-				.map(|i| i.percentage_to_unlock.deconstruct() as u64)
-				.sum();
-			ensure!(100 == sum, Error::<T>::MilestonesHaveToCoverLoan);
 			let proposal_index = Self::proposal_count() + 1;
 			let bond = Self::calculate_bond(amount);
 			<T as pallet::Config>::Currency::reserve(&origin, bond)
@@ -594,7 +592,7 @@ pub mod pallet {
 			let proposal = Proposal {
 				proposer: origin,
 				amount,
-				milestones: proposed_milestones,
+				milestones: Default::default(),
 				beneficiary,
 				apr_rate,
 				bond,
@@ -740,6 +738,45 @@ pub mod pallet {
 			let new_value = Self::total_loan_amount() - Self::balance_to_u64(amount).unwrap();
 			TotalLoanAmount::<T>::put(new_value);
 			Self::deposit_event(Event::<T>::LoanUpdated { loan_index: loan_id });
+			Ok(())
+		}
+
+		/// The committee sets the milestone distribution for the loan
+		#[pallet::call_index(55)]
+		#[pallet::weight(0)]
+		pub fn set_milestones(
+			origin: OriginFor<T>,
+			proposal_index: ProposalIndex,
+			proposed_milestones: BoundedProposedMilestones<T>,
+		) -> DispatchResult {
+			let origin = ensure_signed(origin)?;
+			let current_members = Self::voting_committee();
+			ensure!(current_members.contains(&origin), Error::<T>::InsufficientPermission);
+			let mut proposal = <Proposals<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
+			ensure!(proposal.milestones.len() == 0, Error::<T>::MilestonesAlreadySet);
+			let sum: u64 = proposed_milestones
+				.iter()
+				.map(|i| i.percentage_to_unlock.deconstruct() as u64)
+				.sum();
+			ensure!(100 == sum, Error::<T>::MilestonesHaveToCoverLoan);
+			proposal.milestones = proposed_milestones;
+			Proposals::<T>::insert(proposal_index, proposal);
+			let mut current_vote =
+			<OngoingVotes<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
+			let voted = <UserVotes<T>>::get((proposal_index, origin.clone()));
+			if voted.is_none() {
+				current_vote.yes_votes += 1;
+				UserVotes::<T>::insert((proposal_index, origin.clone()), Vote::Yes);
+				OngoingVotes::<T>::insert(proposal_index, current_vote);
+				Self::deposit_event(Event::<T>::VotedOnProposal {
+					proposal_index,
+					member: origin,
+					vote: Vote::Yes,
+				});
+			} else {
+				OngoingVotes::<T>::insert(proposal_index, current_vote);
+			};
+			Self::deposit_event(Event::<T>::MilestonesSet {proposal_index});
 			Ok(())
 		}
 

@@ -40,7 +40,6 @@ fn propose_works() {
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([0; 32].into()),
 			100,
-			get_milestones(10),
 			sp_runtime::MultiAddress::Id([1; 32].into()),
 			13,
 			20
@@ -57,7 +56,6 @@ fn propose_doesnt_work_not_enough_userbalance() {
 			CommunityLoanPool::propose(
 				RuntimeOrigin::signed([6; 32].into()),
 				100,
-				get_milestones(10),
 				sp_runtime::MultiAddress::Id([1; 32].into()),
 				13,
 				20
@@ -98,15 +96,14 @@ fn voting_works() {
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
 			100,
-			get_milestones(10),
 			sp_runtime::MultiAddress::Id([1; 32].into()),
 			13,
 			20
 		));
-		assert_ok!(CommunityLoanPool::vote_on_proposal(
+		assert_ok!(CommunityLoanPool::set_milestones(
 			RuntimeOrigin::signed([0; 32].into()),
 			1,
-			crate::Vote::Yes
+			get_milestones(10),
 		));
 		assert_ok!(CommunityLoanPool::vote_on_proposal(
 			RuntimeOrigin::signed([1; 32].into()),
@@ -126,15 +123,14 @@ fn vote_rejected_with_no_votes() {
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
 			100,
-			get_milestones(10),
 			sp_runtime::MultiAddress::Id([1; 32].into()),
 			13,
 			20
 		));
-		assert_ok!(CommunityLoanPool::vote_on_proposal(
+		assert_ok!(CommunityLoanPool::set_milestones(
 			RuntimeOrigin::signed([0; 32].into()),
 			1,
-			crate::Vote::No
+			get_milestones(10),
 		));
 		run_to_block(22);
 		assert_noop!(
@@ -156,10 +152,14 @@ fn voting_works_only_for_members() {
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
 			100,
-			get_milestones(10),
 			sp_runtime::MultiAddress::Id([1; 32].into()),
 			13,
 			20
+		));
+		assert_ok!(CommunityLoanPool::set_milestones(
+			RuntimeOrigin::signed([0; 32].into()),
+			1,
+			get_milestones(10),
 		));
 		assert_noop!(
 			CommunityLoanPool::vote_on_proposal(
@@ -180,15 +180,14 @@ fn vote_evaluated_after_yes_votes() {
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
 			100,
-			get_milestones(10),
 			sp_runtime::MultiAddress::Id([1; 32].into()),
 			13,
 			20
 		));
-		assert_ok!(CommunityLoanPool::vote_on_proposal(
+		assert_ok!(CommunityLoanPool::set_milestones(
 			RuntimeOrigin::signed([0; 32].into()),
 			1,
-			crate::Vote::Yes
+			get_milestones(10),
 		));
 		run_to_block(22);
 		assert_eq!(CommunityLoanPool::loan_count(), 1);
@@ -203,15 +202,14 @@ fn milestone_works() {
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
 			100,
-			get_milestones(10),
 			sp_runtime::MultiAddress::Id([1; 32].into()),
 			13,
 			20
 		));
-		assert_ok!(CommunityLoanPool::vote_on_proposal(
+		assert_ok!(CommunityLoanPool::set_milestones(
 			RuntimeOrigin::signed([0; 32].into()),
 			1,
-			crate::Vote::Yes
+			get_milestones(10),
 		));
 		run_to_block(22);
 		assert_ok!(CommunityLoanPool::propose_milestone(RuntimeOrigin::signed([1; 32].into()), 1));
@@ -233,15 +231,14 @@ fn withdraw_works() {
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
 			100,
-			get_milestones(10),
 			sp_runtime::MultiAddress::Id([1; 32].into()),
 			13,
 			20
 		));
-		assert_ok!(CommunityLoanPool::vote_on_proposal(
+		assert_ok!(CommunityLoanPool::set_milestones(
 			RuntimeOrigin::signed([0; 32].into()),
 			1,
-			crate::Vote::Yes
+			get_milestones(10),
 		));
 		run_to_block(22);
 		assert_ok!(CommunityLoanPool::withdraw(RuntimeOrigin::signed([1; 32].into()), 1, 10));
@@ -257,15 +254,14 @@ fn withdraw_fails_by_wrong_caller() {
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
 			100,
-			get_milestones(10),
 			sp_runtime::MultiAddress::Id([1; 32].into()),
 			13,
 			20
 		));
-		assert_ok!(CommunityLoanPool::vote_on_proposal(
+		assert_ok!(CommunityLoanPool::set_milestones(
 			RuntimeOrigin::signed([0; 32].into()),
 			1,
-			crate::Vote::Yes
+			get_milestones(10),
 		));
 		run_to_block(22);
 		assert_noop!(
@@ -282,15 +278,14 @@ fn repay_works() {
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
 			100,
-			get_milestones(10),
 			sp_runtime::MultiAddress::Id([1; 32].into()),
 			13,
 			20
 		));
-		assert_ok!(CommunityLoanPool::vote_on_proposal(
+		assert_ok!(CommunityLoanPool::set_milestones(
 			RuntimeOrigin::signed([0; 32].into()),
 			1,
-			crate::Vote::Yes
+			get_milestones(10),
 		));
 		run_to_block(22);
 		assert_ok!(CommunityLoanPool::withdraw(RuntimeOrigin::signed([1; 32].into()), 1, 10));
@@ -307,15 +302,14 @@ fn repay_if_its_too_much() {
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
 			100,
-			get_milestones(10),
 			sp_runtime::MultiAddress::Id([1; 32].into()),
 			13,
 			20
 		));
-		assert_ok!(CommunityLoanPool::vote_on_proposal(
+		assert_ok!(CommunityLoanPool::set_milestones(
 			RuntimeOrigin::signed([0; 32].into()),
 			1,
-			crate::Vote::Yes
+			get_milestones(10),
 		));
 		run_to_block(22);
 		assert_ok!(CommunityLoanPool::withdraw(RuntimeOrigin::signed([1; 32].into()), 1, 10));
@@ -333,15 +327,14 @@ fn deletion_works() {
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
 			100,
-			get_milestones(10),
 			sp_runtime::MultiAddress::Id([1; 32].into()),
 			13,
 			20
 		));
-		assert_ok!(CommunityLoanPool::vote_on_proposal(
+		assert_ok!(CommunityLoanPool::set_milestones(
 			RuntimeOrigin::signed([0; 32].into()),
 			1,
-			crate::Vote::Yes
+			get_milestones(10),
 		));
 		run_to_block(22);
 		assert_ok!(CommunityLoanPool::withdraw(RuntimeOrigin::signed([1; 32].into()), 1, 10));
