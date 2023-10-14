@@ -1,7 +1,7 @@
 [package]
-name = "pallet-xcavate-staking"
+name = "pallet-nft-marketplace"
 version = "4.0.0-dev"
-description = "The Xcavate pallet xcavate-staking"
+description = "The Xcavate pallet nft-marketplace"
 authors = ["Xcavate Network"]
 homepage = "https://xcavate.io"
 edition = "2021"
@@ -20,21 +20,12 @@ scale-info = { version = "2.1.1", default-features = false, features = [
 	"derive",
 ] }
 serde = { version = "1.0.163", features = ["derive"], optional = true }
-
 frame-benchmarking = {  default-features = false, optional = true, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
 frame-support = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
 frame-system = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
 
-pallet-balances = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
-sp-std = { default-features = false,  git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
-pallet-timestamp = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
-pallet-transaction-payment = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
-pallet-insecure-randomness-collective-flip = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
 pallet-nfts = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
-pallet-contracts = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
-
-# Local dependencies
-pallet-community-loan-pool = { path = "../community-loan-pool", default-features = false }
+enumflags2 = { version = "0.7.7" }
 
 [dev-dependencies]
 sp-core = {  git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
@@ -49,15 +40,8 @@ std = [
 	"frame-support/std",
 	"frame-system/std",
 	"scale-info/std",
-	"pallet-balances/std",
-	"sp-std/std",
 	"serde",
-	"pallet-community-loan-pool/std",
-	"pallet-timestamp/std",
-	"pallet-transaction-payment/std",
-	"pallet-insecure-randomness-collective-flip/std",
 	"pallet-nfts/std",
-	"pallet-contracts/std",
 ]
 runtime-benchmarks = ["frame-benchmarking/runtime-benchmarks"]
 try-runtime = ["frame-support/try-runtime"]

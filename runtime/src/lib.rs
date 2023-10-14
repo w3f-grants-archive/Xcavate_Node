@@ -590,9 +590,9 @@ impl pallet_sudo::Config for Runtime {
 parameter_types! {
 	pub const CommunityLoanPalletId: PalletId = PalletId(*b"py/loana");
 	pub const MaxLoans: u32 = 10000;
-	pub const VotingTime: BlockNumber = 20;
+	pub const VotingTime: BlockNumber = 10;
 	pub const MaximumCommitteeMembers: u32 = 10;
-	pub const MaxMilestones: u32 = 10;
+	pub const MaxMilestones: u32 = 8;
 }
 
 /// Configure the pallet-community-loan-pool in pallets/community-loan-pool.
@@ -645,9 +645,26 @@ impl pallet_xcavate_staking::Config for Runtime {
 }
 
 parameter_types! {
+	pub const NftMarketplacePalletId: PalletId = PalletId(*b"py/nftxc");
+	pub const MaxListedNft: u32 = 1000000;
+	pub const MaxNftsInCollection: u32 = 100;
+}
+
+/// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
+impl pallet_nft_marketplace::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type Currency = Balances;
+	type PalletId = NftMarketplacePalletId;
+	#[cfg(feature = "runtime-benchmarks")]
+	type Helper = pallet_nft::NftHelper;
+	type MaxListedNfts = MaxListedNft;
+	type MaxNftInCollection = MaxNftsInCollection;
+}
+
+parameter_types! {
 	pub Features: PalletFeatures = PalletFeatures::all_enabled();
 	pub const MaxAttributesPerCall: u32 = 10;
-	pub const CollectionDeposit: Balance = 100 * DOLLARS;
+	pub const CollectionDeposit: Balance = DOLLARS;
 	pub const ItemDeposit: Balance = DOLLARS;
 	pub const MetadataDepositBase: Balance = 10 * DOLLARS;
 	pub const MetadataDepositPerByte: Balance = DOLLARS;
@@ -661,6 +678,10 @@ parameter_types! {
 
 	pub const UserStringLimit: u32 = 5;
 
+}
+
+ord_parameter_types! {
+	pub const CollectionCreationOrigin: AccountId = AccountIdConversion::<AccountId>::into_account_truncating(&CommunityLoanPalletId::get());
 }
 
 impl pallet_nfts::Config for Runtime {
@@ -688,7 +709,7 @@ impl pallet_nfts::Config for Runtime {
 	type WeightInfo = pallet_nfts::weights::SubstrateWeight<Runtime>;
 	#[cfg(feature = "runtime-benchmarks")]
 	type Helper = ();
-	type CreateOrigin = AsEnsureOriginWithArg<EnsureSigned<AccountId>>;
+	type CreateOrigin = AsEnsureOriginWithArg<EnsureSignedBy<CollectionCreationOrigin, AccountId>>;
 	type Locker = ();
 }
 
@@ -1551,6 +1572,7 @@ construct_runtime!(
 		Sudo: pallet_sudo,
 		CommunityLoanPool: pallet_community_loan_pool,
 		XcavateStaking: pallet_xcavate_staking,
+		NftMarketplace: pallet_nft_marketplace,
 		Nfts: pallet_nfts,
 		Uniques: pallet_uniques, //10
 		Contracts: pallet_contracts,

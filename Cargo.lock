@@ -4982,6 +4982,7 @@ dependencies = [
  "pallet-im-online",
  "pallet-insecure-randomness-collective-flip",
  "pallet-multisig",
+ "pallet-nft-marketplace",
  "pallet-nfts",
  "pallet-nfts-runtime-api",
  "pallet-nomination-pools",
@@ -5431,12 +5432,14 @@ dependencies = [
 name = "pallet-community-loan-pool"
 version = "4.0.0-dev"
 dependencies = [
+ "enumflags2",
  "frame-benchmarking",
  "frame-support",
  "frame-system",
  "pallet-balances",
  "pallet-contracts",
  "pallet-insecure-randomness-collective-flip",
+ "pallet-nfts",
  "pallet-timestamp",
  "pallet-transaction-payment",
  "pallet-uniques",
@@ -5645,6 +5648,23 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std",
+]
+
+[[package]]
+name = "pallet-nft-marketplace"
+version = "4.0.0-dev"
+dependencies = [
+ "enumflags2",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "pallet-nfts",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
 ]
 
 [[package]]
@@ -5958,9 +5978,9 @@ dependencies = [
  "pallet-community-loan-pool",
  "pallet-contracts",
  "pallet-insecure-randomness-collective-flip",
+ "pallet-nfts",
  "pallet-timestamp",
  "pallet-transaction-payment",
- "pallet-uniques",
  "parity-scale-codec",
  "scale-info",
  "serde",
