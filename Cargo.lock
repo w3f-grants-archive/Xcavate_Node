@@ -5654,11 +5654,14 @@ dependencies = [
 name = "pallet-nft-marketplace"
 version = "4.0.0-dev"
 dependencies = [
+ "enumflags2",
  "frame-benchmarking",
  "frame-support",
  "frame-system",
+ "pallet-nfts",
  "parity-scale-codec",
  "scale-info",
+ "serde",
  "sp-core",
  "sp-io",
  "sp-runtime",

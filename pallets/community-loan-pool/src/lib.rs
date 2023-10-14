@@ -752,7 +752,8 @@ pub mod pallet {
 			let origin = ensure_signed(origin)?;
 			let current_members = Self::voting_committee();
 			ensure!(current_members.contains(&origin), Error::<T>::InsufficientPermission);
-			let mut proposal = <Proposals<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
+			let mut proposal =
+				<Proposals<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(proposal.milestones.len() == 0, Error::<T>::MilestonesAlreadySet);
 			let sum: u64 = proposed_milestones
 				.iter()
@@ -762,7 +763,7 @@ pub mod pallet {
 			proposal.milestones = proposed_milestones;
 			Proposals::<T>::insert(proposal_index, proposal);
 			let mut current_vote =
-			<OngoingVotes<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
+				<OngoingVotes<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
 			let voted = <UserVotes<T>>::get((proposal_index, origin.clone()));
 			if voted.is_none() {
 				current_vote.yes_votes += 1;
@@ -776,7 +777,7 @@ pub mod pallet {
 			} else {
 				OngoingVotes::<T>::insert(proposal_index, current_vote);
 			};
-			Self::deposit_event(Event::<T>::MilestonesSet {proposal_index});
+			Self::deposit_event(Event::<T>::MilestonesSet { proposal_index });
 			Ok(())
 		}
 
