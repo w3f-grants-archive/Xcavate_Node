@@ -442,6 +442,8 @@ pub mod pallet {
 		NotEnoughLoanFundsAvailable,
 		/// The Milestones for the proposal have already been set
 		MilestonesAlreadySet,
+		/// There has been no milestones set in the proposal
+		NoMilestones,
 	}
 
 	#[pallet::event]
@@ -742,6 +744,7 @@ pub mod pallet {
 		}
 
 		/// The committee sets the milestone distribution for the loan
+
 		#[pallet::call_index(55)]
 		#[pallet::weight(0)]
 		pub fn set_milestones(
@@ -796,6 +799,8 @@ pub mod pallet {
 				<OngoingVotes<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
 			let voted = <UserVotes<T>>::get((proposal_index, origin.clone()));
 			ensure!(voted.is_none(), Error::<T>::AlreadyVoted);
+			let proposal = Self::proposals(proposal_index).unwrap_or_default();
+			ensure!(proposal.milestones.len() > 0, Error::<T>::NoMilestones);
 			if vote == Vote::Yes {
 				current_vote.yes_votes += 1;
 			} else {
