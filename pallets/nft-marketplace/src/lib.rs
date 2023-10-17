@@ -15,7 +15,7 @@ mod tests;
 mod benchmarking;
 
 use frame_support::{
-	traits::{Currency, ReservableCurrency, ExistenceRequirement::KeepAlive},
+	traits::{Currency, ExistenceRequirement::KeepAlive, ReservableCurrency},
 	PalletId,
 };
 
@@ -108,7 +108,7 @@ pub mod pallet {
 		type MaxListedNfts: Get<u32>;
 
 		/// The maximum amount of nfts for a collection.
-		type MaxNftInCollection: Get<u32>;	
+		type MaxNftInCollection: Get<u32>;
 	}
 
 	/// Number of nfts that have been listed.
@@ -143,14 +143,13 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
-	// Pallets use events to inform users when important changes are made.
-	// https://docs.substrate.io/main-docs/build/events-errors/
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// Event documentation should end with an array that provides descriptive names for event
-		/// parameters. [something, who]
-		SomethingStored { something: u32, who: T::AccountId },
+		/// A new object has been listed on the marketplace
+		ObjectListed { collection_index: T::CollectionId, price: BalanceOf<T>, seller: AccountIdOf<T> },
+		/// A nft has been bought
+		NftBought { collection_index: T::CollectionId, item_index: T::ItemId, buyer: AccountIdOf<T>, price: BalanceOf<T> }
 	}
 
 	// Errors inform users that something went wrong.
@@ -164,20 +163,17 @@ pub mod pallet {
 		TooManyNfts,
 		/// The buyer doesn't have enough funds
 		NotEnoughFunds,
+		/// The collection has not been found
 		CollectionNotFound,
 	}
 
-	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
-	// These functions materialize as "extrinsics", which are often compared to transactions.
-	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
 	#[pallet::call]
 	impl<T: Config> Pallet<T>
 	where
 		<T as pallet_nfts::Config>::CollectionId: From<u32>,
 		<T as pallet_nfts::Config>::ItemId: From<u32>,
 	{
-		/// An example dispatchable that takes a singles value as a parameter, writes the value to
-		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
+		/// List a real estate object. A new collection is created and 100 nfts get minted.
 		#[pallet::call_index(0)]
 		#[pallet::weight(0)]
 		pub fn list_object(origin: OriginFor<T>, price: BalanceOf<T>) -> DispatchResult
@@ -187,9 +183,7 @@ pub mod pallet {
 		{
 			let origin = ensure_signed(origin)?;
 			let collection_id: T::CollectionId = 1.into();
-			// Check that the extrinsic was signed and get the signer.
-			// This function will return an error if the extrinsic is not signed.
-			// https://docs.substrate.io/main-docs/build/origins/
+
 			let collection = pallet_nfts::Pallet::<T>::do_create_collection(
 				collection_id,
 				Self::account_id(),
@@ -223,17 +217,28 @@ pub mod pallet {
 				)?;
 				OngoingListings::<T>::insert(nft_index, nft);
 				ListedNftCount::<T>::put(nft_index);
-				ListedNfts::<T>::try_append(nft_index).map_err(|_| Error::<T>::TooManyListedNfts)?;
+				ListedNfts::<T>::try_append(nft_index)
+					.map_err(|_| Error::<T>::TooManyListedNfts)?;
 			}
+			Self::deposit_event(Event::<T>::ObjectListed {
+				collection_index: collection_id,
+				price,
+				seller: origin,
+			});
 			Ok(())
 		}
 
+		/// Buying a certain nft.
 		#[pallet::call_index(1)]
 		#[pallet::weight(0)]
 		pub fn buy_nft(origin: OriginFor<T>, listed_nft_index: ListedNftIndex) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
-			let mut nft = <OngoingListings<T>>::take(listed_nft_index).ok_or(Error::<T>::InvalidIndex)?;
-			ensure!(<T as pallet::Config>::Currency::free_balance(&origin) >= nft.price, Error::<T>::NotEnoughFunds);
+			let mut nft =
+				<OngoingListings<T>>::take(listed_nft_index).ok_or(Error::<T>::InvalidIndex)?;
+			ensure!(
+				<T as pallet::Config>::Currency::free_balance(&origin) >= nft.price,
+				Error::<T>::NotEnoughFunds
+			);
 			nft.owner = origin.clone();
 			nft.sold = true;
 			ListedCollection::<T>::try_mutate(nft.collection_id.clone(), |keys| {
@@ -257,7 +262,8 @@ pub mod pallet {
 			let nft = Self::ongoing_listings(listed_nft_index).unwrap();
 			if Self::listed_collection(nft.collection_id).len() == 10 {
 				Self::distribute_nfts(nft.collection_id);
-			} 
+			}
+			Self::deposit_event(Event::<T>::NftBought { collection_index: nft.collection_id, item_index: nft.item_id, buyer: origin, price: nft.price });
 			Ok(())
 		}
 	}
@@ -273,13 +279,20 @@ pub mod pallet {
 				&Self::account_id(),
 				&list[0].real_estate_developer,
 				// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
-				list[0].price * Self::u64_to_balance_option(10).unwrap() * Self::u64_to_balance_option(1000000000000).unwrap(),
+				list[0].price
+					* Self::u64_to_balance_option(10).unwrap()
+					* Self::u64_to_balance_option(1000000000000).unwrap(),
 				//amount,
 				KeepAlive,
 			)
 			.unwrap_or_default();
 			for x in list {
-				pallet_nfts::Pallet::<T>::do_transfer(collection_id, x.item_id, x.owner, |_, _| Ok(()))?;
+				pallet_nfts::Pallet::<T>::do_transfer(
+					collection_id,
+					x.item_id,
+					x.owner,
+					|_, _| Ok(()),
+				)?;
 			}
 			Ok(())
 		}
