@@ -41,8 +41,8 @@ pub struct NftHelper;
 
 #[cfg(feature = "runtime-benchmarks")]
 pub trait BenchmarkHelper<CollectionId, ItemId> {
-	pub fn to_collection(i: u32) -> CollectionId;
-	pub fn to_nft(i: u32) -> ItemId;
+	fn to_collection(i: u32) -> CollectionId;
+	fn to_nft(i: u32) -> ItemId;
 }
 
 #[cfg(feature = "runtime-benchmarks")]
@@ -184,7 +184,7 @@ pub mod pallet {
 			let origin = ensure_signed(origin)?;
 			let collection_id: T::CollectionId = 1.into();
 
-			let collection = pallet_nfts::Pallet::<T>::do_create_collection(
+			pallet_nfts::Pallet::<T>::do_create_collection(
 				collection_id,
 				Self::account_id(),
 				Self::account_id(),
@@ -241,7 +241,7 @@ pub mod pallet {
 			);
 			nft.owner = origin.clone();
 			nft.sold = true;
-			ListedCollection::<T>::try_mutate(nft.collection_id.clone(), |keys| {
+			ListedCollection::<T>::try_mutate(nft.collection_id, |keys| {
 				keys.try_push(nft.clone()).map_err(|_| Error::<T>::TooManyNfts)?;
 				Ok::<(), DispatchError>(())
 			})?;
@@ -249,7 +249,7 @@ pub mod pallet {
 				&origin,
 				&Self::account_id(),
 				// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
-				nft.price * Self::u64_to_balance_option(1000000000000).unwrap(),
+				nft.price * Self::u64_to_balance_option(1000000000000).unwrap_or_default(),
 				//amount,
 				KeepAlive,
 			)

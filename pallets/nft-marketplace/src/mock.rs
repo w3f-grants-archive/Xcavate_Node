@@ -130,8 +130,6 @@ impl pallet_nfts::Config for Test {
 	type Features = Features;
 	type OffchainSignature = Signature;
 	type OffchainPublic = AccountPublic;
-	#[cfg(feature = "runtime-benchmarks")]
-	type Helper = ();
 }
 
 parameter_types! {
@@ -146,7 +144,7 @@ impl pallet_nft_marketplace::Config for Test {
 	type Currency = Balances;
 	type PalletId = NftMarketplacePalletId;
 	#[cfg(feature = "runtime-benchmarks")]
-	type Helper = pallet_nft::NftHelper;
+	type Helper = NftHelper;
 	type MaxListedNfts = MaxListedNft;
 	type MaxNftInCollection = MaxNftsInCollection;
 }

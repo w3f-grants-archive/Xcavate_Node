@@ -326,7 +326,7 @@ pub mod pallet {
 			while total_stake > total_amount_loan {
 				let stakers = Self::active_stakers();
 				let last_staker = &Self::active_stakers()[stakers.len() - 1];
-				let mut ledger = Self::ledger(&last_staker).unwrap();
+				let ledger = Self::ledger(&last_staker).unwrap();
 				if Self::balance_to_u128(ledger.locked).unwrap()
 					< total_stake.saturating_sub(total_amount_loan)
 				{

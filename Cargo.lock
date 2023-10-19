@@ -5658,6 +5658,7 @@ dependencies = [
  "frame-benchmarking",
  "frame-support",
  "frame-system",
+ "pallet-balances",
  "pallet-nfts",
  "parity-scale-codec",
  "scale-info",
