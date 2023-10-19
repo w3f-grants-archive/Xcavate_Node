@@ -55,8 +55,6 @@ pallet-nfts = {  default-features = false, git = "https://github.com/paritytech/
 pallet-uniques = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
 pallet-nfts-runtime-api = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
 node-primitives = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
-pallet-contracts = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
-pallet-contracts-primitives = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
 pallet-insecure-randomness-collective-flip = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
 pallet-assets = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
 pallet-asset-tx-payment = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
@@ -154,8 +152,6 @@ std = [
 	"pallet-uniques/std",
 	"pallet-nfts-runtime-api/std",
 	"node-primitives/std",
-	"pallet-contracts/std",
-	"pallet-contracts-primitives/std",
 	"pallet-insecure-randomness-collective-flip/std",
 	"pallet-assets/std",
 	"pallet-utility/std",
@@ -195,9 +191,11 @@ runtime-benchmarks = [
 	"pallet-timestamp/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
 
+	"pallet-community-loan-pool/runtime-benchmarks",
+	"pallet-xcavate-staking/runtime-benchmarks",
+	"pallet-nft-marketplace/runtime-benchmarks",
 	"pallet-nfts/runtime-benchmarks",
 	"pallet-uniques/runtime-benchmarks",
-	"pallet-contracts/runtime-benchmarks",
 	"pallet-assets/runtime-benchmarks",
 	"pallet-utility/runtime-benchmarks",
 	"pallet-multisig/runtime-benchmarks",
@@ -230,7 +228,6 @@ try-runtime = [
 	"pallet-transaction-payment/try-runtime",
 
 	"pallet-nfts/try-runtime",
-	"pallet-contracts/try-runtime",
 	"pallet-insecure-randomness-collective-flip/try-runtime",
 	"pallet-assets/try-runtime",
 	"pallet-uniques/try-runtime",
