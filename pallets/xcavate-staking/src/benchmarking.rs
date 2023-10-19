@@ -28,10 +28,11 @@ mod benchmarks {
 		assert_eq!(XcavateStaking::<T>::active_stakers()[0], caller);
 	}
 
-	/*  	#[benchmark]
+	#[benchmark]
 	fn unstake() {
 		let caller: T::AccountId = account("alice", SEED, SEED);
 		let value: BalanceOf<T> = 100u32.into();
+		<T as pallet::Config>::Currency::make_free_balance_be(&caller, 100_000_000u32.into());
 		XcavateStaking::<T>::stake(
 			RawOrigin::Signed(caller.clone()).into(),
 			value,
@@ -45,7 +46,7 @@ mod benchmarks {
 			Event::Unlocked{staker: caller, amount: value}
 			.into(),
 		);
-	}  */
+	}  
 
 	impl_benchmark_test_suite!(XcavateStaking, crate::mock::new_test_ext(), crate::mock::Test);
 }

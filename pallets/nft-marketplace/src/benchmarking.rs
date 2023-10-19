@@ -25,6 +25,7 @@ benchmarks! {
   	buy_nft{
 		let value: BalanceOf<T> = 100_000u32.into();
 		let caller: T::AccountId = whitelisted_caller();
+		<T as pallet::Config>::Currency::make_free_balance_be(&caller, 100_000_000u32.into());
 		NftMarketplace::<T>::list_object(RawOrigin::Signed(caller.clone()).into(), value);
 	}: _(RawOrigin::Signed(caller), 1)
 	verify {
