@@ -727,7 +727,7 @@ pub mod pallet {
 				&signer,
 				&loan_pallet,
 				// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
-				(sending_amount * 1000000000000).try_into().ok().unwrap(),
+				(sending_amount as u128 * 1000000000000).try_into().ok().unwrap(),
 				//amount,
 				KeepAlive,
 			)

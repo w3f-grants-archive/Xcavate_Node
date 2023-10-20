@@ -181,7 +181,7 @@ pub mod pallet {
 	{
 		/// List a real estate object. A new collection is created and 100 nfts get minted.
 		#[pallet::call_index(0)]
-		#[pallet::weight(0)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::list_object())]
 		pub fn list_object(origin: OriginFor<T>, price: BalanceOf<T>) -> DispatchResult
 		where
 			<T as pallet_nfts::Config>::CollectionId: From<u32>,
@@ -236,7 +236,7 @@ pub mod pallet {
 
 		/// Buying a certain nft.
 		#[pallet::call_index(1)]
-		#[pallet::weight(0)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::buy_nft())]
 		pub fn buy_nft(origin: OriginFor<T>, listed_nft_index: ListedNftIndex) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let mut nft =

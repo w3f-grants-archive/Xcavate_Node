@@ -498,6 +498,7 @@ parameter_types! {
 /// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
 impl pallet_xcavate_staking::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_xcavate_staking::weights::SubstrateWeight<Runtime>;
 	type Currency = Balances;
 	type MinimumRemainingAmount = MinimumRemainingAmount;
 	type MaxStakers = MaxStaker;
