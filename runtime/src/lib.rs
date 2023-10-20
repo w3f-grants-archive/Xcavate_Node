@@ -513,6 +513,7 @@ parameter_types! {
 /// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
 impl pallet_nft_marketplace::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_nft_marketplace::weights::SubstrateWeight<Runtime>;
 	type Currency = Balances;
 	type PalletId = NftMarketplacePalletId;
 	type MaxListedNfts = MaxListedNft;

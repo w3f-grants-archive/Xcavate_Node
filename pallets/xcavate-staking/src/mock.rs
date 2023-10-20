@@ -144,8 +144,6 @@ impl pallet_nfts::Config for Test {
 	type Features = Features;
 	type OffchainSignature = Signature;
 	type OffchainPublic = AccountPublic;
-	#[cfg(feature = "runtime-benchmarks")]
-	type Helper = ();
 }
 
 impl pallet_insecure_randomness_collective_flip::Config for Test {}
