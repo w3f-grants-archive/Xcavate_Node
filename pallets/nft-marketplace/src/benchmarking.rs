@@ -22,7 +22,7 @@ benchmarks! {
 		assert_eq!(NftMarketplace::<T>::listed_nft_count(), 10);
 	}
 
-  	buy_nft{
+	  buy_nft{
 		let value: BalanceOf<T> = 100_000u32.into();
 		let caller: T::AccountId = whitelisted_caller();
 		<T as pallet::Config>::Currency::make_free_balance_be(&caller, 100_000_000u32.into());
@@ -30,7 +30,6 @@ benchmarks! {
 	}: _(RawOrigin::Signed(caller), 1)
 	verify {
 		assert_eq!(NftMarketplace::<T>::listed_nft_count(), 10);
-	}  
+	}
 	impl_benchmark_test_suite!(NftMarketplace, crate::mock::new_test_ext(), crate::mock::Test);
 }
-

@@ -28,10 +28,17 @@ mod benchmarks {
 
 	#[benchmark]
 	fn propose() {
-		let (caller, value, beneficiary_lookup, developer_experience, loan_term) = setup_proposal::<T>(SEED);
+		let (caller, value, beneficiary_lookup, developer_experience, loan_term) =
+			setup_proposal::<T>(SEED);
 
 		#[extrinsic_call]
-		propose(RawOrigin::Signed(caller), value, beneficiary_lookup, developer_experience, loan_term);
+		propose(
+			RawOrigin::Signed(caller),
+			value,
+			beneficiary_lookup,
+			developer_experience,
+			loan_term,
+		);
 
 		assert_last_event::<T>(Event::Proposed { proposal_index: 1 }.into());
 	}
@@ -48,7 +55,8 @@ mod benchmarks {
 	fn set_milestones() {
 		let alice = account("alice", SEED, SEED);
 		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), alice);
-		let (caller, value, beneficiary_lookup, developer_experience, loan_term) = setup_proposal::<T>(SEED);
+		let (caller, value, beneficiary_lookup, developer_experience, loan_term) =
+			setup_proposal::<T>(SEED);
 		CommunityLoanPool::<T>::propose(
 			RawOrigin::Signed(caller).into(),
 			value,
@@ -71,7 +79,8 @@ mod benchmarks {
 		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), alice);
 		let bob = account("bob", SEED, SEED);
 		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), bob);
-		let (caller, value, beneficiary_lookup, developer_experience, loan_term) = setup_proposal::<T>(SEED);
+		let (caller, value, beneficiary_lookup, developer_experience, loan_term) =
+			setup_proposal::<T>(SEED);
 		CommunityLoanPool::<T>::propose(
 			RawOrigin::Signed(caller).into(),
 			value,
@@ -82,7 +91,11 @@ mod benchmarks {
 		let alice = account("alice", SEED, SEED);
 		let proposal_id = CommunityLoanPool::<T>::proposal_count();
 		let milestones = get_max_milestones::<T>();
-		CommunityLoanPool::<T>::set_milestones(RawOrigin::Signed(alice).into(), proposal_id, milestones);
+		CommunityLoanPool::<T>::set_milestones(
+			RawOrigin::Signed(alice).into(),
+			proposal_id,
+			milestones,
+		);
 		let bob = account("bob", SEED, SEED);
 		#[extrinsic_call]
 		vote_on_proposal(RawOrigin::Signed(bob), proposal_id, crate::Vote::Yes);

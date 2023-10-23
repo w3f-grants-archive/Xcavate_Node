@@ -118,6 +118,11 @@ pub mod pallet {
 	}
 
 	/// Number of nfts that have been listed.
+
+	#[pallet::storage]
+	#[pallet::getter(fn collection_count)]
+	pub(super) type CollectionCount<T> = StorageValue<_, u32, ValueQuery>;
+
 	#[pallet::storage]
 	#[pallet::getter(fn listed_nft_count)]
 	pub(super) type ListedNftCount<T> = StorageValue<_, ListedNftIndex, ValueQuery>;
@@ -153,9 +158,18 @@ pub mod pallet {
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
 		/// A new object has been listed on the marketplace
-		ObjectListed { collection_index: T::CollectionId, price: BalanceOf<T>, seller: AccountIdOf<T> },
+		ObjectListed {
+			collection_index: T::CollectionId,
+			price: BalanceOf<T>,
+			seller: AccountIdOf<T>,
+		},
 		/// A nft has been bought
-		NftBought { collection_index: T::CollectionId, item_index: T::ItemId, buyer: AccountIdOf<T>, price: BalanceOf<T> }
+		NftBought {
+			collection_index: T::CollectionId,
+			item_index: T::ItemId,
+			buyer: AccountIdOf<T>,
+			price: BalanceOf<T>,
+		},
 	}
 
 	// Errors inform users that something went wrong.
@@ -182,18 +196,23 @@ pub mod pallet {
 		/// List a real estate object. A new collection is created and 100 nfts get minted.
 		#[pallet::call_index(0)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::list_object())]
-		pub fn list_object(origin: OriginFor<T>, price: BalanceOf<T>) -> DispatchResult
+		pub fn list_object(
+			origin: OriginFor<T>,
+			price: BalanceOf<T>,
+			data: BoundedVec<u8, T::StringLimit>,
+		) -> DispatchResult
 		where
 			<T as pallet_nfts::Config>::CollectionId: From<u32>,
 			<T as pallet_nfts::Config>::ItemId: From<u32>,
 		{
-			let origin = ensure_signed(origin)?;
-			let collection_id: T::CollectionId = 1.into();
+			let signer = ensure_signed(origin.clone())?;
+			let collection = Self::collection_count() + 1;
+			let collection_id: T::CollectionId = collection.into();
 
 			pallet_nfts::Pallet::<T>::do_create_collection(
 				collection_id,
-				Self::account_id(),
-				Self::account_id(),
+				signer.clone(),
+				signer.clone(),
 				Self::default_collection_config(),
 				T::CollectionDeposit::get(),
 				pallet_nfts::Event::Created {
@@ -202,11 +221,16 @@ pub mod pallet {
 					collection: collection_id,
 				},
 			)?;
+			pallet_nfts::Pallet::<T>::set_collection_metadata(
+				origin.clone(),
+				collection_id,
+				data.clone(),
+			)?;
 			for x in 1..11 {
 				let nft_index = Self::listed_nft_count() + 1;
 				let item_id: T::ItemId = x.into();
 				let nft = NnftDog {
-					real_estate_developer: origin.clone(),
+					real_estate_developer: signer.clone(),
 					owner: Self::account_id(),
 					price: price / Self::u64_to_balance_option(10).unwrap(),
 					collection_id,
@@ -221,15 +245,23 @@ pub mod pallet {
 					Self::default_item_config(),
 					|_, _| Ok(()),
 				)?;
+				pallet_nfts::Pallet::<T>::set_metadata(
+					origin.clone(),
+					collection_id,
+					item_id,
+					data.clone(),
+				)?;
 				OngoingListings::<T>::insert(nft_index, nft);
+				CollectionCount::<T>::put(collection);
 				ListedNftCount::<T>::put(nft_index);
 				ListedNfts::<T>::try_append(nft_index)
 					.map_err(|_| Error::<T>::TooManyListedNfts)?;
 			}
+			pallet_nfts::Pallet::<T>::set_team(origin.clone(), collection_id, None, None, None)?;
 			Self::deposit_event(Event::<T>::ObjectListed {
 				collection_index: collection_id,
 				price,
-				seller: origin,
+				seller: signer,
 			});
 			Ok(())
 		}
@@ -269,7 +301,12 @@ pub mod pallet {
 			if Self::listed_collection(nft.collection_id).len() == 10 {
 				Self::distribute_nfts(nft.collection_id);
 			}
-			Self::deposit_event(Event::<T>::NftBought { collection_index: nft.collection_id, item_index: nft.item_id, buyer: origin, price: nft.price });
+			Self::deposit_event(Event::<T>::NftBought {
+				collection_index: nft.collection_id,
+				item_index: nft.item_id,
+				buyer: origin,
+				price: nft.price,
+			});
 			Ok(())
 		}
 	}

@@ -27,12 +27,12 @@ use sp_staking::currency_to_vote::U128CurrencyToVote;
 //use acurast_p256_crypto::MultiSignature;
 use pallet_acurast_fulfillment_receiver::Fulfillment;
 
+use frame_support::traits::TrackedStorageKey;
 use frame_system::{
 	limits::BlockWeights as SystemBlockWeights, EnsureRoot, EnsureSigned, EnsureSignedBy,
 	EnsureWithSuccess, EventRecord,
 };
 use polkadot_primitives::Nonce;
-use frame_support::traits::TrackedStorageKey;
 
 use node_primitives::Moment;
 use pallet_grandpa::AuthorityId as GrandpaId;
@@ -1144,12 +1144,12 @@ impl pallet_authority_discovery::Config for Runtime {
 }
 
 parameter_types! {
-	pub const LaunchPeriod: BlockNumber = 28 * 24 * 60 * MINUTES;
-	pub const VotingPeriod: BlockNumber = 28 * 24 * 60 * MINUTES;
+	pub const LaunchPeriod: BlockNumber = 1 * MINUTES;
+	pub const VotingPeriod: BlockNumber = 3 * MINUTES;
 	pub const FastTrackVotingPeriod: BlockNumber = 3 * 24 * 60 * MINUTES;
 	pub const MinimumDeposit: Balance = 100 * DOLLARS;
-	pub const EnactmentPeriod: BlockNumber = 30 * 24 * 60 * MINUTES;
-	pub const CooloffPeriod: BlockNumber = 28 * 24 * 60 * MINUTES;
+	pub const EnactmentPeriod: BlockNumber = 1 * MINUTES;
+	pub const CooloffPeriod: BlockNumber = 1 * MINUTES;
 	pub const MaxProposals: u32 = 100;
 }
 

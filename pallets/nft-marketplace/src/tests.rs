@@ -23,6 +23,9 @@ fn buy_nft_works() {
 fn buy_nft_doesnt_work() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_noop!(NftMarketplace::buy_nft(RuntimeOrigin::signed([0; 32].into()), 1), Error::<Test>::InvalidIndex);
+		assert_noop!(
+			NftMarketplace::buy_nft(RuntimeOrigin::signed([0; 32].into()), 1),
+			Error::<Test>::InvalidIndex
+		);
 	})
 }
