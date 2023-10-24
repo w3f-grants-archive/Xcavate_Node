@@ -11,7 +11,11 @@ macro_rules! bvec {
 fn list_object_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_ok!(NftMarketplace::list_object(RuntimeOrigin::signed([0; 32].into()), 1_000_000, bvec![22, 22]));
+		assert_ok!(NftMarketplace::list_object(
+			RuntimeOrigin::signed([0; 32].into()),
+			1_000_000,
+			bvec![22, 22]
+		));
 		assert_eq!(NftMarketplace::listed_nfts().len(), 10);
 	})
 }
@@ -20,7 +24,11 @@ fn list_object_works() {
 fn buy_nft_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_ok!(NftMarketplace::list_object(RuntimeOrigin::signed([0; 32].into()), 1_000_000, bvec![22, 22]));
+		assert_ok!(NftMarketplace::list_object(
+			RuntimeOrigin::signed([0; 32].into()),
+			1_000_000,
+			bvec![22, 22]
+		));
 		assert_ok!(NftMarketplace::buy_nft(RuntimeOrigin::signed([0; 32].into()), 1, 3));
 	})
 }

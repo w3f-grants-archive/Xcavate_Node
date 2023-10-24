@@ -4,10 +4,10 @@ use super::*;
 
 #[allow(unused)]
 use crate::Pallet as NftMarketplace;
-use frame_benchmarking::v1::{account, benchmarks, whitelisted_caller, BenchmarkError};
-use frame_system::RawOrigin;
-use frame_support::traits::Get;
 use frame_benchmarking::__private::vec;
+use frame_benchmarking::v1::{account, benchmarks, whitelisted_caller, BenchmarkError};
+use frame_support::traits::Get;
+use frame_system::RawOrigin;
 
 benchmarks! {
 	where_clause {

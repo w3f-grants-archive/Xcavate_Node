@@ -125,13 +125,13 @@ pub mod pallet {
 	#[pallet::getter(fn collection_count)]
 	pub(super) type CollectionCount<T> = StorageValue<_, u32, ValueQuery>;
 
-	/// All currently ongoing listings
+	/// Vector with all currently ongoing listings
 	#[pallet::storage]
 	#[pallet::getter(fn listed_nfts)]
 	pub(super) type ListedNfts<T: Config> =
 		StorageValue<_, BoundedVec<(T::CollectionId, T::ItemId), T::MaxListedNfts>, ValueQuery>;
 
-	/// Milestone proposal that has been made.
+	/// Mapping of the listed nfts to details
 	#[pallet::storage]
 	#[pallet::getter(fn ongoing_listings)]
 	pub(super) type OngoingListings<T: Config> = StorageMap<
@@ -142,6 +142,7 @@ pub mod pallet {
 		OptionQuery,
 	>;
 
+	/// Mapping of collection to the already sold nfts of this collection
 	#[pallet::storage]
 	#[pallet::getter(fn listed_collection)]
 	pub(super) type ListedCollection<T: Config> = StorageMap<
@@ -149,6 +150,17 @@ pub mod pallet {
 		Twox64Concat,
 		T::CollectionId,
 		BoundedVec<NnftDog<BalanceOf<T>, T::CollectionId, T::ItemId, T>, T::MaxNftInCollection>,
+		ValueQuery,
+	>;
+
+	/// Mapping from owner to nfts
+	#[pallet::storage]
+	#[pallet::getter(fn seller_listings)]
+	pub(super) type SellerListings<T: Config> = StorageMap<
+		_,
+		Twox64Concat,
+		AccountIdOf<T>,
+		BoundedVec<NnftDog<BalanceOf<T>, T::CollectionId, T::ItemId, T>, T::MaxListedNfts>,
 		ValueQuery,
 	>;
 
@@ -183,6 +195,8 @@ pub mod pallet {
 		NotEnoughFunds,
 		/// The collection has not been found
 		CollectionNotFound,
+		/// Not enough nfts available to buy
+		NotEnoughNftsAvailable,
 	}
 
 	#[pallet::call]
@@ -190,7 +204,7 @@ pub mod pallet {
 	where
 		<T as pallet_nfts::Config>::CollectionId: From<u32>,
 		<T as pallet_nfts::Config>::ItemId: From<u32>,
-		u32: EncodeLike<<T as pallet_nfts::Config>::CollectionId>
+		u32: EncodeLike<<T as pallet_nfts::Config>::CollectionId>,
 	{
 		/// List a real estate object. A new collection is created and 100 nfts get minted.
 		#[pallet::call_index(0)]
@@ -249,10 +263,14 @@ pub mod pallet {
 					item_id,
 					data.clone(),
 				)?;
-				OngoingListings::<T>::insert((collection, item_id), nft);
+				OngoingListings::<T>::insert((collection, item_id), nft.clone());
 				CollectionCount::<T>::put(collection);
 				ListedNfts::<T>::try_append((collection, item_id))
 					.map_err(|_| Error::<T>::TooManyListedNfts)?;
+				SellerListings::<T>::try_mutate(signer.clone(), |keys| {
+					keys.try_push(nft).map_err(|_| Error::<T>::TooManyNfts)?;
+					Ok::<(), DispatchError>(())
+				})?;
 			}
 			pallet_nfts::Pallet::<T>::set_team(origin.clone(), collection_id, None, None, None)?;
 			Self::deposit_event(Event::<T>::ObjectListed {
@@ -266,44 +284,58 @@ pub mod pallet {
 		/// Buying a certain nft.
 		#[pallet::call_index(1)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::buy_nft())]
-		pub fn buy_nft(origin: OriginFor<T>, collection: T::CollectionId, item: T::ItemId) -> DispatchResult {
+		pub fn buy_nft(
+			origin: OriginFor<T>,
+			collection: T::CollectionId,
+			amount: u32,
+		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
-			let mut nft =
-				<OngoingListings<T>>::take((collection, item)).ok_or(Error::<T>::InvalidIndex)?;
-			ensure!(
-				<T as pallet::Config>::Currency::free_balance(&origin) >= nft.price,
-				Error::<T>::NotEnoughFunds
-			);
-			nft.owner = origin.clone();
-			nft.sold = true;
-			ListedCollection::<T>::try_mutate(collection, |keys| {
-				keys.try_push(nft.clone()).map_err(|_| Error::<T>::TooManyNfts)?;
-				Ok::<(), DispatchError>(())
-			})?;
-			<T as pallet::Config>::Currency::transfer(
-				&origin,
-				&Self::account_id(),
-				// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
-				nft.price * Self::u64_to_balance_option(1000000000000).unwrap_or_default(),
-				//amount,
-				KeepAlive,
-			)
-			.unwrap_or_default();
-			let mut ongoing_listings = Self::listed_nfts();
-			let index = ongoing_listings.iter().position(|x| *x == (collection, item)).unwrap();
-			ongoing_listings.remove(index);
-			ListedNfts::<T>::put(ongoing_listings);
-			OngoingListings::<T>::insert((collection, item), nft);
-			let nft = Self::ongoing_listings((collection, item)).unwrap();
-			if Self::listed_collection(collection).len() == 10 {
-				Self::distribute_nfts(collection);
+			ensure!(Self::listed_nfts().len() >= amount.try_into().unwrap(), Error::<T>::NotEnoughNftsAvailable);
+			for x in 0..amount as usize {
+				let mut ongoing_listings = Self::listed_nfts();
+				let next_nft = ongoing_listings[0];
+				let mut nft =
+					<OngoingListings<T>>::take(next_nft).ok_or(Error::<T>::InvalidIndex)?;
+				ensure!(
+					<T as pallet::Config>::Currency::free_balance(&origin) >= nft.price,
+					Error::<T>::NotEnoughFunds
+				);
+				let old_nft_data = nft.clone();
+				nft.owner = origin.clone();
+				nft.sold = true;
+				ListedCollection::<T>::try_mutate(collection, |keys| {
+					keys.try_push(nft.clone()).map_err(|_| Error::<T>::TooManyNfts)?;
+					Ok::<(), DispatchError>(())
+				})?;
+				<T as pallet::Config>::Currency::transfer(
+					&origin,
+					&Self::account_id(),
+					// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
+					nft.price * Self::u64_to_balance_option(1000000000000).unwrap_or_default(),
+					//amount,
+					KeepAlive,
+				)
+				.unwrap_or_default();
+				let index = ongoing_listings.iter().position(|x| *x == next_nft).unwrap();
+				ongoing_listings.remove(index);
+				ListedNfts::<T>::put(ongoing_listings);
+				if Self::listed_collection(collection).len() == 10 {
+					Self::distribute_nfts(collection);
+				}
+				let price = nft.price.clone();
+				let item = nft.item_id.clone();
+				SellerListings::<T>::try_mutate(nft.real_estate_developer.clone(), |keys| {
+					let index = keys.iter().position(|x| *x == old_nft_data).unwrap();
+					keys.remove(index);
+					Ok::<(), DispatchError>(())
+				})?;
+				Self::deposit_event(Event::<T>::NftBought {
+					collection_index: collection,
+					item_index: item,
+					buyer: origin.clone(),
+					price,
+				});
 			}
-			Self::deposit_event(Event::<T>::NftBought {
-				collection_index: collection,
-				item_index: item,
-				buyer: origin,
-				price: nft.price,
-			});
 			Ok(())
 		}
 	}
