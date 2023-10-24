@@ -125,7 +125,7 @@ pub mod pallet {
 	#[pallet::getter(fn collection_count)]
 	pub(super) type CollectionCount<T> = StorageValue<_, u32, ValueQuery>;
 
-	/// All currently ongoing loans
+	/// All currently ongoing listings
 	#[pallet::storage]
 	#[pallet::getter(fn listed_nfts)]
 	pub(super) type ListedNfts<T: Config> =

@@ -141,6 +141,7 @@ parameter_types! {
 /// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
 impl pallet_nft_marketplace::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = weights::SubstrateWeight<Test>;
 	type Currency = Balances;
 	type PalletId = NftMarketplacePalletId;
 	#[cfg(feature = "runtime-benchmarks")]
