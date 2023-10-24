@@ -530,7 +530,7 @@ parameter_types! {
 	pub const ItemDeposit: Balance = DOLLARS;
 	pub const MetadataDepositBase: Balance = 10 * DOLLARS;
 	pub const MetadataDepositPerByte: Balance = DOLLARS;
-	pub const StringLimit: u32 = 50;
+	pub const StringLimit: u32 = 5000;
 	pub const KeyLimit: u32 = 32;
 	pub const ValueLimit: u32 = 256;
 	pub const ApprovalsLimit: u32 = 20;

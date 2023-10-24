@@ -20,7 +20,7 @@ benchmarks! {
 	list_object{
 		let value: BalanceOf<T> = 100_000u32.into();
 		let caller: T::AccountId = whitelisted_caller();
-		<T as pallet::Config>::Currency::make_free_balance_be(&caller, 10000u32.into());
+		<T as pallet::Config>::Currency::make_free_balance_be(&origin, DepositBalanceOf::<T>::max_value());
 		<T as pallet::Config>::Currency::make_free_balance_be(&NftMarketplace::<T>::account_id(), 10000u32.into());
 	}: _(RawOrigin::Signed(caller), value, vec![0; T::StringLimit::get() as usize].try_into().unwrap())
 	verify {
