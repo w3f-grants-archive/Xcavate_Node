@@ -66,7 +66,7 @@ fn distributes_nfts_and_funds() {
 
 #[test]
 fn listing_and_selling_multiple_objects() {
-	new_test_ext().execute_with(||{
+	new_test_ext().execute_with(|| {
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([2; 32].into()),
 			1_000_000,

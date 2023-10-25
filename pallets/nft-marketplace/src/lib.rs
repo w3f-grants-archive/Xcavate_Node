@@ -131,6 +131,17 @@ pub mod pallet {
 	pub(super) type ListedNfts<T: Config> =
 		StorageValue<_, BoundedVec<(T::CollectionId, T::ItemId), T::MaxListedNfts>, ValueQuery>;
 
+	/// Mapping of collection to the listed nfts of this collection
+	#[pallet::storage]
+	#[pallet::getter(fn listed_nfts_of_collection)]
+	pub(super) type ListedNftsOfCollection<T: Config> = StorageMap<
+		_,
+		Twox64Concat,
+		T::CollectionId,
+		BoundedVec<NnftDog<BalanceOf<T>, T::CollectionId, T::ItemId, T>, T::MaxNftInCollection>,
+		ValueQuery,
+	>;
+
 	/// Mapping of the listed nfts to details
 	#[pallet::storage]
 	#[pallet::getter(fn ongoing_listings)]
@@ -265,6 +276,10 @@ pub mod pallet {
 				)?;
 				OngoingListings::<T>::insert((collection, item_id), nft.clone());
 				CollectionCount::<T>::put(collection);
+				ListedNftsOfCollection::<T>::try_mutate(collection, |keys| {
+					keys.try_push(nft.clone()).map_err(|_| Error::<T>::TooManyNfts)?;
+					Ok::<(), DispatchError>(())
+				})?;
 				ListedNfts::<T>::try_append((collection, item_id))
 					.map_err(|_| Error::<T>::TooManyListedNfts)?;
 				SellerListings::<T>::try_mutate(signer.clone(), |keys| {
@@ -290,12 +305,15 @@ pub mod pallet {
 			amount: u32,
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
-			ensure!(Self::listed_nfts().len() >= amount.try_into().unwrap(), Error::<T>::NotEnoughNftsAvailable);
+			ensure!(
+				Self::listed_nfts_of_collection(collection).len() >= amount.try_into().unwrap(),
+				Error::<T>::NotEnoughNftsAvailable
+			);
 			for x in 0..amount as usize {
-				let mut ongoing_listings = Self::listed_nfts();
-				let next_nft = ongoing_listings[0];
+				let mut ongoing_listings = Self::listed_nfts_of_collection(collection);
+				let next_nft = &ongoing_listings[0];
 				let mut nft =
-					<OngoingListings<T>>::take(next_nft).ok_or(Error::<T>::InvalidIndex)?;
+					<OngoingListings<T>>::take((next_nft.collection_id, next_nft.item_id)).ok_or(Error::<T>::InvalidIndex)?;
 				ensure!(
 					<T as pallet::Config>::Currency::free_balance(&origin) >= nft.price,
 					Error::<T>::NotEnoughFunds
@@ -311,14 +329,18 @@ pub mod pallet {
 					&origin,
 					&Self::account_id(),
 					// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
-					nft.price /* * Self::u64_to_balance_option(1000000000000).unwrap_or_default() */,
+					nft.price, /* * Self::u64_to_balance_option(1000000000000).unwrap_or_default() */
 					//amount,
 					KeepAlive,
 				)
 				.unwrap_or_default();
-				let index = ongoing_listings.iter().position(|x| *x == next_nft).unwrap();
+				let mut listed_nfts = Self::listed_nfts();
+				let index = listed_nfts.iter().position(|x| *x == (next_nft.collection_id, next_nft.item_id)).unwrap();
+				listed_nfts.remove(index);
+				ListedNfts::<T>::put(listed_nfts);
+				let index = ongoing_listings.iter().position(|x| *x == *next_nft).unwrap();
 				ongoing_listings.remove(index);
-				ListedNfts::<T>::put(ongoing_listings);
+				ListedNftsOfCollection::<T>::insert(collection, ongoing_listings);
 				if Self::listed_collection(collection).len() == 10 {
 					Self::distribute_nfts(collection);
 				}
