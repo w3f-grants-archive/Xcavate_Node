@@ -68,12 +68,12 @@ fn distributes_nfts_and_funds() {
 fn listing_and_selling_multiple_objects() {
 	new_test_ext().execute_with(|| {
 		assert_ok!(NftMarketplace::list_object(
-			RuntimeOrigin::signed([2; 32].into()),
+			RuntimeOrigin::signed([3; 32].into()),
 			1_000_000,
 			bvec![22, 22]
 		));
 		assert_ok!(NftMarketplace::list_object(
-			RuntimeOrigin::signed([3; 32].into()),
+			RuntimeOrigin::signed([2; 32].into()),
 			1_000_000,
 			bvec![22, 22]
 		));
@@ -83,14 +83,22 @@ fn listing_and_selling_multiple_objects() {
 			bvec![22, 22]
 		));
 		assert_eq!(NftMarketplace::listed_nfts().len(), 30);
-		assert_ok!(NftMarketplace::buy_nft(RuntimeOrigin::signed([1; 32].into()), 1, 10));
-		assert_ok!(NftMarketplace::buy_nft(RuntimeOrigin::signed([1; 32].into()), 4, 2));
+		assert_ok!(NftMarketplace::buy_nft(RuntimeOrigin::signed([1; 32].into()), 2, 10));
+		assert_eq!(NftMarketplace::ongoing_listings((2,8)), None);
+		assert_ok!(NftMarketplace::buy_nft(RuntimeOrigin::signed([1; 32].into()), 3, 2));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([3; 32].into()),
 			1_000_000,
 			bvec![22, 22]
 		));
-		assert_ok!(NftMarketplace::buy_nft(RuntimeOrigin::signed([2; 32].into()), 2, 3));
+		assert_ok!(NftMarketplace::buy_nft(RuntimeOrigin::signed([2; 32].into()), 1, 3));
+		assert_eq!(NftMarketplace::ongoing_listings((1,3)), None);
+		assert_eq!(NftMarketplace::ongoing_listings((1,4)).unwrap().sold, false);
 		assert_eq!(NftMarketplace::listed_nfts().len(), 25);
+		assert_eq!(NftMarketplace::listed_nfts_of_collection(1).len(), 7);
+		assert_eq!(NftMarketplace::listed_nfts_of_collection(2).len(), 0);
+		assert_eq!(NftMarketplace::listed_nfts_of_collection(3).len(), 8);
+		assert_eq!(NftMarketplace::ongoing_listings((3,2)), None);
+
 	});
 }
