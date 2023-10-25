@@ -250,12 +250,12 @@ pub mod pallet {
 				collection_id,
 				data.clone(),
 			)?;
-			for x in 1..11 {
+			for x in 1..101 {
 				let item_id: T::ItemId = x.into();
 				let nft = NnftDog {
 					real_estate_developer: signer.clone(),
 					owner: Self::account_id(),
-					price: price / Self::u64_to_balance_option(10).unwrap(),
+					price: price / Self::u64_to_balance_option(100).unwrap(),
 					collection_id,
 					item_id,
 					sold: Default::default(),
@@ -341,7 +341,7 @@ pub mod pallet {
 				let index = ongoing_listings.iter().position(|x| *x == *next_nft).unwrap();
 				ongoing_listings.remove(index);
 				ListedNftsOfCollection::<T>::insert(collection, ongoing_listings);
-				if Self::listed_collection(collection).len() == 10 {
+				if Self::listed_collection(collection).len() == 100 {
 					Self::distribute_nfts(collection);
 				}
 				let price = nft.price.clone();
@@ -374,7 +374,7 @@ pub mod pallet {
 				&list[0].real_estate_developer,
 				// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
 				list[0].price
-					* Self::u64_to_balance_option(10).unwrap()
+					* Self::u64_to_balance_option(100).unwrap()
 					* Self::u64_to_balance_option(1000000000000).unwrap(),
 				//amount,
 				KeepAlive,
