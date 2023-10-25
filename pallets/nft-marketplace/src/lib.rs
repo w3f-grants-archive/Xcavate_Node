@@ -329,7 +329,7 @@ pub mod pallet {
 					&origin,
 					&Self::account_id(),
 					// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
-					nft.price, /* * Self::u64_to_balance_option(1000000000000).unwrap_or_default() */
+					nft.price * Self::u64_to_balance_option(1000000000000).unwrap_or_default(),
 					//amount,
 					KeepAlive,
 				)
@@ -375,7 +375,7 @@ pub mod pallet {
 				// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
 				list[0].price
 					* Self::u64_to_balance_option(10).unwrap()
-					/* * Self::u64_to_balance_option(1000000000000).unwrap() */,
+					* Self::u64_to_balance_option(1000000000000).unwrap(),
 				//amount,
 				KeepAlive,
 			)
