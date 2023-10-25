@@ -157,7 +157,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 	pallet_balances::GenesisConfig::<Test> {
 		balances: vec![
 			([0; 32].into(), 20_000_000),
-			([1; 32].into(), 15_000),
+			([1; 32].into(), 15_000_000),
 			([2; 32].into(), 150_000),
 			([3; 32].into(), 5_000),
 			((NftMarketplace::account_id()), 20_000_000),
