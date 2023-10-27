@@ -175,6 +175,17 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	/// Mapping from seller to nfts
+	#[pallet::storage]
+	#[pallet::getter(fn seller_sold_nfts)]
+	pub(super) type SellerSoldNfts<T: Config> = StorageMap<
+		_,
+		Twox64Concat,
+		AccountIdOf<T>,
+		BoundedVec<NnftDog<BalanceOf<T>, T::CollectionId, T::ItemId, T>, T::MaxListedNfts>,
+		ValueQuery,
+	>;
+
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
@@ -374,8 +385,8 @@ pub mod pallet {
 				&list[0].real_estate_developer,
 				// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
 				list[0].price
-					* Self::u64_to_balance_option(100).unwrap()
-					* Self::u64_to_balance_option(1000000000000).unwrap(),
+					* Self::u64_to_balance_option(100).unwrap_or_default()
+					* Self::u64_to_balance_option(1000000000000).unwrap_or_default(),
 				//amount,
 				KeepAlive,
 			)
@@ -384,9 +395,13 @@ pub mod pallet {
 				pallet_nfts::Pallet::<T>::do_transfer(
 					collection_id,
 					x.item_id,
-					x.owner,
+					x.owner.clone(),
 					|_, _| Ok(()),
 				)?;
+				SellerSoldNfts::<T>::try_mutate(x.real_estate_developer.clone(), |keys| {
+					keys.try_push(x).map_err(|_| Error::<T>::TooManyNfts)?;
+					Ok::<(), DispatchError>(())
+				})?;
 			}
 			Ok(())
 		}
