@@ -28,7 +28,7 @@ mod benchmarks {
 		assert_eq!(XcavateStaking::<T>::active_stakers()[0], caller);
 	}
 
-	/* 	#[benchmark]
+	#[benchmark]
 	fn unstake() {
 		let caller: T::AccountId = account("alice", SEED, SEED);
 		let value: BalanceOf<T> = 1_000u32.into();
@@ -50,7 +50,7 @@ mod benchmarks {
 		let staked_value: BalanceOf<T> = 999u32.into();
 		assert_eq!(XcavateStaking::<T>::ledger(staker).unwrap().locked, staked_value);
 
-	}   */
+	}  
 
 	impl_benchmark_test_suite!(XcavateStaking, crate::mock::new_test_ext(), crate::mock::Test);
 }
