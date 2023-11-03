@@ -25,6 +25,7 @@ frame-support = {  default-features = false, git = "https://github.com/paritytec
 frame-system = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
 
 pallet-nfts = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
+pallet-balances = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
 enumflags2 = { version = "0.7.7" }
 
 [dev-dependencies]
@@ -42,6 +43,7 @@ std = [
 	"scale-info/std",
 	"serde",
 	"pallet-nfts/std",
+	"pallet-balances/std",
 ]
 runtime-benchmarks = ["frame-benchmarking/runtime-benchmarks"]
 try-runtime = ["frame-support/try-runtime"]

@@ -12,8 +12,6 @@ use sp_runtime::{
 	MultiSignature,
 };
 
-use pallet_contracts::Schedule;
-
 use pallet_transaction_payment::CurrencyAdapter;
 
 use frame_support::traits::ConstU8;
@@ -144,8 +142,6 @@ impl pallet_nfts::Config for Test {
 	type Features = Features;
 	type OffchainSignature = Signature;
 	type OffchainPublic = AccountPublic;
-	#[cfg(feature = "runtime-benchmarks")]
-	type Helper = ();
 }
 
 impl pallet_insecure_randomness_collective_flip::Config for Test {}
@@ -212,6 +208,7 @@ impl pallet_xcavate_staking::Config for Test {
 	type MinimumRemainingAmount = ConstU32<100>;
 	type MaxStakers = MaxStaker;
 	type TimeProvider = Timestamp;
+	type WeightInfo = weights::SubstrateWeight<Test>;
 }
 
 // Build genesis storage according to the mock runtime.

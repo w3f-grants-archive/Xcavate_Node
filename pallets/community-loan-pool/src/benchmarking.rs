@@ -11,14 +11,15 @@ const SEED: u32 = 0;
 
 fn setup_proposal<T: Config>(
 	u: u32,
-) -> (T::AccountId, BalanceOf<T>, BoundedProposedMilestones<T>, AccountIdLookupOf<T>) {
+) -> (T::AccountId, BalanceOf<T>, AccountIdLookupOf<T>, u64, u64) {
 	let caller = account("caller", u, SEED);
 	let value: BalanceOf<T> = T::ProposalBondMinimum::get().saturating_mul(100u32.into());
 	let _ = <T as pallet::Config>::Currency::make_free_balance_be(&caller, value);
-	let milestones = get_max_milestones::<T>();
 	let beneficiary = account("beneficiary", u, SEED);
 	let beneficiary_lookup = T::Lookup::unlookup(beneficiary);
-	(caller, value, milestones, beneficiary_lookup)
+	let developer_experience = 13;
+	let loan_term = 20;
+	(caller, value, beneficiary_lookup, developer_experience, loan_term)
 }
 
 #[benchmarks]
@@ -27,28 +28,19 @@ mod benchmarks {
 
 	#[benchmark]
 	fn propose() {
-		let (caller, value, milestones, beneficiary_lookup) = setup_proposal::<T>(SEED);
+		let (caller, value, beneficiary_lookup, developer_experience, loan_term) =
+			setup_proposal::<T>(SEED);
 
 		#[extrinsic_call]
-		propose(RawOrigin::Signed(caller), value, milestones, beneficiary_lookup);
+		propose(
+			RawOrigin::Signed(caller),
+			value,
+			beneficiary_lookup,
+			developer_experience,
+			loan_term,
+		);
 
 		assert_last_event::<T>(Event::Proposed { proposal_index: 1 }.into());
-	}
-
-	#[benchmark]
-	fn reject_proposal() {
-		let (caller, value, milestones, beneficiary_lookup) = setup_proposal::<T>(SEED);
-		CommunityLoanPool::<T>::propose(
-			RawOrigin::Signed(caller).into(),
-			value,
-			milestones,
-			beneficiary_lookup,
-		);
-		let proposal_id = CommunityLoanPool::<T>::proposal_count();
-		#[extrinsic_call]
-		reject_proposal(RawOrigin::Root, proposal_id);
-
-		assert_last_event::<T>(Event::Rejected { proposal_index: proposal_id }.into());
 	}
 
 	#[benchmark]
@@ -60,22 +52,55 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn vote_on_milestone_proposal() {
+	fn set_milestones() {
 		let alice = account("alice", SEED, SEED);
 		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), alice);
-		let (caller, value, milestones, beneficiary_lookup) = setup_proposal::<T>(SEED);
+		let (caller, value, beneficiary_lookup, developer_experience, loan_term) =
+			setup_proposal::<T>(SEED);
 		CommunityLoanPool::<T>::propose(
 			RawOrigin::Signed(caller).into(),
 			value,
-			milestones,
 			beneficiary_lookup,
+			developer_experience,
+			loan_term,
 		);
 		let alice = account("alice", SEED, SEED);
 		let proposal_id = CommunityLoanPool::<T>::proposal_count();
+		let milestones = get_max_milestones::<T>();
 		#[extrinsic_call]
-		vote_on_proposal(RawOrigin::Signed(alice), proposal_id, crate::Vote::Yes);
+		set_milestones(RawOrigin::Signed(alice), proposal_id, milestones);
 
 		assert_eq!(CommunityLoanPool::<T>::ongoing_votes(proposal_id).unwrap().yes_votes, 1);
+	}
+
+	#[benchmark]
+	fn vote_on_proposal() {
+		let alice = account("alice", SEED, SEED);
+		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), alice);
+		let bob = account("bob", SEED, SEED);
+		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), bob);
+		let (caller, value, beneficiary_lookup, developer_experience, loan_term) =
+			setup_proposal::<T>(SEED);
+		CommunityLoanPool::<T>::propose(
+			RawOrigin::Signed(caller).into(),
+			value,
+			beneficiary_lookup,
+			developer_experience,
+			loan_term,
+		);
+		let alice = account("alice", SEED, SEED);
+		let proposal_id = CommunityLoanPool::<T>::proposal_count();
+		let milestones = get_max_milestones::<T>();
+		CommunityLoanPool::<T>::set_milestones(
+			RawOrigin::Signed(alice).into(),
+			proposal_id,
+			milestones,
+		);
+		let bob = account("bob", SEED, SEED);
+		#[extrinsic_call]
+		vote_on_proposal(RawOrigin::Signed(bob), proposal_id, crate::Vote::Yes);
+
+		assert_eq!(CommunityLoanPool::<T>::ongoing_votes(proposal_id).unwrap().yes_votes, 2);
 	}
 
 	/* 	#[benchmark]

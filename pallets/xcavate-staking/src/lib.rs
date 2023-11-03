@@ -6,6 +6,7 @@
 /// <https://docs.substrate.io/reference/frame-pallets/>
 /// <https://docs.substrate.io/reference/frame-pallets/>
 pub use pallet::*;
+pub use weights::WeightInfo;
 
 #[cfg(test)]
 mod mock;
@@ -15,6 +16,8 @@ mod tests;
 
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
+pub mod weights;
+pub use weights::*;
 
 use frame_support::sp_runtime::traits::Zero;
 
@@ -52,6 +55,8 @@ pub mod pallet {
 	pub trait Config: frame_system::Config + pallet_community_loan_pool::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+		/// Type representing the weight of this pallet
+		type WeightInfo: WeightInfo;
 		/// The lockable currency type.
 		type Currency: Currency<Self::AccountId>
 			+ LockableCurrency<Self::AccountId, Moment = BlockNumberFor<Self>>
@@ -143,7 +148,7 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		#[pallet::call_index(0)]
-		#[pallet::weight(0)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::stake())]
 		pub fn stake(
 			origin: OriginFor<T>,
 			#[pallet::compact] value: BalanceOf<T>,
@@ -193,7 +198,7 @@ pub mod pallet {
 		}
 
 		#[pallet::call_index(1)]
-		#[pallet::weight(1_000)]
+		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
 		pub fn unstake(
 			origin: OriginFor<T>,
 			#[pallet::compact] value: BalanceOf<T>,
@@ -326,7 +331,7 @@ pub mod pallet {
 			while total_stake > total_amount_loan {
 				let stakers = Self::active_stakers();
 				let last_staker = &Self::active_stakers()[stakers.len() - 1];
-				let mut ledger = Self::ledger(&last_staker).unwrap();
+				let ledger = Self::ledger(&last_staker).unwrap();
 				if Self::balance_to_u128(ledger.locked).unwrap()
 					< total_stake.saturating_sub(total_amount_loan)
 				{

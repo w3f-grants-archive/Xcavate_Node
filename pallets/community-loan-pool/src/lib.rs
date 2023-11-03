@@ -3,8 +3,6 @@
 /// Edit this file to define custom logic or remove it if it is not needed.
 /// Learn more about FRAME and the core library of Substrate FRAME pallets:
 /// <https://docs.substrate.io/reference/frame-pallets/>
-/// <https://docs.substrate.io/reference/frame-pallets/>
-/// <https://docs.substrate.io/reference/frame-pallets/>
 pub use pallet::*;
 pub use weights::WeightInfo;
 
@@ -81,8 +79,8 @@ pub struct ProposedMilestone {
 
 #[cfg(feature = "runtime-benchmarks")]
 pub trait BenchmarkHelper<CollectionId, ItemId> {
-	pub fn to_collection(i: u32) -> CollectionId;
-	pub fn to_nft(i: u32) -> ItemId;
+	fn to_collection(i: u32) -> CollectionId;
+	fn to_nft(i: u32) -> ItemId;
 }
 
 #[cfg(feature = "runtime-benchmarks")]
@@ -100,7 +98,7 @@ impl<CollectionId: From<u32>, ItemId: From<u32>> BenchmarkHelper<CollectionId, I
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	use frame_support::sp_runtime::{SaturatedConversion, Saturating};
+	use frame_support::sp_runtime::Saturating;
 	use frame_system::pallet_prelude::*;
 	use scale_info::TypeInfo;
 
@@ -442,6 +440,8 @@ pub mod pallet {
 		NotEnoughLoanFundsAvailable,
 		/// The Milestones for the proposal have already been set
 		MilestonesAlreadySet,
+		/// There has been no milestones set in the proposal
+		NoMilestones,
 	}
 
 	#[pallet::event]
@@ -727,7 +727,7 @@ pub mod pallet {
 				&signer,
 				&loan_pallet,
 				// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
-				(sending_amount * 1000000000000).try_into().ok().unwrap(),
+				(sending_amount as u128 * 1000000000000).try_into().ok().unwrap(),
 				//amount,
 				KeepAlive,
 			)
@@ -742,6 +742,7 @@ pub mod pallet {
 		}
 
 		/// The committee sets the milestone distribution for the loan
+
 		#[pallet::call_index(55)]
 		#[pallet::weight(0)]
 		pub fn set_milestones(
@@ -796,6 +797,8 @@ pub mod pallet {
 				<OngoingVotes<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
 			let voted = <UserVotes<T>>::get((proposal_index, origin.clone()));
 			ensure!(voted.is_none(), Error::<T>::AlreadyVoted);
+			let proposal = Self::proposals(proposal_index).unwrap();
+			ensure!(proposal.milestones.len() > 0, Error::<T>::NoMilestones);
 			if vote == Vote::Yes {
 				current_vote.yes_votes += 1;
 			} else {
@@ -925,7 +928,7 @@ pub mod pallet {
 			<T as pallet_nfts::Config>::ItemId: From<u32>,
 		{
 			let proposal = <Proposals<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
-			let total_loan_amount = Self::u64_to_balance_option(Self::total_loan_amount()).unwrap();
+			//let total_loan_amount = Self::u64_to_balance_option(Self::total_loan_amount()).unwrap();
 			//let decimal = 1000000000000_u64.saturated_into();
 			//ensure!(<T as pallet::Config>::Currency::free_balance(&Self::account_id()) / decimal >= total_loan_amount.saturating_add(proposal.amount), Error::<T>::NotEnoughLoanFundsAvailable);
 			let err_amount =

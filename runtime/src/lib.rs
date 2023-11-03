@@ -27,6 +27,7 @@ use sp_staking::currency_to_vote::U128CurrencyToVote;
 //use acurast_p256_crypto::MultiSignature;
 use pallet_acurast_fulfillment_receiver::Fulfillment;
 
+use frame_support::traits::TrackedStorageKey;
 use frame_system::{
 	limits::BlockWeights as SystemBlockWeights, EnsureRoot, EnsureSigned, EnsureSignedBy,
 	EnsureWithSuccess, EventRecord,
@@ -377,147 +378,6 @@ impl pallet_balances::Config for Runtime {
 	type MaxHolds = ConstU32<50>; // FIXME
 	type MaxFreezes = ConstU32<50>; // FIXME
 }
-//////////////////////////////////////////////Start///////////////////////////////////////////////
-use codec::{Encode, MaxEncodedLen};
-use frame_system::RawOrigin;
-use pallet_contracts::chain_extension::{
-	ChainExtension, Environment, Ext, InitState, RetVal, SysConfig,
-};
-use sp_runtime::{traits::StaticLookup, DispatchError};
-use sp_std::marker::PhantomData;
-
-enum UniquesFunc {
-	Create,
-	Transfer,
-	Burn,
-}
-
-impl TryFrom<u16> for UniquesFunc {
-	type Error = DispatchError;
-
-	fn try_from(value: u16) -> Result<Self, Self::Error> {
-		match value {
-			1 => Ok(UniquesFunc::Create),
-			2 => Ok(UniquesFunc::Transfer),
-			3 => Ok(UniquesFunc::Burn),
-			_ => Err(DispatchError::Other("PalletUniquesExtension: Unimplemented func_id")),
-		}
-	}
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Encode, Decode, MaxEncodedLen)]
-#[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
-pub enum Origin {
-	Caller,
-	Address,
-}
-
-impl Default for Origin {
-	fn default() -> Self {
-		Self::Address
-	}
-}
-
-#[macro_export]
-macro_rules! select_origin {
-	($origin:expr, $account:expr) => {
-		match $origin {
-			Origin::Caller => return Ok(RetVal::Converging(0)),
-			Origin::Address => RawOrigin::Signed($account),
-		}
-	};
-}
-
-impl<T, W> ChainExtension<T> for UniquesExtension<T, W>
-where
-	T: pallet_uniques::Config + pallet_contracts::Config,
-	<T as pallet_uniques::Config>::CollectionId: Copy,
-	<T as pallet_uniques::Config>::ItemId: Copy,
-	<<T as SysConfig>::Lookup as StaticLookup>::Source: From<<T as SysConfig>::AccountId>,
-	<T as SysConfig>::AccountId: From<[u8; 32]>,
-{
-	fn call<E: Ext>(&mut self, env: Environment<E, InitState>) -> Result<RetVal, DispatchError>
-	where
-		E: Ext<T = T>,
-	{
-		let func_id = env.func_id().try_into()?;
-		let mut env = env.buf_in_buf_out();
-
-		match func_id {
-			UniquesFunc::Create => {
-				let (origin, collection, admin): (
-					Origin,
-					<T as pallet_uniques::Config>::CollectionId,
-					T::AccountId,
-				) = env.read_as()?;
-
-				let raw_origin = select_origin!(&origin, env.ext().address().clone());
-
-				let call_result = pallet_uniques::Pallet::<T>::create(
-					raw_origin.into(),
-					collection,
-					admin.into(),
-				);
-				match call_result {
-					Err(e) => Err(e),
-					Ok(_) => Ok(RetVal::Converging(0)),
-				}
-			},
-			UniquesFunc::Transfer => {
-				let (origin, collection, item, dest): (
-					Origin,
-					<T as pallet_uniques::Config>::CollectionId,
-					<T as pallet_uniques::Config>::ItemId,
-					T::AccountId,
-				) = env.read_as()?;
-
-				let raw_origin = select_origin!(&origin, env.ext().address().clone());
-
-				let call_result = pallet_uniques::Pallet::<T>::transfer(
-					raw_origin.into(),
-					collection,
-					item,
-					dest.into(),
-				);
-				match call_result {
-					Err(e) => Err(e),
-					Ok(_) => Ok(RetVal::Converging(0)),
-				}
-			},
-			UniquesFunc::Burn => {
-				let (origin, collection, item, check_owner): (
-					Origin,
-					<T as pallet_uniques::Config>::CollectionId,
-					<T as pallet_uniques::Config>::ItemId,
-					T::AccountId,
-				) = env.read_as()?;
-
-				let raw_origin = select_origin!(&origin, env.ext().address().clone());
-
-				let call_result = pallet_uniques::Pallet::<T>::burn(
-					raw_origin.into(),
-					collection,
-					item,
-					Some(check_owner.into()),
-				);
-				match call_result {
-					Err(e) => Err(e),
-					Ok(_) => Ok(RetVal::Converging(0)),
-				}
-			},
-		}
-	}
-}
-
-impl<T, W> Default for UniquesExtension<T, W> {
-	fn default() -> Self {
-		UniquesExtension(PhantomData)
-	}
-}
-
-pub struct UniquesExtension<T, W>(PhantomData<(T, W)>);
-
-//////////////////////////////////////////////End///////////////////////////////////////////////
 
 parameter_types! {
 	pub FeeMultiplier: Multiplier = Multiplier::one();
@@ -624,7 +484,7 @@ impl pallet_community_loan_pool::Config for Runtime {
 	type TimeProvider = Timestamp;
 	type WeightInfo = pallet_community_loan_pool::weights::SubstrateWeight<Runtime>;
 	#[cfg(feature = "runtime-benchmarks")]
-	type Helper = pallet_nft::NftHelper;
+	type Helper = pallet_community_loan_pool::NftHelper;
 	type VotingTime = VotingTime;
 	type MaxCommitteeMembers = MaximumCommitteeMembers;
 	type MaxMilestonesPerProject = MaxMilestones;
@@ -638,6 +498,7 @@ parameter_types! {
 /// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
 impl pallet_xcavate_staking::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_xcavate_staking::weights::SubstrateWeight<Runtime>;
 	type Currency = Balances;
 	type MinimumRemainingAmount = MinimumRemainingAmount;
 	type MaxStakers = MaxStaker;
@@ -646,19 +507,20 @@ impl pallet_xcavate_staking::Config for Runtime {
 
 parameter_types! {
 	pub const NftMarketplacePalletId: PalletId = PalletId(*b"py/nftxc");
-	pub const MaxListedNft: u32 = 1000000;
+	pub const MaxListedNft: u32 = 30000;
 	pub const MaxNftsInCollection: u32 = 100;
 }
 
 /// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
 impl pallet_nft_marketplace::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_nft_marketplace::weights::SubstrateWeight<Runtime>;
 	type Currency = Balances;
 	type PalletId = NftMarketplacePalletId;
-	#[cfg(feature = "runtime-benchmarks")]
-	type Helper = pallet_nft::NftHelper;
 	type MaxListedNfts = MaxListedNft;
 	type MaxNftInCollection = MaxNftsInCollection;
+	#[cfg(feature = "runtime-benchmarks")]
+	type Helper = pallet_nft_marketplace::NftHelper;
 }
 
 parameter_types! {
@@ -668,7 +530,7 @@ parameter_types! {
 	pub const ItemDeposit: Balance = DOLLARS;
 	pub const MetadataDepositBase: Balance = 10 * DOLLARS;
 	pub const MetadataDepositPerByte: Balance = DOLLARS;
-	pub const StringLimit: u32 = 50;
+	pub const StringLimit: u32 = 5000;
 	pub const KeyLimit: u32 = 32;
 	pub const ValueLimit: u32 = 256;
 	pub const ApprovalsLimit: u32 = 20;
@@ -732,48 +594,6 @@ impl pallet_uniques::Config for Runtime {
 	type Helper = ();
 	type CreateOrigin = AsEnsureOriginWithArg<EnsureSigned<AccountId>>;
 	type Locker = ();
-}
-
-parameter_types! {
-	pub const DepositPerItem: Balance = deposit(1, 0);
-	pub const DepositPerByte: Balance = deposit(0, 1);
-	pub const DefaultDepositLimit: Balance = deposit(1024, 1024 * 1024);
-	pub Schedule: pallet_contracts::Schedule<Runtime> = Default::default();
-	pub CodeHashLockupDepositPercent: Perbill = Perbill::from_percent(30);
-}
-
-impl pallet_contracts::Config for Runtime {
-	type Time = Timestamp;
-	type Randomness = RandomnessCollectiveFlip;
-	type Currency = Balances;
-	type RuntimeEvent = RuntimeEvent;
-	type RuntimeCall = RuntimeCall;
-	/// The safest default is to allow no calls at all.
-	///
-	/// Runtimes should whitelist dispatchables that are allowed to be called from contracts
-	/// and make sure they are stable. Dispatchables exposed to contracts are not allowed to
-	/// change because that would break already deployed contracts. The `Call` structure itself
-	/// is not allowed to change the indices of existing pallets, too.
-	type CallFilter = frame_support::traits::Everything;
-	type DepositPerItem = DepositPerItem;
-	type DepositPerByte = DepositPerByte;
-	type CallStack = [pallet_contracts::Frame<Self>; 5];
-	type WeightPrice = pallet_transaction_payment::Pallet<Self>;
-	type WeightInfo = pallet_contracts::weights::SubstrateWeight<Self>;
-	type ChainExtension = ();
-	type Schedule = Schedule;
-	type AddressGenerator = pallet_contracts::DefaultAddressGenerator;
-	type MaxCodeLen = ConstU32<{ 123 * 1024 }>;
-	type MaxStorageKeyLen = ConstU32<128>;
-	type UnsafeUnstableInterface = ConstBool<true>;
-	type MaxDebugBufferLen = ConstU32<{ 2 * 1024 * 1024 }>;
-	type DefaultDepositLimit = DefaultDepositLimit;
-	type MaxDelegateDependencies = ConstU32<32>;
-	type CodeHashLockupDepositPercent = CodeHashLockupDepositPercent;
-	type RuntimeHoldReason = RuntimeHoldReason;
-	type Migrations = ();
-	type Debug = ();
-	type Environment = ();
 }
 
 parameter_types! {
@@ -1324,12 +1144,12 @@ impl pallet_authority_discovery::Config for Runtime {
 }
 
 parameter_types! {
-	pub const LaunchPeriod: BlockNumber = 28 * 24 * 60 * MINUTES;
-	pub const VotingPeriod: BlockNumber = 28 * 24 * 60 * MINUTES;
+	pub const LaunchPeriod: BlockNumber = 1 * MINUTES;
+	pub const VotingPeriod: BlockNumber = 3 * MINUTES;
 	pub const FastTrackVotingPeriod: BlockNumber = 3 * 24 * 60 * MINUTES;
 	pub const MinimumDeposit: Balance = 100 * DOLLARS;
-	pub const EnactmentPeriod: BlockNumber = 30 * 24 * 60 * MINUTES;
-	pub const CooloffPeriod: BlockNumber = 28 * 24 * 60 * MINUTES;
+	pub const EnactmentPeriod: BlockNumber = 1 * MINUTES;
+	pub const CooloffPeriod: BlockNumber = 1 * MINUTES;
 	pub const MaxProposals: u32 = 100;
 }
 
@@ -1575,7 +1395,6 @@ construct_runtime!(
 		NftMarketplace: pallet_nft_marketplace,
 		Nfts: pallet_nfts,
 		Uniques: pallet_uniques, //10
-		Contracts: pallet_contracts,
 		RandomnessCollectiveFlip: pallet_insecure_randomness_collective_flip,
 		Assets: pallet_assets::<Instance1>,
 		PoolAssets: pallet_assets::<Instance2>,
@@ -1653,10 +1472,6 @@ pub type Executive = frame_executive::Executive<
 	AllPalletsWithSystem,
 >;
 
-// All migrations executed on runtime upgrade as a nested tuple of types implementing
-// `OnRuntimeUpgrade`.
-// type Migrations = (pallet_contracts::Migration<Runtime>,);
-
 #[cfg(feature = "runtime-benchmarks")]
 #[macro_use]
 extern crate frame_benchmarking;
@@ -1669,9 +1484,10 @@ mod benches {
 		[pallet_balances, Balances]
 		[pallet_timestamp, Timestamp]
 		[pallet_community_loan_pool, CommunityLoanPool]
+		[pallet_xcavate_staking, XcavateStaking]
+		[pallet_nft_marketplace, NftMarketplace]
 		[pallet_nfts, Nfts]
 		[pallet_uniques, Uniques]
-		[pallet_contracts, Contracts]
 		[pallet_assets, Assets]
 		[pallet_utility, Utility]
 		[pallet_multisig, Multisig]
@@ -1720,84 +1536,6 @@ impl_runtime_apis! {
 
 		fn collection_attribute(collection: u32, key: Vec<u8>) -> Option<Vec<u8>> {
 			<Nfts as Inspect<AccountId>>::collection_attribute(&collection, &key)
-		}
-	}
-
-	impl pallet_contracts::ContractsApi<Block, AccountId, Balance, BlockNumber, Hash, EventRecord<RuntimeEvent, H256>> for Runtime
-	{
-		fn call(
-			origin: AccountId,
-			dest: AccountId,
-			value: Balance,
-			gas_limit: Option<Weight>,
-			storage_deposit_limit: Option<Balance>,
-			input_data: Vec<u8>,
-		) -> pallet_contracts_primitives::ContractExecResult<Balance, EventRecord<RuntimeEvent, H256>> {
-			let gas_limit = gas_limit.unwrap_or(BlockWeights::get().max_block);
-			Contracts::bare_call(
-				origin,
-				dest,
-				value,
-				gas_limit,
-				storage_deposit_limit,
-				input_data,
-//				true,
-				// FIXME: possibly not all (if any) of the below arguments are correct
-				pallet_contracts::DebugInfo::UnsafeDebug,
-				pallet_contracts::CollectEvents::UnsafeCollect,
-				pallet_contracts::Determinism::Enforced,
-			)
-		}
-
-		fn instantiate(
-			origin: AccountId,
-			value: Balance,
-			gas_limit: Option<Weight>,
-			storage_deposit_limit: Option<Balance>,
-			code: pallet_contracts_primitives::Code<Hash>,
-			data: Vec<u8>,
-			salt: Vec<u8>,
-			// FIXME: generic type parameters of EventRecord<(), ()>
-		) -> pallet_contracts_primitives::ContractInstantiateResult<AccountId, Balance, EventRecord<RuntimeEvent, H256>>
-		{
-			let gas_limit = gas_limit.unwrap_or(BlockWeights::get().max_block);
-			Contracts::bare_instantiate(
-				origin,
-				value,
-				gas_limit,
-				storage_deposit_limit,
-				code,
-				data,
-				salt,
-				pallet_contracts::DebugInfo::UnsafeDebug, // FIXME
-				pallet_contracts::CollectEvents::UnsafeCollect, // FIXME
-//				true
-			)
-		}
-
-		fn upload_code(
-			origin: AccountId,
-			code: Vec<u8>,
-			storage_deposit_limit: Option<Balance>,
-			determinism: pallet_contracts::Determinism,
-		) -> pallet_contracts_primitives::CodeUploadResult<Hash, Balance>
-		{
-			Contracts::bare_upload_code(
-				origin,
-				code,
-				storage_deposit_limit,
-				determinism,
-			)
-		}
-
-		fn get_storage(
-			address: AccountId,
-			key: Vec<u8>,
-		) -> pallet_contracts_primitives::GetStorageResult {
-			Contracts::get_storage(
-				address,
-				key
-			)
 		}
 	}
 
@@ -2042,7 +1780,7 @@ impl_runtime_apis! {
 		fn dispatch_benchmark(
 			config: frame_benchmarking::BenchmarkConfig
 		) -> Result<Vec<frame_benchmarking::BenchmarkBatch>, sp_runtime::RuntimeString> {
-			use frame_benchmarking::{baseline, Benchmarking, BenchmarkBatch, TrackedStorageKey};
+			use frame_benchmarking::{baseline, Benchmarking, BenchmarkBatch};
 
 			use frame_system_benchmarking::Pallet as SystemBench;
 			use baseline::Pallet as BaselineBench;
