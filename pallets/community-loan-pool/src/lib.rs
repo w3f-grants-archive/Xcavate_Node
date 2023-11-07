@@ -464,23 +464,23 @@ pub mod pallet {
 		Deleted { loan_index: LoanIndex },
 		/// Apy has been charged.
 		ApyCharged { loan_index: LoanIndex },
-		/// Loan has been updated
+		/// Loan has been updated.
 		LoanUpdated { loan_index: LoanIndex },
-		/// User withdraw money
+		/// User withdrew money.
 		Withdraw { loan_index: LoanIndex, amount: BalanceOf<T> },
-		/// Voted on a proposal
+		/// Voted on a proposal.
 		VotedOnProposal { proposal_index: ProposalIndex, member: AccountIdOf<T>, vote: Vote },
-		/// Voted on a milestone
+		/// Voted on a milestone.
 		VotedOnMilestone { proposal_index: ProposalIndex, member: AccountIdOf<T>, vote: Vote },
-		/// Voted on a deletion
+		/// Voted on a deletion.
 		VotedOnDeletion { proposal_index: ProposalIndex, member: AccountIdOf<T>, vote: Vote },
-		/// A new committee member has been added
+		/// A new committee member has been added.
 		CommiteeMemberAdded { new_member: AccountIdOf<T> },
-		/// Milestone Proposal has been approved
+		/// Milestone Proposal has been approved.
 		MilestoneApproved { loan_id: LoanIndex },
-		/// Milestone Proposal has been rejected
+		/// Milestone Proposal has been rejected.
 		MilestoneRejected { proposal_index: ProposalIndex },
-		/// Milestones have been set for a proposal
+		/// Milestones have been set for a proposal.
 		MilestonesSet { proposal_index: ProposalIndex },
 	}
 
@@ -494,6 +494,7 @@ pub mod pallet {
 
 			let ended_votings = RoundsExpiring::<T>::take(n);
 
+			/// Checks if there is a voting for a loan is expiring this block.
 			ended_votings.iter().for_each(|item| {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
 				let voting_result = <OngoingVotes<T>>::take(item);
@@ -509,6 +510,7 @@ pub mod pallet {
 
 			let ended_milestone_votes = MilestoneRoundsExpiring::<T>::take(n);
 
+			/// checks if there is a voting for a milestone is expiring this block
 			ended_milestone_votes.iter().for_each(|item| {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
 				let voting_result = <OngoingMilestoneVotes<T>>::take(item);
@@ -527,6 +529,7 @@ pub mod pallet {
 
 			let ended_deletion_votes = DeletionRoundsExpiring::<T>::take(n);
 
+			/// checks if there is a voting for a loan deletion is expiring this block
 			ended_deletion_votes.iter().for_each(|item| {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
 				let voting_result = <OngoingDeletionVotes<T>>::take(item);
@@ -547,6 +550,7 @@ pub mod pallet {
 			weight
 		}
 
+		/// Charging loan apy every block for testing purpose
 		fn on_finalize(_n: frame_system::pallet_prelude::BlockNumberFor<T>) {
 			//let block = n.saturated_into::<u64>();
 			//if block % 10 == 0 {
@@ -557,8 +561,18 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		/// Apply for a loan. A deposit amount is reserved
+		/// Creates a proposal for a loan. A deposit amount is reserved
 		/// and slashed if the proposal is rejected. It is returned once the proposal is awarded.
+		///
+		/// The origin must be Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `amount`: The amount of token that the real estate developer wants to lend.
+		/// - `beneficiary`: The account that should be able to receive the funds.
+		/// - `developer_experience`: Amout of years that the real estate developer has in experience.
+		/// - `loan_term`: Estimated duration of the loan in months.
+		///
+		/// Emits `Proposed` event when succesfful
 		#[pallet::call_index(0)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::propose())]
 		pub fn propose(
@@ -609,7 +623,14 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Applying for the next milestone in the ongoing loan.
+		/// Creates a proposal for the next milestone in the loan.
+		///
+		/// The origin must be Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `loan_id`: The index of the loan.
+		///
+		/// Emits `MilestoneProposed` event when succesfful
 		#[pallet::call_index(1)]
 		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
 		pub fn propose_milestone(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
@@ -642,6 +663,14 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Creates a proposal for loan deletion.
+		///
+		/// The origin must be the borrower of the loan, Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `loan_id`: The index of the loan.
+		///
+		/// Emits `DeletionProposed` event when succesfful
 		#[pallet::call_index(2)]
 		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
 		pub fn propose_deletion(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
@@ -670,10 +699,15 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Withdraw an certain amount of the loan from the pallet.
+		/// Lets the real estate developer withdraw the funds from the loan.
 		///
-		/// May only be called from the loan borrower.
-
+		/// The origin must be the borrower of the loan, Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `loan_id`: The index of the loan.
+		/// - `amount`: The amount of token the real estate developer wants to withdraw.
+		///
+		/// Emits `Withdraw` event when succesfful
 		#[pallet::call_index(3)]
 		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
 		pub fn withdraw(
@@ -708,10 +742,15 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Repays a certain amount of the loan from the pallet.
+		/// Lets the real estate developer repay the borrowed funds from the loan
 		///
-		/// May only be called from the loan borrower.
-
+		/// The origin must be signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `loan_id`: The index of the loan.
+		/// - `amount`: The amount of token the real estate developer wants to repay
+		///
+		/// Emits `LoanUpdated` event when succesfful
 		#[pallet::call_index(4)]
 		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
 		pub fn repay(
@@ -743,8 +782,16 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// The committee sets the milestone distribution for the loan
-
+		/// Lets the committee set the milestones for a loan.
+		///	The caller automaticly votes yes for the proposal by calling this function.
+		///
+		/// The origin must be a member of the committee, signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `proposal_index`: The index of the proposal.
+		/// - `proposed_milestones`: A vector with the different milestone percentages, it must be 100 in sum.
+		///
+		/// Emits `MilestonesSet` event when succesfful
 		#[pallet::call_index(55)]
 		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
 		pub fn set_milestones(
@@ -784,7 +831,15 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Let committee members vote for a proposal
+		/// Let committee members vote for a proposal.
+		///
+		/// The origin must be a member of the committee, signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `proposal_index`: The index of the proposal.
+		/// - `vote`: Must be either a Yes vote or a No vote.
+		///
+		/// Emits `VotedOnProposal` event when succesfful.
 		#[pallet::call_index(5)]
 		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
 		pub fn vote_on_proposal(
@@ -817,7 +872,15 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Let committee vote on milestone proposal
+		/// Let committee vote on milestone proposal.
+		///
+		/// The origin must be a member of the committee, signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `proposal_index`: The index of the proposal.
+		/// - `vote`: Must be either a Yes vote or a No vote.
+		///
+		/// Emits `VotedOnMilestone` event when succesfful.
 		#[pallet::call_index(6)]
 		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
 		pub fn vote_on_milestone_proposal(
@@ -848,7 +911,15 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Let committee vote on deletion proposal
+		/// Let committee vote on deletion proposal.
+		///
+		/// The origin must be a member of the committee, signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `proposal_index`: The index of the proposal.
+		/// - `vote`: Must be either a Yes vote or a No vote.
+		///
+		/// Emits `VotedOnDeletion` event when succesfful.
 		#[pallet::call_index(7)]
 		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
 		pub fn vote_on_deletion_proposal(
@@ -879,7 +950,14 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Adding a new address to the vote committee
+		/// Adding a new address to the vote committee.
+		///
+		/// The origin must be the sudo.
+		///
+		/// Parameters:
+		/// - `member`: The address of the new committee member.
+		///
+		/// Emits `CommiteeMemberAdded` event when succesfful.
 		#[pallet::call_index(8)]
 		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
 		pub fn add_committee_member(
@@ -899,10 +977,12 @@ pub mod pallet {
 	//** Our helper functions.**//
 
 	impl<T: Config> Pallet<T> {
+		/// Get the account id of the pallet.
 		pub fn account_id() -> AccountIdOf<T> {
 			T::PalletId::get().into_account_truncating()
 		}
 
+		/// The needed bond for a proposal whose spend is `value`.
 		fn calculate_bond(value: BalanceOf<T>) -> BalanceOf<T> {
 			let mut r = T::ProposalBondMinimum::get().max(T::ProposalBond::get() * value);
 			if let Some(m) = T::ProposalBondMaximum::get() {
@@ -911,6 +991,7 @@ pub mod pallet {
 			r
 		}
 
+		/// Rejects the proposal for a loan.
 		fn reject_loan_proposal(proposal_index: ProposalIndex) -> DispatchResult {
 			let proposal = <Proposals<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
 			let value = proposal.bond;
@@ -924,6 +1005,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Approves the proposal and creates the loan.
 		fn approve_loan_proposal(proposal_index: ProposalIndex) -> DispatchResult
 		where
 			<T as pallet_nfts::Config>::ItemId: From<u32>,
@@ -1007,7 +1089,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		// Work in progress, to be implmented in the future
+		/// Charges the apy and adds the amount to the loan.
 		fn charge_apy() -> DispatchResult {
 			let ongoing_loans = Self::ongoing_loans();
 			for i in ongoing_loans {
@@ -1030,6 +1112,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Add the unlocked milestone when a milestone gets approved.
 		fn updating_available_amount(
 			loan_id: LoanIndex,
 			proposal_index: &ProposalIndex,
@@ -1058,6 +1141,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Rejects a milestone proposal.
 		fn reject_milestone(proposal_index: &ProposalIndex) -> DispatchResult {
 			let proposal_info = <MilestoneInfo<T>>::take(proposal_index)
 				.ok_or(Error::<T>::InvalidIndex)
@@ -1072,6 +1156,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Deletes a loan when a deletion proposal has been successfull.
 		fn delete_loan(loan_id: LoanIndex) -> DispatchResult {
 			let loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(loan.borrowed_amount.is_zero(), Error::<T>::LoanStillOngoing);
@@ -1090,6 +1175,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Opens the withdraws again when a deletion proposal got rejected.
 		fn open_withdrawl(loan_id: LoanIndex) -> DispatchResult {
 			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			loan.withdraw_lock = false;
@@ -1097,6 +1183,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Calculates the apr for a loan.
 		fn calculate_apr(experience: u64, loan_term: u64) -> u64 {
 			let experinece_number: f32 = match experience {
 				1..=5 => 1.7,
