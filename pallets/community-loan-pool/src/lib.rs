@@ -445,6 +445,11 @@ pub mod pallet {
 		NoMilestones,
 		/// There is an issue by calling the next collection id.
 		UnknownCollection,
+		/// Error by convertion to balance type.
+		ConversionError,
+		ArithmeticUnderflow,
+		/// Error by dividing a number.
+		DivisionError,
 	}
 
 	#[pallet::event]
@@ -585,7 +590,7 @@ pub mod pallet {
 			let origin = ensure_signed(origin)?;
 			let beneficiary = T::Lookup::lookup(beneficiary)?;
 			let total_loan_amount =
-				Self::u64_to_balance_option(Self::reserved_loan_amount()).unwrap();
+				Self::u64_to_balance_option(Self::reserved_loan_amount())?;
 			//let decimal = 1000000000000_u64.saturated_into();
 			ensure!(
 				<T as pallet::Config>::Currency::free_balance(&Self::account_id())
@@ -721,7 +726,7 @@ pub mod pallet {
 			ensure!(amount <= loan.available_amount, Error::<T>::NotEnoughFundsToWithdraw);
 			ensure!(!loan.withdraw_lock, Error::<T>::DeletionVotingOngoing);
 			let loan_pallet = Self::account_id();
-			let sending_amount = Self::balance_to_u64(amount).unwrap();
+			let sending_amount = Self::balance_to_u64(amount)?;
 			// For unit tests the line with the
 			<T as pallet::Config>::Currency::transfer(
 				&loan_pallet,
@@ -736,7 +741,9 @@ pub mod pallet {
 			loan.available_amount = loan.available_amount.saturating_sub(amount);
 			Loans::<T>::insert(loan_id, loan);
 			let reserved_value =
-				Self::reserved_loan_amount() - Self::balance_to_u64(amount).unwrap();
+				Self::reserved_loan_amount()
+				.checked_sub(Self::balance_to_u64(amount)?)
+				.ok_or(Error::<T>::ArithmeticUnderflow)?;
 			ReservedLoanAmount::<T>::put(reserved_value);
 			Self::deposit_event(Event::<T>::Withdraw { loan_index: loan_id, amount });
 			Ok(())
@@ -763,7 +770,7 @@ pub mod pallet {
 			ensure!(amount <= loan.borrowed_amount, Error::<T>::WantsToRepayTooMuch);
 			//ensure!(signer == loan.contract_account_id, Error::<T>::InsufficientPermission);
 			let loan_pallet = Self::account_id();
-			let sending_amount = Self::balance_to_u64(amount).unwrap();
+			let sending_amount = Self::balance_to_u64(amount)?;
 			<T as pallet::Config>::Currency::transfer(
 				&signer,
 				&loan_pallet,
@@ -776,7 +783,9 @@ pub mod pallet {
 			loan.borrowed_amount = loan.borrowed_amount.saturating_sub(amount);
 			loan.current_loan_balance = loan.current_loan_balance.saturating_sub(amount);
 			Loans::<T>::insert(loan_id, loan);
-			let new_value = Self::total_loan_amount() - Self::balance_to_u64(amount).unwrap();
+			let new_value = Self::total_loan_amount()
+			.checked_sub(Self::balance_to_u64(amount)?)
+			.ok_or(Error::<T>::ArithmeticUnderflow)?;
 			TotalLoanAmount::<T>::put(new_value);
 			Self::deposit_event(Event::<T>::LoanUpdated { loan_index: loan_id });
 			Ok(())
@@ -792,7 +801,7 @@ pub mod pallet {
 		/// - `proposed_milestones`: A vector with the different milestone percentages, it must be 100 in sum.
 		///
 		/// Emits `MilestonesSet` event when succesfful
-		#[pallet::call_index(55)]
+		#[pallet::call_index(5)]
 		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
 		pub fn set_milestones(
 			origin: OriginFor<T>,
@@ -840,7 +849,7 @@ pub mod pallet {
 		/// - `vote`: Must be either a Yes vote or a No vote.
 		///
 		/// Emits `VotedOnProposal` event when succesfful.
-		#[pallet::call_index(5)]
+		#[pallet::call_index(6)]
 		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
 		pub fn vote_on_proposal(
 			origin: OriginFor<T>,
@@ -881,7 +890,7 @@ pub mod pallet {
 		/// - `vote`: Must be either a Yes vote or a No vote.
 		///
 		/// Emits `VotedOnMilestone` event when succesfful.
-		#[pallet::call_index(6)]
+		#[pallet::call_index(7)]
 		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
 		pub fn vote_on_milestone_proposal(
 			origin: OriginFor<T>,
@@ -920,7 +929,7 @@ pub mod pallet {
 		/// - `vote`: Must be either a Yes vote or a No vote.
 		///
 		/// Emits `VotedOnDeletion` event when succesfful.
-		#[pallet::call_index(7)]
+		#[pallet::call_index(8)]
 		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
 		pub fn vote_on_deletion_proposal(
 			origin: OriginFor<T>,
@@ -958,7 +967,7 @@ pub mod pallet {
 		/// - `member`: The address of the new committee member.
 		///
 		/// Emits `CommiteeMemberAdded` event when succesfful.
-		#[pallet::call_index(8)]
+		#[pallet::call_index(9)]
 		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
 		pub fn add_committee_member(
 			origin: OriginFor<T>,
@@ -1025,7 +1034,7 @@ pub mod pallet {
 				* milestones[0].percentage_to_unlock.deconstruct() as u64
 				/ 100;
 			milestones.remove(0);
-			let available_amount = Self::u64_to_balance_option(amount).unwrap();
+			let available_amount = Self::u64_to_balance_option(amount)?;
 			let loan_apy = proposal.apr_rate;
 			if pallet_nfts::NextCollectionId::<T>::get().is_none() {
 				pallet_nfts::NextCollectionId::<T>::set(T::CollectionId::initial_value());
@@ -1078,10 +1087,10 @@ pub mod pallet {
 				|_, _| Ok(()),
 			)?;
 
-			let new_value = Self::total_loan_amount() + Self::balance_to_u64(value).unwrap();
+			let new_value = Self::total_loan_amount() + Self::balance_to_u64(value)?;
 			TotalLoanAmount::<T>::put(new_value);
 			let reserved_value =
-				Self::reserved_loan_amount() + Self::balance_to_u64(value).unwrap();
+				Self::reserved_loan_amount() + Self::balance_to_u64(value)?;
 			ReservedLoanAmount::<T>::put(reserved_value);
 			Proposals::<T>::remove(proposal_index);
 			LoanCount::<T>::put(loan_index);
@@ -1097,10 +1106,10 @@ pub mod pallet {
 				let mut loan = <Loans<T>>::take(loan_index).ok_or(Error::<T>::InvalidIndex)?;
 				let current_timestamp = T::TimeProvider::now().as_secs();
 				let time_difference = current_timestamp - loan.last_timestamp;
-				let loan_amount = Self::balance_to_u64(loan.current_loan_balance).unwrap();
+				let loan_amount = Self::balance_to_u64(loan.current_loan_balance)?;
 				let interests =
 					loan_amount * time_difference * loan.loan_apy / 365 / 60 / 60 / 24 / 100 / 100;
-				let interest_balance = Self::u64_to_balance_option(interests).unwrap();
+				let interest_balance = Self::u64_to_balance_option(interests)?;
 				loan.borrowed_amount += interest_balance;
 				loan.current_loan_balance += interest_balance;
 				loan.last_timestamp = current_timestamp;
@@ -1120,13 +1129,14 @@ pub mod pallet {
 			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			let loan_amount = loan.loan_amount;
 			let mut loan_milestones = loan.milestones;
-			let added_available_amount = Self::balance_to_u64(loan_amount).unwrap()
-				* loan_milestones[0].percentage_to_unlock.deconstruct() as u64
-				/ 100;
+			let added_available_amount = Self::balance_to_u64(loan_amount)?
+				* (loan_milestones[0].percentage_to_unlock.deconstruct() as u64)
+				.checked_div(100)
+				.ok_or(Error::<T>::DivisionError)?;
 			loan_milestones.remove(0);
 			let new_available_amount = loan
 				.available_amount
-				.saturating_add(Self::u64_to_balance_option(added_available_amount).unwrap());
+				.saturating_add(Self::u64_to_balance_option(added_available_amount)?);
 			loan.milestones = loan_milestones;
 			loan.available_amount = new_available_amount;
 			let proposal_info = <MilestoneInfo<T>>::take(proposal_index)
@@ -1167,7 +1177,8 @@ pub mod pallet {
 			let index = loans.iter().position(|x| *x == loan_id).unwrap();
 			loans.remove(index);
 			let reserved_loan = Self::reserved_loan_amount()
-				- Self::balance_to_u64(loan.current_loan_balance).unwrap();
+			.checked_sub(Self::balance_to_u64(loan.current_loan_balance)?)
+			.ok_or(Error::<T>::ArithmeticUnderflow)?;
 			ReservedLoanAmount::<T>::put(reserved_loan);
 			OngoingLoans::<T>::put(loans);
 			Loans::<T>::remove(loan_id);
@@ -1203,12 +1214,12 @@ pub mod pallet {
 			interest_points as u64
 		}
 
-		pub fn balance_to_u64(input: BalanceOf<T>) -> Option<u64> {
-			TryInto::<u64>::try_into(input).ok()
+		pub fn balance_to_u64(input: BalanceOf<T>) -> Result<u64, Error<T>> {
+			TryInto::<u64>::try_into(input).map_err(|_| Error::<T>::ConversionError)
 		}
 
-		pub fn u64_to_balance_option(input: u64) -> Option<BalanceOf<T>> {
-			input.try_into().ok()
+		pub fn u64_to_balance_option(input: u64) -> Result<BalanceOf<T>, Error<T>> {
+			input.try_into().map_err(|_| Error::<T>::ConversionError)
 		}
 
 		fn default_collection_config(

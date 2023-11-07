@@ -239,6 +239,8 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
+
+		/// Gets the balance that would be available for staking. 
 		fn available_staking_balance(
 			staker: &T::AccountId,
 			ledger: &LedgerAccount<BalanceOf<T>>,
@@ -248,6 +250,7 @@ pub mod pallet {
 			free_balance.saturating_sub(ledger.locked)
 		}
 
+		/// Updates the staking infos for the staker.
 		fn update_ledger(staker: &T::AccountId, ledger: LedgerAccount<BalanceOf<T>>) {
 			if ledger.locked.is_zero() {
 				Ledger::<T>::remove(staker);
@@ -268,6 +271,7 @@ pub mod pallet {
 			}
 		}
 
+		/// Calculates the current staking apy.
 		fn calculate_current_apy() -> u128 {
 			let ongoing_loans = pallet_community_loan_pool::Pallet::<T>::ongoing_loans();
 			let mut loan_apys = 0;
@@ -291,6 +295,7 @@ pub mod pallet {
 			average_loan_apy - 200
 		}
 
+		/// Claims the rewards for the stakers
 		pub fn claim_rewards() -> DispatchResult {
 			let active_stakers = Self::active_stakers();
 			for i in active_stakers {
@@ -334,6 +339,8 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// If the total loan amount is lower than the total stake, this function
+		/// unstakes the stake so that the total amount of the stake equals the total amount of the loan
 		fn check_relation_to_loan() -> DispatchResult {
 			let mut total_amount_loan =
 				pallet_community_loan_pool::Pallet::<T>::total_loan_amount() as u128;
@@ -360,6 +367,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Unstakes stakers
 		fn unstake_staker(staker: T::AccountId, value: BalanceOf<T>) -> DispatchResult {
 			let mut ledger = Self::ledger(&staker).unwrap();
 
