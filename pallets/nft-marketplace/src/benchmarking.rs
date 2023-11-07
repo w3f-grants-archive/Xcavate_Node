@@ -6,10 +6,12 @@ use super::*;
 use crate::Pallet as NftMarketplace;
 use frame_benchmarking::__private::vec;
 use frame_benchmarking::v1::{account, benchmarks, whitelisted_caller, BenchmarkError};
+use frame_support::sp_runtime::traits::Bounded;
 use frame_support::traits::Get;
 use frame_system::RawOrigin;
-use frame_support::sp_runtime::traits::Bounded;
-type DepositBalanceOf<T> = <<T as pallet_nfts::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+type DepositBalanceOf<T> = <<T as pallet_nfts::Config>::Currency as Currency<
+	<T as frame_system::Config>::AccountId,
+>>::Balance;
 
 benchmarks! {
 	where_clause {

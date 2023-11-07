@@ -33,24 +33,17 @@ mod benchmarks {
 		let caller: T::AccountId = account("alice", SEED, SEED);
 		let value: BalanceOf<T> = 1_000u32.into();
 		<T as pallet::Config>::Currency::make_free_balance_be(&caller, 100_000_000u32.into());
-		XcavateStaking::<T>::stake(
-			RawOrigin::Signed(caller.clone()).into(),
-			value,
-		);
+		XcavateStaking::<T>::stake(RawOrigin::Signed(caller.clone()).into(), value);
 		assert_eq!(XcavateStaking::<T>::active_stakers().len(), 1);
 		let unstake_value: BalanceOf<T> = 1u32.into();
 		#[extrinsic_call]
 		unstake(RawOrigin::Signed(caller.clone()), unstake_value);
 
-		assert_last_event::<T>(
-			Event::Unlocked{staker: caller, amount: unstake_value}
-			.into(),
-		);
+		assert_last_event::<T>(Event::Unlocked { staker: caller, amount: unstake_value }.into());
 		let staker = &XcavateStaking::<T>::active_stakers()[0];
 		let staked_value: BalanceOf<T> = 999u32.into();
 		assert_eq!(XcavateStaking::<T>::ledger(staker).unwrap().locked, staked_value);
-
-	}  
+	}
 
 	impl_benchmark_test_suite!(XcavateStaking, crate::mock::new_test_ext(), crate::mock::Test);
 }

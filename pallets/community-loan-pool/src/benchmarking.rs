@@ -103,29 +103,42 @@ mod benchmarks {
 		assert_eq!(CommunityLoanPool::<T>::ongoing_votes(proposal_id).unwrap().yes_votes, 2);
 	}
 
-	/* 	#[benchmark]
-		fn approve_proposal() {
-			let alice = account("alice", SEED, SEED);
-			CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), alice);
-			let (caller, value, milestones, beneficiary_lookup) = setup_proposal::<T>(SEED);
-			CommunityLoanPool::<T>::propose(
-				RawOrigin::Signed(caller.clone()).into(),
-				value,
-				milestones,
-				beneficiary_lookup
-			);
-	/* 		let alice = account("alice", SEED, SEED);
-			let proposal_id = CommunityLoanPool::<T>::proposal_count();
-			CommunityLoanPool::<T>::vote_on_proposal(RawOrigin::Signed(alice).into(), proposal_id, crate::Vote::Yes); */
-			let proposal = CommunityLoanPool::<T>::proposals(1).unwrap();
-			<T as Config>::EvaluatedLoans::try_append(proposal).unwrap_or_default();
-			let bob = account("bob", SEED, SEED);
-			let proposal_id = CommunityLoanPool::<T>::proposal_count();
-			let collection_id: T::CollectionId = T::Helper::to_collection(2);
-			let nft_id: T::ItemId = T::Helper::to_nft(10);
-			#[extrinsic_call]
-			approve_proposal(RawOrigin::Signed(caller), proposal_id, collection_id, nft_id, 20, bob);
-		} */
+	/* #[benchmark]
+	fn withdraw() {
+		let alice = account("alice", SEED, SEED);
+		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), alice);
+		let bob = account("bob", SEED, SEED);
+		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), bob);
+		let (caller, value, beneficiary_lookup, developer_experience, loan_term) =
+			setup_proposal::<T>(SEED);
+		CommunityLoanPool::<T>::propose(
+			RawOrigin::Signed(caller.clone()).into(),
+			value,
+			beneficiary_lookup,
+			developer_experience,
+			loan_term,
+		);
+		let alice = account("alice", SEED, SEED);
+		let proposal_id = CommunityLoanPool::<T>::proposal_count();
+		let milestones = get_max_milestones::<T>();
+		CommunityLoanPool::<T>::set_milestones(
+			RawOrigin::Signed(alice).into(),
+			proposal_id,
+			milestones,
+		);
+		let bob = account("bob", SEED, SEED);
+		CommunityLoanPool::<T>::vote_on_proposal(
+			RawOrigin::Signed(bob).into(),
+			proposal_id,
+			crate::Vote::Yes,
+		);
+		run_to_block::<T>(30u32.into());
+		assert_eq!(CommunityLoanPool::<T>::ongoing_votes(proposal_id).unwrap().yes_votes, 2);
+		assert_eq!(CommunityLoanPool::<T>::ongoing_loans().len(), 1);
+
+		#[extrinsic_call]
+		withdraw(RawOrigin::Signed(caller), 1, value);
+	} */
 
 	impl_benchmark_test_suite!(CommunityLoanPool, crate::mock::new_test_ext(), crate::mock::Test);
 }
@@ -151,3 +164,9 @@ fn get_milestones<T: Config>(mut n: u32) -> BoundedProposedMilestones<T> {
 fn assert_last_event<T: Config>(generic_event: <T as Config>::RuntimeEvent) {
 	frame_system::Pallet::<T>::assert_last_event(generic_event.into());
 }
+
+/* fn run_to_block<T: Config>(new_block: frame_system::pallet_prelude::BlockNumberFor<T>) {
+	frame_system::Pallet::<T>::set_block_number(new_block);
+	frame_system::Pallet::<T>::on_initialize(frame_system::Pallet::<T>::block_number());
+	CommunityLoanPool::<T>::on_initialize(frame_system::Pallet::<T>::block_number());
+} */
