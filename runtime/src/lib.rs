@@ -529,6 +529,7 @@ parameter_types! {
 	pub const MaxListedNftProject: u32 = 300000;
 	pub const MaxNftsInCollectionProject: u32 = 10000;
 	pub const MaxOngoingProject: u32 = 10000;
+	pub const MaxNftHolders: u32 = 10000;
 }
 
 /// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
@@ -543,6 +544,7 @@ impl pallet_community_projects::Config for Runtime {
 	type Helper = pallet_community_projects::NftHelper;
 	type TimeProvider = Timestamp;
 	type MaxOngoingProjects = MaxOngoingProject;
+	type MaxNftHolder = MaxNftHolders;
 }
 
 parameter_types! {

@@ -108,6 +108,22 @@ pub mod pallet {
 		pallet_id: AccountIdOf<T>,
 	}
 
+	/// Vote enum.
+	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
+	pub enum Vote {
+		Yes,
+		No,
+	}
+
+	/// Voting stats.
+	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
+	pub struct VoteStats {
+		pub yes_votes: u64,
+		pub no_votes: u64,
+	}
+
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
 	pub trait Config: frame_system::Config + pallet_nfts::Config {
@@ -133,6 +149,9 @@ pub mod pallet {
 		/// The maximum amount of projects that can run at the same time.
 		#[pallet::constant]
 		type MaxOngoingProjects: Get<u32>;
+		/// The maximum amount of nft holder.
+		#[pallet::constant]
+		type MaxNftHolder: Get<u32>;
 	}
 
 	/// Vector with all currently ongoing listings.
@@ -179,6 +198,28 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	/// Stores the project keys and round types ending on a given block for milestone period.
+	#[pallet::storage]
+	pub type VotingPeriodExpiring<T: Config> = StorageMap<
+		_,
+		Blake2_128Concat,
+		BlockNumberFor<T>,
+		BoundedVec<T::CollectionId, T::MaxOngoingProjects>,
+		ValueQuery,
+	>;
+
+	/// Mapping of ongoing votes.
+	#[pallet::storage]
+	#[pallet::getter(fn ongoing_votes)]
+	pub(super) type OngoingVotes<T: Config> =
+		StorageMap<_, Twox64Concat, T::CollectionId, VoteStats, OptionQuery>;
+
+	/// Mapping of collection to the users.
+	#[pallet::storage]
+	#[pallet::getter(fn voted_user)]
+	pub(super) type VotedUser<T: Config> =
+		StorageMap<_, Twox64Concat, T::CollectionId, BoundedVec<AccountIdOf<T>, T::MaxNftHolder>, OptionQuery>;
+
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
@@ -219,8 +260,8 @@ pub mod pallet {
 			let ended_milestone = MilestonePeriodExpiring::<T>::take(n);
 			ended_milestone.iter().for_each(|item| {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
-				start_voting_period(item);
-			})
+				Self::start_voting_period(*item);
+			});
 
 			weight
 		}
@@ -407,7 +448,15 @@ pub mod pallet {
 		}
 
 		fn start_voting_period(collection_id: T::CollectionId) -> DispatchResult {
-			
+			let vote_stats = VoteStats { yes_votes: 0, no_votes: 0};
+			OngoingVotes::<T>::insert(collection_id, vote_stats);
+			let current_block_number = <frame_system::Pallet<T>>::block_number();
+			let expiry_block = current_block_number.saturating_add(10_u64.try_into().ok().unwrap());
+			VotingPeriodExpiring::<T>::try_mutate(expiry_block, |keys| {
+				keys.try_push(collection_id).map_err(|_| Error::<T>::TooManyProjects)?;
+				Ok::<(), DispatchError>(())
+			})?;
+			Ok(())
 		}
 
 		/// Set the default collection configuration for creating a collection.
