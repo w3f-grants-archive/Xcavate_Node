@@ -15,7 +15,7 @@ pub mod weights;
 pub use weights::*;
 
 use frame_support::{
-	traits::{Currency, ExistenceRequirement::KeepAlive, ReservableCurrency, Incrementable},
+	traits::{Currency, ExistenceRequirement::KeepAlive, Incrementable, ReservableCurrency},
 	PalletId,
 };
 
@@ -260,9 +260,10 @@ pub mod pallet {
 				pallet_nfts::NextCollectionId::<T>::set(T::CollectionId::initial_value());
 			};
 			let collection: u32 = pallet_nfts::NextCollectionId::<T>::get()
-			.ok_or(Error::<T>::UnknownCollection)?.into();
-			let collection_id = pallet_nfts::NextCollectionId::<T>::get()
-			.ok_or(Error::<T>::UnknownCollection)?;
+				.ok_or(Error::<T>::UnknownCollection)?
+				.into();
+			let collection_id =
+				pallet_nfts::NextCollectionId::<T>::get().ok_or(Error::<T>::UnknownCollection)?;
 			let next_collection_id = collection_id.increment();
 			pallet_nfts::NextCollectionId::<T>::set(next_collection_id);
 

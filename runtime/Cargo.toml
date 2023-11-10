@@ -99,6 +99,7 @@ frame-system-benchmarking = {  default-features = false, git = "https://github.c
 pallet-community-loan-pool = {  default-features = false, path = "../pallets/community-loan-pool" }
 pallet-xcavate-staking = {  default-features = false, path = "../pallets/xcavate-staking" }
 pallet-nft-marketplace = {  default-features = false, path = "../pallets/nft-marketplace" }
+pallet-community-projects = {  default-features = false, path = "../pallets/community-projects" }
 
 
 [build-dependencies]
@@ -127,6 +128,7 @@ std = [
 	"pallet-community-loan-pool/std",
 	"pallet-xcavate-staking/std",
 	"pallet-nft-marketplace/std",
+	"pallet-community-projects/std",
 	"pallet-timestamp/std",
 	"pallet-transaction-payment-rpc-runtime-api/std",
 	"pallet-transaction-payment/std",

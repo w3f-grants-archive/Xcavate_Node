@@ -29,7 +29,8 @@ use frame_support::{
 	pallet_prelude::*,
 	sp_runtime,
 	traits::{
-		Currency, ExistenceRequirement::KeepAlive, Get, OnUnbalanced, ReservableCurrency, UnixTime, Incrementable
+		Currency, ExistenceRequirement::KeepAlive, Get, Incrementable, OnUnbalanced,
+		ReservableCurrency, UnixTime,
 	},
 	PalletId,
 };
@@ -589,8 +590,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let beneficiary = T::Lookup::lookup(beneficiary)?;
-			let total_loan_amount =
-				Self::u64_to_balance_option(Self::reserved_loan_amount())?;
+			let total_loan_amount = Self::u64_to_balance_option(Self::reserved_loan_amount())?;
 			//let decimal = 1000000000000_u64.saturated_into();
 			ensure!(
 				<T as pallet::Config>::Currency::free_balance(&Self::account_id())
@@ -740,8 +740,7 @@ pub mod pallet {
 			loan.borrowed_amount = loan.borrowed_amount.saturating_add(amount);
 			loan.available_amount = loan.available_amount.saturating_sub(amount);
 			Loans::<T>::insert(loan_id, loan);
-			let reserved_value =
-				Self::reserved_loan_amount()
+			let reserved_value = Self::reserved_loan_amount()
 				.checked_sub(Self::balance_to_u64(amount)?)
 				.ok_or(Error::<T>::ArithmeticUnderflow)?;
 			ReservedLoanAmount::<T>::put(reserved_value);
@@ -784,8 +783,8 @@ pub mod pallet {
 			loan.current_loan_balance = loan.current_loan_balance.saturating_sub(amount);
 			Loans::<T>::insert(loan_id, loan);
 			let new_value = Self::total_loan_amount()
-			.checked_sub(Self::balance_to_u64(amount)?)
-			.ok_or(Error::<T>::ArithmeticUnderflow)?;
+				.checked_sub(Self::balance_to_u64(amount)?)
+				.ok_or(Error::<T>::ArithmeticUnderflow)?;
 			TotalLoanAmount::<T>::put(new_value);
 			Self::deposit_event(Event::<T>::LoanUpdated { loan_index: loan_id });
 			Ok(())
@@ -1039,8 +1038,8 @@ pub mod pallet {
 			if pallet_nfts::NextCollectionId::<T>::get().is_none() {
 				pallet_nfts::NextCollectionId::<T>::set(T::CollectionId::initial_value());
 			};
-			let collection_id = pallet_nfts::NextCollectionId::<T>::get()
-			.ok_or(Error::<T>::UnknownCollection)?;
+			let collection_id =
+				pallet_nfts::NextCollectionId::<T>::get().ok_or(Error::<T>::UnknownCollection)?;
 			let next_collection_id = collection_id.increment();
 			pallet_nfts::NextCollectionId::<T>::set(next_collection_id);
 			let item_id: T::ItemId = proposal_index.into();
@@ -1089,8 +1088,7 @@ pub mod pallet {
 
 			let new_value = Self::total_loan_amount() + Self::balance_to_u64(value)?;
 			TotalLoanAmount::<T>::put(new_value);
-			let reserved_value =
-				Self::reserved_loan_amount() + Self::balance_to_u64(value)?;
+			let reserved_value = Self::reserved_loan_amount() + Self::balance_to_u64(value)?;
 			ReservedLoanAmount::<T>::put(reserved_value);
 			Proposals::<T>::remove(proposal_index);
 			LoanCount::<T>::put(loan_index);
@@ -1131,8 +1129,8 @@ pub mod pallet {
 			let mut loan_milestones = loan.milestones;
 			let added_available_amount = Self::balance_to_u64(loan_amount)?
 				* (loan_milestones[0].percentage_to_unlock.deconstruct() as u64)
-				.checked_div(100)
-				.ok_or(Error::<T>::DivisionError)?;
+					.checked_div(100)
+					.ok_or(Error::<T>::DivisionError)?;
 			loan_milestones.remove(0);
 			let new_available_amount = loan
 				.available_amount
@@ -1177,8 +1175,8 @@ pub mod pallet {
 			let index = loans.iter().position(|x| *x == loan_id).unwrap();
 			loans.remove(index);
 			let reserved_loan = Self::reserved_loan_amount()
-			.checked_sub(Self::balance_to_u64(loan.current_loan_balance)?)
-			.ok_or(Error::<T>::ArithmeticUnderflow)?;
+				.checked_sub(Self::balance_to_u64(loan.current_loan_balance)?)
+				.ok_or(Error::<T>::ArithmeticUnderflow)?;
 			ReservedLoanAmount::<T>::put(reserved_loan);
 			OngoingLoans::<T>::put(loans);
 			Loans::<T>::remove(loan_id);

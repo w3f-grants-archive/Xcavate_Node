@@ -239,8 +239,7 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
-
-		/// Gets the balance that would be available for staking. 
+		/// Gets the balance that would be available for staking.
 		fn available_staking_balance(
 			staker: &T::AccountId,
 			ledger: &LedgerAccount<BalanceOf<T>>,

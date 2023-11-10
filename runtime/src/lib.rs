@@ -524,6 +524,28 @@ impl pallet_nft_marketplace::Config for Runtime {
 }
 
 parameter_types! {
+	pub const CommunityProjectPalletId: PalletId = PalletId(*b"py/cmprj");
+	pub const MaxNftType: u32 = 3;
+	pub const MaxListedNftProject: u32 = 300000;
+	pub const MaxNftsInCollectionProject: u32 = 10000;
+	pub const MaxOngoingProject: u32 = 10000;
+}
+
+/// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
+impl pallet_community_projects::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type Currency = Balances;
+	type PalletId = CommunityProjectPalletId;
+	type MaxNftTypes = MaxNftType;
+	type MaxListedNfts = MaxListedNftProject;
+	type MaxNftInCollection = MaxNftsInCollectionProject;
+	#[cfg(feature = "runtime-benchmarks")]
+	type Helper = pallet_community_projects::NftHelper;
+	type TimeProvider = Timestamp;
+	type MaxOngoingProjects = MaxOngoingProject;
+}
+
+parameter_types! {
 	pub Features: PalletFeatures = PalletFeatures::all_enabled();
 	pub const MaxAttributesPerCall: u32 = 10;
 	pub const CollectionDeposit: Balance = DOLLARS;
@@ -1393,6 +1415,7 @@ construct_runtime!(
 		CommunityLoanPool: pallet_community_loan_pool,
 		XcavateStaking: pallet_xcavate_staking,
 		NftMarketplace: pallet_nft_marketplace,
+		CommunityProject: pallet_community_projects,
 		Nfts: pallet_nfts,
 		Uniques: pallet_uniques, //10
 		RandomnessCollectiveFlip: pallet_insecure_randomness_collective_flip,
