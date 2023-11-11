@@ -80,6 +80,8 @@ pub mod pallet {
 		pub project_owner: AccountIdOf<T>,
 		pub project_price: Balance,
 		pub duration: u32,
+		pub milestones: u32,
+		pub remaining_milestones: u32,
 		pub project_balance: Balance,
 		pub launching_timestamp: BlockNumberFor<T>,
 	}
@@ -218,7 +220,13 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn voted_user)]
 	pub(super) type VotedUser<T: Config> =
-		StorageMap<_, Twox64Concat, T::CollectionId, BoundedVec<AccountIdOf<T>, T::MaxNftHolder>, OptionQuery>;
+		StorageMap<_, Twox64Concat, T::CollectionId, BoundedVec<AccountIdOf<T>, T::MaxNftHolder>, ValueQuery>;
+
+	/// Mapping of a collection to the nft holder.
+	#[pallet::storage]
+	#[pallet::getter(fn nft_holder)]
+	pub(super) type NftHolder<T: Config> =
+		StorageMap<_, Twox64Concat, T::CollectionId, BoundedVec<AccountIdOf<T>, T::MaxNftHolder>, ValueQuery>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -232,6 +240,14 @@ pub mod pallet {
 			buyer: AccountIdOf<T>,
 			price: BalanceOf<T>,
 		},
+		/// Voted on a milestone.
+		VotedOnMilestone { collection_index: T::CollectionId, voter: AccountIdOf<T>, vote: Vote },
+		/// A project has been sold out.
+		ProjectLaunched { collection_index: T::CollectionId },
+		/// A Voting period has started.
+		VotingPeriodStarted { collection_index: T::CollectionId },
+		/// Funds has been send to the project
+		FundsDestributed { collection_index: T::CollectionId, owner: AccountIdOf<T>, amount: BalanceOf<T> },
 	}
 
 	#[pallet::error]
@@ -249,6 +265,9 @@ pub mod pallet {
 		UnknownCollection,
 		ConversionError,
 		TooManyProjects,
+		AlreadyVoted,
+		TooManyVoters,
+		InsufficientPermission,
 	}
 
 	#[pallet::hooks]
@@ -261,6 +280,19 @@ pub mod pallet {
 			ended_milestone.iter().for_each(|item| {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
 				Self::start_voting_period(*item);
+			});
+
+			let ended_voting = VotingPeriodExpiring::<T>::take(n);
+			ended_voting.iter().for_each(|item| {
+				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
+				let voting_result = <OngoingVotes<T>>::take(item);
+				if let Some(voting_result) = voting_result {
+					if voting_result.yes_votes > voting_result.no_votes {
+						Self::distribute_funds(*item).unwrap_or_default();
+					}
+
+					OngoingVotes::<T>::remove(item);
+				}
 			});
 
 			weight
@@ -320,6 +352,8 @@ pub mod pallet {
 				project_owner: signer.clone(),
 				project_price: price,
 				duration,
+				milestones: duration,
+				remaining_milestones: duration,
 				project_balance: Default::default(),
 				launching_timestamp: Default::default(),
 			};
@@ -385,7 +419,7 @@ pub mod pallet {
 				.ok_or(Error::<T>::InvalidIndex)?;
 			<T as pallet::Config>::Currency::transfer(
 				&origin.clone(),
-				&nft.project_owner,
+				&Self::account_id(),
 				nft.price * Self::u64_to_balance_option(1000000000000).unwrap_or_default(),
 				KeepAlive,
 			)
@@ -398,8 +432,10 @@ pub mod pallet {
 			)?;
 			project.project_balance += nft.price;
 			if project.project_balance >= project.project_price {
+				OngoingProjects::<T>::insert(collection_id, project);
 				Self::launch_project(collection_id);
 			} else {
+				OngoingProjects::<T>::insert(collection_id, project);
 				let mut listed_nfts = Self::listed_nfts();
 				let index =
 					listed_nfts.iter().position(|x| *x == (collection_id, item_id)).unwrap();
@@ -410,12 +446,49 @@ pub mod pallet {
 				listed_items.remove(index);
 				ListedNftsOfCollection::<T>::insert(collection_id, listed_items);
 			};
-			OngoingProjects::<T>::insert(collection_id, project);
+			let nft_holder = Self::nft_holder(collection_id);
+			if !nft_holder.contains(&origin.clone()) {
+				NftHolder::<T>::try_mutate(collection_id, |keys| {
+					keys.try_push(origin.clone()).map_err(|_| Error::<T>::TooManyVoters)?;
+					Ok::<(), DispatchError>(())
+				})?;
+			}
 			Self::deposit_event(Event::<T>::NftBought {
 				collection_index: collection_id,
 				item_index: item_id,
 				buyer: origin.clone(),
 				price: nft.price,
+			});
+			Ok(())
+		}
+
+		#[pallet::call_index(2)]
+		#[pallet::weight(0)]
+		pub fn vote_on_milestone(
+			origin: OriginFor<T>,
+			collection_id: T::CollectionId,
+			vote: Vote,
+		) -> DispatchResult {
+			let origin = ensure_signed(origin)?;
+			let mut current_vote = OngoingVotes::<T>::take(collection_id).ok_or(Error::<T>::InvalidIndex)?;
+			let nft_voter = Self::nft_holder(collection_id);
+			ensure!(nft_voter.contains(&origin.clone()), Error::<T>::InsufficientPermission);
+			let voted = Self::voted_user(collection_id);
+			ensure!(!voted.contains(&origin), Error::<T>::AlreadyVoted);
+			if vote == Vote::Yes {
+				current_vote.yes_votes += 1;
+			} else {
+				current_vote.no_votes += 1;
+			};
+			VotedUser::<T>::try_mutate(collection_id, |keys| {
+				keys.try_push(origin.clone()).map_err(|_| Error::<T>::TooManyVoters)?;
+				Ok::<(), DispatchError>(())
+			})?;
+			OngoingVotes::<T>::insert(collection_id, current_vote);
+			Self::deposit_event(Event::<T>::VotedOnMilestone {
+				collection_index: collection_id,
+				voter: origin.clone(),
+				vote,
 			});
 			Ok(())
 		}
@@ -444,6 +517,9 @@ pub mod pallet {
 				keys.try_push(collection_id).map_err(|_| Error::<T>::TooManyProjects)?;
 				Ok::<(), DispatchError>(())
 			})?;
+			Self::deposit_event(Event::<T>::ProjectLaunched {
+				collection_index: collection_id,
+			});
 			Ok(())
 		}
 
@@ -456,6 +532,25 @@ pub mod pallet {
 				keys.try_push(collection_id).map_err(|_| Error::<T>::TooManyProjects)?;
 				Ok::<(), DispatchError>(())
 			})?;
+			Self::deposit_event(Event::<T>::VotingPeriodStarted {
+				collection_index: collection_id,
+			});
+			Ok(())
+		}
+
+		fn distribute_funds(collection_id: T::CollectionId) -> DispatchResult {
+			let mut project =
+			OngoingProjects::<T>::take(collection_id).ok_or(Error::<T>::InvalidIndex)?;
+			<T as pallet::Config>::Currency::transfer(
+				&Self::account_id(),
+				&project.project_owner,
+				project.project_balance / project.milestones.into() * Self::u64_to_balance_option(1000000000000).unwrap_or_default(),
+				KeepAlive,
+			)
+			.map_err(|_| Error::<T>::NotEnoughFunds)?;
+			project.remaining_milestones -= 1;
+			OngoingProjects::<T>::insert(collection_id, project.clone());
+			Self::deposit_event(Event::<T>::FundsDestributed { collection_index: collection_id, owner: project.project_owner, amount: project.project_balance / project.milestones.into() });
 			Ok(())
 		}
 
