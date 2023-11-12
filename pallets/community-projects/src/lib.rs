@@ -4,6 +4,8 @@ pub use pallet::*;
 
 use codec::EncodeLike;
 
+use pallet_assets::Instance1;
+
 use frame_support::{
 	traits::{
 		Currency, ExistenceRequirement::KeepAlive, Incrementable, ReservableCurrency, UnixTime,
@@ -128,7 +130,7 @@ pub mod pallet {
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config + pallet_nfts::Config {
+	pub trait Config: frame_system::Config + pallet_nfts::Config + pallet_assets::Config<Instance1> {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 		/// The currency type.
@@ -323,7 +325,7 @@ pub mod pallet {
 			nft_types: BoundedNftDonationTypes<T>,
 			duration: u32,
 			price: BalanceOf<T>,
-			data: BoundedVec<u8, T::StringLimit>,
+			data: BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>,
 		) -> DispatchResult
 		where
 			u32: From<<T as pallet_nfts::Config>::CollectionId>,
@@ -403,12 +405,9 @@ pub mod pallet {
 				}
 			}
 			pallet_nfts::Pallet::<T>::set_team(origin.clone(), collection_id, None, None, None)?;
-
-			// Return a successful DispatchResultWithPostInfo
 			Ok(())
 		}
 
-		/// An example dispatchable that may throw a custom error.
 		#[pallet::call_index(1)]
 		#[pallet::weight(0)]
 		pub fn buy_nft(
