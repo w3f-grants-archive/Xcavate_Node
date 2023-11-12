@@ -33,7 +33,7 @@ mod benchmarking;
 
 pub type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
 
-type BalanceOf<T> =
+pub type BalanceOf<T> =
 	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
 type BalanceOf1<T> = <<T as pallet_nfts::Config>::Currency as Currency<
@@ -248,6 +248,10 @@ pub mod pallet {
 		VotingPeriodStarted { collection_index: T::CollectionId },
 		/// Funds has been send to the project
 		FundsDestributed { collection_index: T::CollectionId, owner: AccountIdOf<T>, amount: BalanceOf<T> },
+		/// A Milestone period has started.
+		MilestonePeriodStarted { collection_id: T::CollectionId },
+		/// The project has been deleted.
+		ProjectDeleted { collection_id: T::CollectionId }
 	}
 
 	#[pallet::error]
@@ -292,6 +296,12 @@ pub mod pallet {
 					}
 
 					OngoingVotes::<T>::remove(item);
+				}
+				let project = Self::ongoing_projects(*item).unwrap();
+				if project.remaining_milestones >= 1 {
+					Self::start_milestone_period(*item);
+				} else {
+					Self::delete_project(*item);
 				}
 			});
 
@@ -420,7 +430,7 @@ pub mod pallet {
 			<T as pallet::Config>::Currency::transfer(
 				&origin.clone(),
 				&Self::account_id(),
-				nft.price * Self::u64_to_balance_option(1000000000000).unwrap_or_default(),
+				nft.price /* * Self::u64_to_balance_option(1000000000000).unwrap_or_default() */,
 				KeepAlive,
 			)
 			.map_err(|_| Error::<T>::NotEnoughFunds)?;
@@ -507,6 +517,7 @@ pub mod pallet {
 				let mut listed_nfts = Self::listed_nfts();
 				let index = listed_nfts.iter().position(|x| *x == (collection_id, item)).unwrap();
 				listed_nfts.remove(index);
+				ListedNfts::<T>::put(listed_nfts);
 			}
 			let mut project = Self::ongoing_projects(collection_id).unwrap();
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
@@ -538,19 +549,38 @@ pub mod pallet {
 			Ok(())
 		}
 
+		fn start_milestone_period(collection_id: T::CollectionId) -> DispatchResult {
+			let current_block_number = <frame_system::Pallet<T>>::block_number();
+			let expiry_block = current_block_number.saturating_add(10_u64.try_into().ok().unwrap());
+			MilestonePeriodExpiring::<T>::try_mutate(expiry_block, |keys| {
+				keys.try_push(collection_id).map_err(|_| Error::<T>::TooManyProjects)?;
+				Ok::<(), DispatchError>(())
+			})?;
+			Self::deposit_event(Event::<T>::MilestonePeriodStarted {
+				collection_id,
+			});
+			Ok(())
+		}
+
 		fn distribute_funds(collection_id: T::CollectionId) -> DispatchResult {
 			let mut project =
 			OngoingProjects::<T>::take(collection_id).ok_or(Error::<T>::InvalidIndex)?;
 			<T as pallet::Config>::Currency::transfer(
 				&Self::account_id(),
 				&project.project_owner,
-				project.project_balance / project.milestones.into() * Self::u64_to_balance_option(1000000000000).unwrap_or_default(),
+				project.project_balance / project.milestones.into() /* * Self::u64_to_balance_option(1000000000000).unwrap_or_default() */,
 				KeepAlive,
 			)
 			.map_err(|_| Error::<T>::NotEnoughFunds)?;
 			project.remaining_milestones -= 1;
 			OngoingProjects::<T>::insert(collection_id, project.clone());
 			Self::deposit_event(Event::<T>::FundsDestributed { collection_index: collection_id, owner: project.project_owner, amount: project.project_balance / project.milestones.into() });
+			Ok(())
+		}
+
+		fn delete_project(collection_id: T::CollectionId) -> DispatchResult {
+			OngoingProjects::<T>::take(collection_id).ok_or(Error::<T>::InvalidIndex)?;
+			Self::deposit_event(Event::<T>::ProjectDeleted {collection_id});
 			Ok(())
 		}
 
