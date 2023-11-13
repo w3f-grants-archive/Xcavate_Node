@@ -232,10 +232,14 @@ fn testnet_genesis(
 		grandpa: Default::default(),
 		sudo: SudoConfig {
 			// Assign network admin rights.
-			key: Some(root_key),
+			key: Some(root_key.clone()),
 		},
 		transaction_payment: Default::default(),
-		assets: AssetsConfig::default(),
+		assets: AssetsConfig {
+            assets: vec![(1000, root_key.clone(), true, 1)], // Genesis assets: id, owner, is_sufficient, min_balance
+            metadata: vec![(1000, "XUSD".into(), "XUSD".into(), 0)], // Genesis metadata: id, name, symbol, decimals
+            accounts: vec![(1000, root_key.clone(), 10_000_000 * DOLLARS)], // Genesis accounts: id, account_id, balance
+        },
 		pool_assets: Default::default(),
 		im_online: Default::default(),
 		council: CouncilConfig { members: vec![], phantom: Default::default() },

@@ -545,6 +545,9 @@ impl pallet_community_projects::Config for Runtime {
 	type TimeProvider = Timestamp;
 	type MaxOngoingProjects = MaxOngoingProject;
 	type MaxNftHolder = MaxNftHolders;
+	type AssetId = u32;
+	type CollectionId = u32;
+	type ItemId = u32;
 }
 
 parameter_types! {
