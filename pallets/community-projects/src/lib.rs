@@ -369,11 +369,13 @@ pub mod pallet {
 
 					OngoingVotes::<T>::remove(item);
 				}
-				let project = Self::ongoing_projects(*item).unwrap();
-				if project.remaining_milestones >= 1 {
-					Self::start_milestone_period(*item);
-				} else {
-					Self::delete_project(*item);
+				let project = Self::ongoing_projects(*item);
+				if let Some(project) = project {
+					if project.remaining_milestones >= 1 {
+						Self::start_milestone_period(*item);
+					} else {
+						Self::delete_project(*item);
+					}
 				}
 			});
 
@@ -493,14 +495,7 @@ pub mod pallet {
 				OngoingProjects::<T>::take(collection_id).ok_or(Error::<T>::InvalidIndex)?;
 			let nft = OngoingNftDetails::<T>::take((collection_id, item_id))
 				.ok_or(Error::<T>::InvalidIndex)?;
-			/* 			<T as pallet::Config>::Currency::transfer(
-				&origin.clone(),
-				&Self::account_id(),
-				nft.price /* * Self::u64_to_balance_option(1000000000000).unwrap_or_default() */,
-				KeepAlive,
-			)
-			.map_err(|_| Error::<T>::NotEnoughFunds)?; */
-			let user_lookup = <T::Lookup as StaticLookup>::unlookup(signer.clone());
+			let user_lookup = <T::Lookup as StaticLookup>::unlookup(Self::account_id());
 			let asset_id: AssetId<T> = 1.into();
 			pallet_assets::Pallet::<T, Instance1>::transfer(
 				origin,
@@ -661,13 +656,6 @@ pub mod pallet {
 		fn distribute_funds(collection_id: <T as pallet::Config>::CollectionId) -> DispatchResult {
 			let mut project =
 				OngoingProjects::<T>::take(collection_id).ok_or(Error::<T>::InvalidIndex)?;
-			/* 			<T as pallet::Config>::Currency::transfer(
-				&Self::account_id(),
-				&project.project_owner,
-				project.project_balance / project.milestones.into() /* * Self::u64_to_balance_option(1000000000000).unwrap_or_default() */,
-				KeepAlive,
-			)
-			.map_err(|_| Error::<T>::NotEnoughFunds)?; */
 			let user_lookup = <T::Lookup as StaticLookup>::unlookup(project.project_owner.clone());
 			let origin: OriginFor<T> = RawOrigin::Signed(Self::account_id()).into();
 			let asset_id: AssetId<T> = 1.into();

@@ -66,8 +66,8 @@ fn buy_works() {
 		));
 		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 1));
 		assert_eq!(CommunityProjects::listed_nfts().len(), 5);
-		assert_eq!(Balances::free_balance(&([1; 32].into())), 14_800);
-		assert_eq!(Balances::free_balance(&CommunityProjects::account_id()), 20_000_200);
+		assert_eq!(Assets::balance(1, &[1; 32].into()), 1300);
+		assert_eq!(Assets::balance(1, &CommunityProjects::account_id()),200);
 	});
 }
 
@@ -132,8 +132,8 @@ fn distributing_funds_works() {
 			crate::Vote::Yes
 		));
 		run_to_block(22);
-		assert_eq!(Balances::free_balance(&([0; 32].into())), 20_000_098);
-		assert_eq!(Balances::free_balance(&CommunityProjects::account_id()), 20_000_200);
+		assert_eq!(Assets::balance(1, &[0; 32].into()), 20_000_100);
+		assert_eq!(Assets::balance(1, &CommunityProjects::account_id()), 200);
 	});
 }
 
@@ -157,8 +157,8 @@ fn delete_project_works() {
 			crate::Vote::Yes
 		));
 		run_to_block(22);
-		assert_eq!(Balances::free_balance(&([0; 32].into())), 20_000_298);
-		assert_eq!(Balances::free_balance(&CommunityProjects::account_id()), 20_000_000);
+		assert_eq!(Assets::balance(1, &[0; 32].into()), 20_000_300);
+		assert_eq!(Assets::balance(1, &CommunityProjects::account_id()), 0);
 		assert_eq!(CommunityProjects::ongoing_projects(0), None);
 	})
 }
