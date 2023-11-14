@@ -8,6 +8,8 @@ use sp_runtime::{
 	MultiSignature,
 };
 
+use frame_system::EnsureRoot;
+
 //use pallet_transaction_payment::CurrencyAdapter;
 
 use frame_support::traits::ConstU8;
@@ -42,7 +44,6 @@ pub const MINUTES: BlockNumber = 60_000 / (MILLISECS_PER_BLOCK as BlockNumber);
 pub const HOURS: BlockNumber = MINUTES * 60;
 pub const DAYS: BlockNumber = HOURS * 24;
 
-
 // Configure a mock runtime to test the pallet.
 frame_support::construct_runtime!(
 	pub enum Test
@@ -52,6 +53,7 @@ frame_support::construct_runtime!(
 		Uniques: pallet_nfts::{Pallet, Call, Storage, Event<T>},
 		CommunityProjects: pallet_community_projects,
 		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
+		Assets: pallet_assets::<Instance1>,
 	}
 );
 
@@ -149,6 +151,34 @@ impl pallet_timestamp::Config for Test {
 }
 
 parameter_types! {
+	pub const AssetConversionPalletId: PalletId = PalletId(*b"py/ascon");
+
+}
+
+impl pallet_assets::Config<Instance1> for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type Balance = u128;
+	type AssetId = u32;
+	type AssetIdParameter = codec::Compact<u32>;
+	type Currency = Balances;
+	type CreateOrigin = AsEnsureOriginWithArg<frame_system::EnsureSigned<Self::AccountId>>;
+	type ForceOrigin = EnsureRoot<AccountId>;
+	type AssetDeposit = ConstU32<1>;
+	type AssetAccountDeposit = ConstU32<1>;
+	type MetadataDepositBase = ConstU32<1>;
+	type MetadataDepositPerByte = ConstU32<1>;
+	type ApprovalDeposit = ConstU32<1>;
+	type StringLimit = ConstU32<50>;
+	type Freezer = ();
+	type Extra = ();
+	type CallbackHandle = ();
+	type WeightInfo = ();
+	type RemoveItemsLimit = ConstU32<1000>;
+	#[cfg(feature = "runtime-benchmarks")]
+	type BenchmarkHelper = ();
+}
+
+parameter_types! {
 	pub const CommunityProjectPalletId: PalletId = PalletId(*b"py/cmprj");
 	pub const MaxNftType: u32 = 3;
 	pub const MaxListedNftProject: u32 = 300000;
@@ -170,6 +200,9 @@ impl pallet_community_projects::Config for Test {
 	type TimeProvider = Timestamp;
 	type MaxOngoingProjects = MaxOngoingProject;
 	type MaxNftHolder = MaxNftHolders;
+	type AssetId = u32;
+	type CollectionId = u32;
+	type ItemId = u32;
 }
 
 // Build genesis storage according to the mock runtime.
@@ -184,6 +217,19 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 			([3; 32].into(), 5_000),
 			((CommunityProjects::account_id()), 20_000_000),
 		],
+	}
+	.assimilate_storage(&mut test)
+	.unwrap();
+
+	pallet_assets::GenesisConfig::<Test, Instance1> {
+		assets: vec![(1, [0; 32].into(), true, 1)], // Genesis assets: id, owner, is_sufficient, min_balance
+		metadata: vec![(1, "XUSD".into(), "XUSD".into(), 0)], // Genesis metadata: id, name, symbol, decimals
+		accounts: vec![
+			(1, [0; 32].into(), 20_000_000),
+			(1, [1; 32].into(), 15_00),
+			(1, [2; 32].into(), 150_000),
+			(1, [3; 32].into(), 5_000),
+		], // Genesis accounts: id, account_id, balance
 	}
 	.assimilate_storage(&mut test)
 	.unwrap();

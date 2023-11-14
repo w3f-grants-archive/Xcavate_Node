@@ -5,7 +5,7 @@ use frame_support::{
 };
 
 use crate::Config;
-use crate::{BoundedNftDonationTypes, NftDonationTypes, BalanceOf};
+use crate::{BalanceOf, BoundedNftDonationTypes, NftDonationTypes};
 
 macro_rules! bvec {
 	($( $x:tt )*) => {
@@ -42,16 +42,28 @@ fn run_to_block(n: u64) {
 fn list_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_ok!(CommunityProjects::list_project(RuntimeOrigin::signed([0; 32].into()), get_project_nfts(3), 5, 900, bvec![22, 22]));
+		assert_ok!(CommunityProjects::list_project(
+			RuntimeOrigin::signed([0; 32].into()),
+			get_project_nfts(3),
+			5,
+			900,
+			bvec![22, 22]
+		));
 		assert_eq!(CommunityProjects::listed_nfts().len(), 6);
 	});
 }
 
 #[test]
-fn buy_works(){
+fn buy_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_ok!(CommunityProjects::list_project(RuntimeOrigin::signed([0; 32].into()), get_project_nfts(3), 5, 900, bvec![22, 22]));
+		assert_ok!(CommunityProjects::list_project(
+			RuntimeOrigin::signed([0; 32].into()),
+			get_project_nfts(3),
+			5,
+			900,
+			bvec![22, 22]
+		));
 		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 1));
 		assert_eq!(CommunityProjects::listed_nfts().len(), 5);
 		assert_eq!(Balances::free_balance(&([1; 32].into())), 14_800);
@@ -60,10 +72,16 @@ fn buy_works(){
 }
 
 #[test]
-fn launch_project_works(){
+fn launch_project_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_ok!(CommunityProjects::list_project(RuntimeOrigin::signed([0; 32].into()), get_project_nfts(3), 5, 300, bvec![22, 22]));
+		assert_ok!(CommunityProjects::list_project(
+			RuntimeOrigin::signed([0; 32].into()),
+			get_project_nfts(3),
+			5,
+			300,
+			bvec![22, 22]
+		));
 		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 1));
 		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([2; 32].into()), 0, 0));
 		assert_eq!(CommunityProjects::listed_nfts().len(), 0);
@@ -71,30 +89,48 @@ fn launch_project_works(){
 }
 
 #[test]
-fn voting_works(){
+fn voting_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_ok!(CommunityProjects::list_project(RuntimeOrigin::signed([0; 32].into()), get_project_nfts(3), 5, 300, bvec![22, 22]));
+		assert_ok!(CommunityProjects::list_project(
+			RuntimeOrigin::signed([0; 32].into()),
+			get_project_nfts(3),
+			5,
+			300,
+			bvec![22, 22]
+		));
 		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 1));
 		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([2; 32].into()), 0, 0));
 		assert_eq!(CommunityProjects::listed_nfts().len(), 0);
 		run_to_block(11);
-		assert_ok!(CommunityProjects::vote_on_milestone(RuntimeOrigin::signed([2; 32].into()), 0, crate::Vote::Yes
-	));
+		assert_ok!(CommunityProjects::vote_on_milestone(
+			RuntimeOrigin::signed([2; 32].into()),
+			0,
+			crate::Vote::Yes
+		));
 	});
 }
 
 #[test]
-fn distributing_funds_works(){
+fn distributing_funds_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_ok!(CommunityProjects::list_project(RuntimeOrigin::signed([0; 32].into()), get_project_nfts(3), 3, 300, bvec![22, 22]));
+		assert_ok!(CommunityProjects::list_project(
+			RuntimeOrigin::signed([0; 32].into()),
+			get_project_nfts(3),
+			3,
+			300,
+			bvec![22, 22]
+		));
 		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 1));
 		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([2; 32].into()), 0, 0));
 		assert_eq!(CommunityProjects::listed_nfts().len(), 0);
 		run_to_block(11);
-		assert_ok!(CommunityProjects::vote_on_milestone(RuntimeOrigin::signed([2; 32].into()), 0, crate::Vote::Yes
-	));
+		assert_ok!(CommunityProjects::vote_on_milestone(
+			RuntimeOrigin::signed([2; 32].into()),
+			0,
+			crate::Vote::Yes
+		));
 		run_to_block(22);
 		assert_eq!(Balances::free_balance(&([0; 32].into())), 20_000_098);
 		assert_eq!(Balances::free_balance(&CommunityProjects::account_id()), 20_000_200);
@@ -102,15 +138,24 @@ fn distributing_funds_works(){
 }
 
 #[test]
-fn delete_project_works(){
+fn delete_project_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_ok!(CommunityProjects::list_project(RuntimeOrigin::signed([0; 32].into()), get_project_nfts(3), 1, 300, bvec![22, 22]));
+		assert_ok!(CommunityProjects::list_project(
+			RuntimeOrigin::signed([0; 32].into()),
+			get_project_nfts(3),
+			1,
+			300,
+			bvec![22, 22]
+		));
 		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 1));
 		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([2; 32].into()), 0, 0));
 		run_to_block(11);
-		assert_ok!(CommunityProjects::vote_on_milestone(RuntimeOrigin::signed([2; 32].into()), 0, crate::Vote::Yes
-	));
+		assert_ok!(CommunityProjects::vote_on_milestone(
+			RuntimeOrigin::signed([2; 32].into()),
+			0,
+			crate::Vote::Yes
+		));
 		run_to_block(22);
 		assert_eq!(Balances::free_balance(&([0; 32].into())), 20_000_298);
 		assert_eq!(Balances::free_balance(&CommunityProjects::account_id()), 20_000_000);
