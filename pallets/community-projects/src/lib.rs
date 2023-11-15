@@ -2,14 +2,10 @@
 
 pub use pallet::*;
 
-use codec::EncodeLike;
-
 use pallet_assets::Instance1;
 
 use frame_support::{
-	traits::{
-		Currency, ExistenceRequirement::KeepAlive, Incrementable, ReservableCurrency, UnixTime,
-	},
+	traits::{Currency, Incrementable, ReservableCurrency, UnixTime},
 	BoundedVec, PalletId,
 };
 
@@ -18,7 +14,7 @@ use pallet_nfts::{
 };
 
 use frame_support::sp_runtime::{
-	traits::{AccountIdConversion, CheckedDiv, CheckedMul, StaticLookup},
+	traits::{AccountIdConversion, StaticLookup},
 	Saturating,
 };
 
@@ -92,6 +88,7 @@ pub mod pallet {
 		pub remaining_milestones: u32,
 		pub project_balance: Balance,
 		pub launching_timestamp: BlockNumberFor<T>,
+		pub strikes: u8,
 	}
 
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
@@ -291,6 +288,17 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	/// Mapping of collection id and account id to the voting power
+	#[pallet::storage]
+	#[pallet::getter(fn voting_power)]
+	pub(super) type VotingPower<T: Config> = StorageMap<
+		_,
+		Twox64Concat,
+		(<T as pallet::Config>::CollectionId, AccountIdOf<T>),
+		u64,
+		OptionQuery,
+	>;
+
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
@@ -346,6 +354,7 @@ pub mod pallet {
 		AlreadyVoted,
 		TooManyVoters,
 		InsufficientPermission,
+		NoOngoingVotingPeriod,
 	}
 
 	#[pallet::hooks]
@@ -365,6 +374,8 @@ pub mod pallet {
 				if let Some(voting_result) = voting_result {
 					if voting_result.yes_votes > voting_result.no_votes {
 						Self::distribute_funds(*item).unwrap_or_default();
+					} else {
+						Self::ckeck_strikes(*item);
 					}
 
 					OngoingVotes::<T>::remove(item);
@@ -377,6 +388,7 @@ pub mod pallet {
 						Self::delete_project(*item);
 					}
 				}
+				VotedUser::<T>::take(*item);
 			});
 
 			weight
@@ -431,11 +443,12 @@ pub mod pallet {
 				remaining_milestones: duration,
 				project_balance: Default::default(),
 				launching_timestamp: Default::default(),
+				strikes: Default::default(),
 			};
 			OngoingProjects::<T>::insert(collection_id, project);
 			let mut nft_id_index = 0;
 			for nft_type in nft_types {
-				for y in 0..nft_type.amount {
+				for _y in 0..nft_type.amount {
 					let item_id: <T as pallet::Config>::ItemId = nft_id_index.into();
 					let nft = NftDetails {
 						project_owner: signer.clone(),
@@ -484,7 +497,6 @@ pub mod pallet {
 			collection_id: <T as pallet::Config>::CollectionId,
 			item_id: <T as pallet::Config>::ItemId,
 		) -> DispatchResult {
-			/// Buy x nfts
 			let signer = ensure_signed(origin.clone())?;
 
 			ensure!(
@@ -501,7 +513,7 @@ pub mod pallet {
 				origin,
 				asset_id.into().into(),
 				user_lookup,
-				nft.price, /* * Self::u64_to_balance_option(1000000000000).unwrap_or_default() */
+				nft.price * Self::u64_to_balance_option(1000000000000).unwrap_or_default(), 
 			)
 			.map_err(|_| Error::<T>::NotEnoughFunds)?;
 			pallet_nfts::Pallet::<T>::do_transfer(
@@ -533,6 +545,12 @@ pub mod pallet {
 					Ok::<(), DispatchError>(())
 				})?;
 			}
+			let mut current_voting_power =
+				Self::voting_power((collection_id, signer.clone())).unwrap_or_default();
+			current_voting_power += TryInto::<u64>::try_into(nft.price)
+				.map_err(|_| Error::<T>::ConversionError)
+				.unwrap();
+			VotingPower::<T>::insert((collection_id, signer.clone()), current_voting_power);
 			Self::deposit_event(Event::<T>::NftBought {
 				collection_index: collection_id,
 				item_index: item_id,
@@ -551,15 +569,17 @@ pub mod pallet {
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let mut current_vote =
-				OngoingVotes::<T>::take(collection_id).ok_or(Error::<T>::InvalidIndex)?;
+				OngoingVotes::<T>::take(collection_id).ok_or(Error::<T>::NoOngoingVotingPeriod)?;
 			let nft_voter = Self::nft_holder(collection_id);
 			ensure!(nft_voter.contains(&origin.clone()), Error::<T>::InsufficientPermission);
 			let voted = Self::voted_user(collection_id);
 			ensure!(!voted.contains(&origin), Error::<T>::AlreadyVoted);
+			let voting_power =
+				Self::voting_power((collection_id, origin.clone())).unwrap_or_default();
 			if vote == Vote::Yes {
-				current_vote.yes_votes += 1;
+				current_vote.yes_votes += voting_power;
 			} else {
-				current_vote.no_votes += 1;
+				current_vote.no_votes += voting_power;
 			};
 			VotedUser::<T>::try_mutate(collection_id, |keys| {
 				keys.try_push(origin.clone()).map_err(|_| Error::<T>::TooManyVoters)?;
@@ -574,7 +594,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::call_index(3)]
+/* 		#[pallet::call_index(3)]
 		#[pallet::weight(0)]
 		pub fn test_transfer(
 			origin: OriginFor<T>,
@@ -592,7 +612,7 @@ pub mod pallet {
 				amount,
 			)?;
 			Ok(())
-		}
+		} */
 	}
 	impl<T: Config> Pallet<T> {
 		/// Get the account id of the pallet
@@ -613,8 +633,16 @@ pub mod pallet {
 			let mut project = Self::ongoing_projects(collection_id).unwrap();
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
 			project.launching_timestamp = current_block_number;
+			// The milestone period is so short for testing purpose. Later on it will be about three weeks if the duration is lower than 12.
+			
+			let milestone_period = if project.duration > 12 {
+				project.duration * 10 / 12
+			} else {
+				10
+			};
 			OngoingProjects::<T>::insert(collection_id, project);
-			let expiry_block = current_block_number.saturating_add(10_u64.try_into().ok().unwrap());
+			let expiry_block =
+				current_block_number.saturating_add(milestone_period.try_into().ok().unwrap());
 			MilestonePeriodExpiring::<T>::try_mutate(expiry_block, |keys| {
 				keys.try_push(collection_id).map_err(|_| Error::<T>::TooManyProjects)?;
 				Ok::<(), DispatchError>(())
@@ -629,6 +657,7 @@ pub mod pallet {
 			let vote_stats = VoteStats { yes_votes: 0, no_votes: 0 };
 			OngoingVotes::<T>::insert(collection_id, vote_stats);
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
+			// The voting period is so short for testing purpose. Later on it will be about 1 week.
 			let expiry_block = current_block_number.saturating_add(10_u64.try_into().ok().unwrap());
 			VotingPeriodExpiring::<T>::try_mutate(expiry_block, |keys| {
 				keys.try_push(collection_id).map_err(|_| Error::<T>::TooManyProjects)?;
@@ -659,15 +688,26 @@ pub mod pallet {
 			let user_lookup = <T::Lookup as StaticLookup>::unlookup(project.project_owner.clone());
 			let origin: OriginFor<T> = RawOrigin::Signed(Self::account_id()).into();
 			let asset_id: AssetId<T> = 1.into();
-			pallet_assets::Pallet::<T, Instance1>::transfer(origin, asset_id.into().into(), user_lookup, project.project_balance / project.milestones.into() /* * Self::u64_to_balance_option(1000000000000).unwrap_or_default() */ )
+			pallet_assets::Pallet::<T, Instance1>::transfer(origin, asset_id.into().into(), user_lookup, project.project_balance / project.milestones.into() * Self::u64_to_balance_option(1000000000000).unwrap_or_default() )
 			.map_err(|_| Error::<T>::NotEnoughFunds)?;
 			project.remaining_milestones -= 1;
+			project.strikes = Default::default();
 			OngoingProjects::<T>::insert(collection_id, project.clone());
 			Self::deposit_event(Event::<T>::FundsDestributed {
 				collection_index: collection_id,
 				owner: project.project_owner,
 				amount: project.project_balance / project.milestones.into(),
 			});
+			Ok(())
+		}
+
+		fn ckeck_strikes(collection_id: <T as pallet::Config>::CollectionId) -> DispatchResult {
+			let mut project = Self::ongoing_projects(collection_id).unwrap();
+			project.strikes += 1;
+			OngoingProjects::<T>::insert(collection_id, project.clone());
+			if project.strikes >= 3 {
+				Self::delete_project(collection_id);
+			}
 			Ok(())
 		}
 
