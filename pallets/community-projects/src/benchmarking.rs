@@ -3,33 +3,79 @@
 use super::*;
 
 #[allow(unused)]
-use crate::Pallet as Template;
+use crate::Pallet as CommunityProjects;
 use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
+const SEED: u32 = 0;
+use frame_support::traits::Get;
+use frame_support::sp_runtime::traits::Bounded;
+type DepositBalanceOf<T> = <<T as pallet_nfts::Config>::Currency as Currency<
+	<T as frame_system::Config>::AccountId,
+>>::Balance;
+use crate::mock::Assets;
+
+fn setup_listing<T: Config>(u: u32) -> (T::AccountId, BoundedNftDonationTypes<T>, BoundedVec<BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>, <T as Config>::MaxNftTypes>, u32, BalanceOf<T>, BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>) {
+	let caller: T::AccountId = account("caller", u, SEED);
+	let project_types = get_project_nfts::<T>(4);
+	<T as pallet_nfts::Config>::Currency::make_free_balance_be(&caller, DepositBalanceOf::<T>::max_value());
+	let metadatas = get_nft_metadata::<T>(4);
+	let duration = 12;
+	let value: BalanceOf<T> = 100u32.into();
+	let single_metadata = vec![0; <T as pallet_nfts::Config>::StringLimit::get() as usize].try_into().unwrap();
+	(caller, project_types, metadatas, duration, value, single_metadata)
+}
+
+fn setup_asset<T: Config>() {
+
+}
 
 #[benchmarks]
 mod benchmarks {
 	use super::*;
 
 	#[benchmark]
-	fn do_something() {
-		let value = 100u32.into();
-		let caller: T::AccountId = whitelisted_caller();
+	fn list_project() {
+		let (caller, project_types, metadatas, duration, value, single_metadata) = setup_listing::<T>(SEED);
 		#[extrinsic_call]
-		do_something(RawOrigin::Signed(caller), value);
-
-		assert_eq!(Something::<T>::get(), Some(value));
+		list_project(RawOrigin::Signed(caller), project_types, metadatas, duration, value, single_metadata);
+		assert_eq!(CommunityProjects::<T>::listed_nfts().len(), 6);
 	}
 
-	#[benchmark]
-	fn cause_error() {
-		Something::<T>::put(100u32);
-		let caller: T::AccountId = whitelisted_caller();
+/*  	#[benchmark]
+ 	fn buy_nft() {
+		let (caller, project_types, metadatas, duration, value, single_metadata) = setup_listing::<T>(SEED);
+		CommunityProjects::<T>::list_project(RawOrigin::Signed(caller).into(), project_types, metadatas, duration, value, single_metadata);
+		let buyer = account("buyer", SEED, SEED);
+		<T as pallet_nfts::Config>::Currency::make_free_balance_be(&buyer, DepositBalanceOf::<T>::max_value());
 		#[extrinsic_call]
-		cause_error(RawOrigin::Signed(caller));
+		buy_nft(RawOrigin::Signed(buyer), 0.into(), 1.into());
 
-		assert_eq!(Something::<T>::get(), Some(101u32));
+		//assert_eq!(Something::<T>::get(), Some(101u32));
+	}   */
+
+	impl_benchmark_test_suite!(CommunityProjects, crate::mock::new_test_ext(), crate::mock::Test);
+}
+
+fn get_project_nfts<T: Config>(mut n: u32) -> BoundedNftDonationTypes<T> {
+	let max = <T as Config>::MaxNftTypes::get();
+	if n > max {
+		n = max
 	}
+	(1..=n)
+		.map(|x| NftDonationTypes::<BalanceOf<T>> { price: (100 * x).into(), amount: x })
+		.collect::<Vec<NftDonationTypes<BalanceOf<T>>>>()
+		.try_into()
+		.expect("bound is ensured; qed")
+}
 
-	impl_benchmark_test_suite!(Template, crate::mock::new_test_ext(), crate::mock::Test);
+fn get_nft_metadata<T: Config>(mut n: u32) -> BoundedVec<BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>, <T as Config>::MaxNftTypes> {
+	let max = <T as Config>::MaxNftTypes::get();
+	if n > max {
+		n = max
+	}
+	(1..=n)
+		.map(|_| vec![0; <T as pallet_nfts::Config>::StringLimit::get() as usize].try_into().unwrap())
+		.collect::<Vec<BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>>>()
+		.try_into()
+		.expect("bound is ensured; qed")
 }

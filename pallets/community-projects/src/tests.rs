@@ -6,6 +6,8 @@ use frame_support::{
 
 use crate::Config;
 use crate::{BalanceOf, BoundedNftDonationTypes, NftDonationTypes};
+use sp_core::{bounded::BoundedVec, Pair};
+
 
 macro_rules! bvec {
 	($( $x:tt )*) => {
@@ -21,6 +23,18 @@ fn get_project_nfts(mut n: u32) -> BoundedNftDonationTypes<Test> {
 	(1..=n)
 		.map(|x| NftDonationTypes::<BalanceOf<Test>> { price: (100 * x).into(), amount: x })
 		.collect::<Vec<NftDonationTypes<BalanceOf<Test>>>>()
+		.try_into()
+		.expect("bound is ensured; qed")
+}
+
+fn get_nft_metadata(mut n: u32) -> BoundedVec<BoundedVec<u8, <Test as pallet_nfts::Config>::StringLimit>, <Test as Config>::MaxNftTypes> {
+	let max = <Test as Config>::MaxNftTypes::get();
+	if n > max {
+		n = max
+	}
+	(1..=n)
+		.map(|_| bvec![22, 22])
+		.collect::<Vec<BoundedVec<u8, <Test as pallet_nfts::Config>::StringLimit>>>()
 		.try_into()
 		.expect("bound is ensured; qed")
 }
@@ -45,6 +59,7 @@ fn list_works() {
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
+			get_nft_metadata(3),
 			5,
 			900,
 			bvec![22, 22]
@@ -60,6 +75,7 @@ fn buy_works() {
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
+			get_nft_metadata(3),
 			5,
 			900,
 			bvec![22, 22]
@@ -78,6 +94,7 @@ fn launch_project_works() {
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
+			get_nft_metadata(3),
 			5,
 			300,
 			bvec![22, 22]
@@ -95,6 +112,7 @@ fn voting_works() {
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
+			get_nft_metadata(3),
 			5,
 			300,
 			bvec![22, 22]
@@ -119,13 +137,17 @@ fn rejecting_vote_works() {
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
-			2,
+			get_nft_metadata(3),
+			4,
 			900,
 			bvec![22, 22]
 		));
 		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 5));
 		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 4));
 		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([2; 32].into()), 0, 3));
+		assert_eq!(Assets::balance(1, &[1; 32].into()), 900);
+		assert_eq!(Assets::balance(1, &[2; 32].into()), 149_700);
+		assert_eq!(Assets::balance(1, &CommunityProjects::account_id()), 900);
 		run_to_block(11);
 		assert_ok!(CommunityProjects::vote_on_milestone(
 			RuntimeOrigin::signed([2; 32].into()),
@@ -135,9 +157,9 @@ fn rejecting_vote_works() {
 		assert_ok!(CommunityProjects::vote_on_milestone(
 			RuntimeOrigin::signed([1; 32].into()),
 			0,
-			crate::Vote::No
+			crate::Vote::Yes
 		));
-		assert_eq!(CommunityProjects::ongoing_votes(0).unwrap().no_votes, 600);
+		assert_eq!(CommunityProjects::ongoing_votes(0).unwrap().no_votes, 0);
 		run_to_block(31);
 		assert_ok!(CommunityProjects::vote_on_milestone(
 			RuntimeOrigin::signed([1; 32].into()),
@@ -150,8 +172,17 @@ fn rejecting_vote_works() {
 			0,
 			crate::Vote::No
 		));
-		run_to_block(61);
+		run_to_block(71);
+		assert_ok!(CommunityProjects::vote_on_milestone(
+			RuntimeOrigin::signed([1; 32].into()),
+			0,
+			crate::Vote::No
+		));
+		run_to_block(81);
 		assert_eq!(CommunityProjects::ongoing_projects(0), None);
+		assert_eq!(Assets::balance(1, &[1; 32].into()), 1_350);
+		assert_eq!(Assets::balance(1, &[2; 32].into()), 149_925);
+		assert_eq!(Assets::balance(1, &CommunityProjects::account_id()), 0);
 	})
 }
 
@@ -162,17 +193,21 @@ fn voting_fails_with_no_permission() {
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
+			get_nft_metadata(3),
 			3,
 			300,
 			bvec![22, 22]
 		));
 		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 5));
 		run_to_block(11);
-		assert_noop!(CommunityProjects::vote_on_milestone(
-			RuntimeOrigin::signed([2; 32].into()),
-			0,
-			crate::Vote::Yes
-		), Error::<Test>::InsufficientPermission);
+		assert_noop!(
+			CommunityProjects::vote_on_milestone(
+				RuntimeOrigin::signed([2; 32].into()),
+				0,
+				crate::Vote::Yes
+			),
+			Error::<Test>::InsufficientPermission
+		);
 	})
 }
 
@@ -183,6 +218,7 @@ fn voting_fails_with_double_voting() {
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
+			get_nft_metadata(3),
 			3,
 			300,
 			bvec![22, 22]
@@ -194,11 +230,14 @@ fn voting_fails_with_double_voting() {
 			0,
 			crate::Vote::Yes
 		));
-		assert_noop!(CommunityProjects::vote_on_milestone(
-			RuntimeOrigin::signed([1; 32].into()),
-			0,
-			crate::Vote::Yes
-		), Error::<Test>::AlreadyVoted);
+		assert_noop!(
+			CommunityProjects::vote_on_milestone(
+				RuntimeOrigin::signed([1; 32].into()),
+				0,
+				crate::Vote::Yes
+			),
+			Error::<Test>::AlreadyVoted
+		);
 	})
 }
 
@@ -209,16 +248,20 @@ fn voting_fails_with_no_ongoing_voting() {
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
+			get_nft_metadata(3),
 			3,
 			300,
 			bvec![22, 22]
 		));
 		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 5));
-		assert_noop!(CommunityProjects::vote_on_milestone(
-			RuntimeOrigin::signed([1; 32].into()),
-			0,
-			crate::Vote::Yes
-		), Error::<Test>::NoOngoingVotingPeriod);
+		assert_noop!(
+			CommunityProjects::vote_on_milestone(
+				RuntimeOrigin::signed([1; 32].into()),
+				0,
+				crate::Vote::Yes
+			),
+			Error::<Test>::NoOngoingVotingPeriod
+		);
 	})
 }
 
@@ -229,6 +272,7 @@ fn set_strikes_works() {
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
+			get_nft_metadata(3),
 			3,
 			300,
 			bvec![22, 22]
@@ -266,6 +310,7 @@ fn distributing_funds_works() {
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
+			get_nft_metadata(3),
 			3,
 			300,
 			bvec![22, 22]
@@ -292,6 +337,7 @@ fn distributing_funds_works_for_2_rounds_works() {
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
+			get_nft_metadata(3),
 			3,
 			300,
 			bvec![22, 22]
@@ -327,6 +373,7 @@ fn delete_project_works() {
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
+			get_nft_metadata(3),
 			1,
 			300,
 			bvec![22, 22]

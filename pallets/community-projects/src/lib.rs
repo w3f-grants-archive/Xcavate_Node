@@ -152,7 +152,7 @@ pub mod pallet {
 		/// The maximum amount of nfts for a collection.
 		type MaxNftInCollection: Get<u32>;
 		#[cfg(feature = "runtime-benchmarks")]
-		type Helper: crate::BenchmarkHelper<Self::CollectionId, Self::ItemId>;
+		type Helper: crate::BenchmarkHelper<<Self as pallet::Config>::CollectionId, <Self as pallet::Config>::ItemId>;
 		/// lose coupling of pallet timestamp.
 		type TimeProvider: UnixTime;
 		/// The maximum amount of projects that can run at the same time.
@@ -355,6 +355,8 @@ pub mod pallet {
 		TooManyVoters,
 		InsufficientPermission,
 		NoOngoingVotingPeriod,
+		NoFundsRemaining,
+		WrongAmountOfMetadata,
 	}
 
 	#[pallet::hooks]
@@ -402,11 +404,13 @@ pub mod pallet {
 		pub fn list_project(
 			origin: OriginFor<T>,
 			nft_types: BoundedNftDonationTypes<T>,
+			metadata: BoundedVec<BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>, <T as Config>::MaxNftTypes>, 
 			duration: u32,
 			price: BalanceOf<T>,
 			data: BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>,
 		) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
+			ensure!(metadata.len() == nft_types.len(), Error::<T>::WrongAmountOfMetadata);
 			if pallet_nfts::NextCollectionId::<T>::get().is_none() {
 				pallet_nfts::NextCollectionId::<T>::set(
 					<T as pallet_nfts::Config>::CollectionId::initial_value(),
@@ -446,7 +450,9 @@ pub mod pallet {
 				strikes: Default::default(),
 			};
 			OngoingProjects::<T>::insert(collection_id, project);
+			let nft_metadata = &metadata;
 			let mut nft_id_index = 0;
+			let mut metadata_index = 0;
 			for nft_type in nft_types {
 				for _y in 0..nft_type.amount {
 					let item_id: <T as pallet::Config>::ItemId = nft_id_index.into();
@@ -468,7 +474,7 @@ pub mod pallet {
 						origin.clone(),
 						collection_id.into(),
 						item_id.into(),
-						data.clone(),
+						nft_metadata[metadata_index as usize].clone(),
 					)?;
 					ListedNfts::<T>::try_append((collection_id, item_id))
 						.map_err(|_| Error::<T>::TooManyListedNfts)?;
@@ -479,6 +485,7 @@ pub mod pallet {
 					})?;
 					nft_id_index += 1;
 				}
+				metadata_index += 1;
 			}
 			pallet_nfts::Pallet::<T>::set_team(
 				origin.clone(),
@@ -513,7 +520,7 @@ pub mod pallet {
 				origin,
 				asset_id.into().into(),
 				user_lookup,
-				nft.price * Self::u64_to_balance_option(1000000000000).unwrap_or_default(), 
+				nft.price /* * Self::u64_to_balance_option(1000000000000).unwrap_or_default() */,
 			)
 			.map_err(|_| Error::<T>::NotEnoughFunds)?;
 			pallet_nfts::Pallet::<T>::do_transfer(
@@ -594,7 +601,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-/* 		#[pallet::call_index(3)]
+		/* 		#[pallet::call_index(3)]
 		#[pallet::weight(0)]
 		pub fn test_transfer(
 			origin: OriginFor<T>,
@@ -634,12 +641,9 @@ pub mod pallet {
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
 			project.launching_timestamp = current_block_number;
 			// The milestone period is so short for testing purpose. Later on it will be about three weeks if the duration is lower than 12.
-			
-			let milestone_period = if project.duration > 12 {
-				project.duration * 10 / 12
-			} else {
-				10
-			};
+
+			let milestone_period =
+				if project.duration > 12 { project.duration * 10 / 12 } else { 10 };
 			OngoingProjects::<T>::insert(collection_id, project);
 			let expiry_block =
 				current_block_number.saturating_add(milestone_period.try_into().ok().unwrap());
@@ -688,7 +692,13 @@ pub mod pallet {
 			let user_lookup = <T::Lookup as StaticLookup>::unlookup(project.project_owner.clone());
 			let origin: OriginFor<T> = RawOrigin::Signed(Self::account_id()).into();
 			let asset_id: AssetId<T> = 1.into();
-			pallet_assets::Pallet::<T, Instance1>::transfer(origin, asset_id.into().into(), user_lookup, project.project_balance / project.milestones.into() * Self::u64_to_balance_option(1000000000000).unwrap_or_default() )
+			pallet_assets::Pallet::<T, Instance1>::transfer(
+				origin,
+				asset_id.into().into(),
+				user_lookup,
+				project.project_balance / project.milestones.into()
+					/* * Self::u64_to_balance_option(1000000000000).unwrap_or_default() */,
+			)
 			.map_err(|_| Error::<T>::NotEnoughFunds)?;
 			project.remaining_milestones -= 1;
 			project.strikes = Default::default();
@@ -706,8 +716,35 @@ pub mod pallet {
 			project.strikes += 1;
 			OngoingProjects::<T>::insert(collection_id, project.clone());
 			if project.strikes >= 3 {
-				Self::delete_project(collection_id);
+				Self::delete_project_refund(collection_id);
 			}
+			Ok(())
+		}
+
+		fn delete_project_refund(
+			collection_id: <T as pallet::Config>::CollectionId,
+		) -> DispatchResult {
+			let project =
+				OngoingProjects::<T>::take(collection_id).ok_or(Error::<T>::InvalidIndex)?;
+			let percentage = project.remaining_milestones * 10000 / project.milestones;
+			let nft_holders = NftHolder::<T>::take(collection_id);
+			for nft_holder in nft_holders {
+				let voting_power = VotingPower::<T>::take((collection_id, nft_holder.clone()))
+					.ok_or(Error::<T>::NoFundsRemaining)?;
+				let remaining_funds = voting_power * percentage as u64 / 10000;
+				let origin: OriginFor<T> = RawOrigin::Signed(Self::account_id()).into();
+				let asset_id: AssetId<T> = 1.into();
+				let user_lookup = <T::Lookup as StaticLookup>::unlookup(nft_holder);
+				pallet_assets::Pallet::<T, Instance1>::transfer(
+					origin,
+					asset_id.into().into(),
+					user_lookup,
+					Self::u64_to_balance_option(remaining_funds).unwrap_or_default()
+						/* * Self::u64_to_balance_option(1000000000000).unwrap_or_default() */,
+				)
+				.map_err(|_| Error::<T>::NotEnoughFunds)?;
+			}
+			Self::deposit_event(Event::<T>::ProjectDeleted { collection_id });
 			Ok(())
 		}
 

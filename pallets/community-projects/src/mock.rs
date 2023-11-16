@@ -174,8 +174,6 @@ impl pallet_assets::Config<Instance1> for Test {
 	type CallbackHandle = ();
 	type WeightInfo = ();
 	type RemoveItemsLimit = ConstU32<1000>;
-	#[cfg(feature = "runtime-benchmarks")]
-	type BenchmarkHelper = ();
 }
 
 parameter_types! {
@@ -195,11 +193,11 @@ impl pallet_community_projects::Config for Test {
 	type MaxNftTypes = MaxNftType;
 	type MaxListedNfts = MaxListedNftProject;
 	type MaxNftInCollection = MaxNftsInCollectionProject;
-	#[cfg(feature = "runtime-benchmarks")]
-	type Helper = pallet_community_projects::NftHelper;
 	type TimeProvider = Timestamp;
 	type MaxOngoingProjects = MaxOngoingProject;
 	type MaxNftHolder = MaxNftHolders;
+	#[cfg(feature = "runtime-benchmarks")]
+	type Helper = NftHelper;
 	type AssetId = u32;
 	type CollectionId = u32;
 	type ItemId = u32;
@@ -226,7 +224,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 		metadata: vec![(1, "XUSD".into(), "XUSD".into(), 0)], // Genesis metadata: id, name, symbol, decimals
 		accounts: vec![
 			(1, [0; 32].into(), 20_000_000),
-			(1, [1; 32].into(), 15_00),
+			(1, [1; 32].into(), 1_500),
 			(1, [2; 32].into(), 150_000),
 			(1, [3; 32].into(), 5_000),
 		], // Genesis accounts: id, account_id, balance

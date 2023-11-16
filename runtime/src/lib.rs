@@ -525,7 +525,7 @@ impl pallet_nft_marketplace::Config for Runtime {
 
 parameter_types! {
 	pub const CommunityProjectPalletId: PalletId = PalletId(*b"py/cmprj");
-	pub const MaxNftType: u32 = 3;
+	pub const MaxNftType: u32 = 4;
 	pub const MaxListedNftProject: u32 = 300000;
 	pub const MaxNftsInCollectionProject: u32 = 10000;
 	pub const MaxOngoingProject: u32 = 10000;
