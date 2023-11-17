@@ -12,7 +12,7 @@ use frame_support::sp_runtime::traits::Bounded;
 type DepositBalanceOf<T> = <<T as pallet_nfts::Config>::Currency as Currency<
 	<T as frame_system::Config>::AccountId,
 >>::Balance;
-use crate::mock::Assets;
+use pallet_assets::Pallet as Assets;
 
 fn setup_listing<T: Config>(u: u32) -> (T::AccountId, BoundedNftDonationTypes<T>, BoundedVec<BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>, <T as Config>::MaxNftTypes>, u32, BalanceOf<T>, BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>) {
 	let caller: T::AccountId = account("caller", u, SEED);
@@ -36,22 +36,31 @@ mod benchmarks {
 	#[benchmark]
 	fn list_project() {
 		let (caller, project_types, metadatas, duration, value, single_metadata) = setup_listing::<T>(SEED);
+		let amount: BalanceOf<T> = 1u32.into();
 		#[extrinsic_call]
 		list_project(RawOrigin::Signed(caller), project_types, metadatas, duration, value, single_metadata);
 		assert_eq!(CommunityProjects::<T>::listed_nfts().len(), 6);
 	}
 
-/*  	#[benchmark]
+  	#[benchmark]
  	fn buy_nft() {
 		let (caller, project_types, metadatas, duration, value, single_metadata) = setup_listing::<T>(SEED);
 		CommunityProjects::<T>::list_project(RawOrigin::Signed(caller).into(), project_types, metadatas, duration, value, single_metadata);
-		let buyer = account("buyer", SEED, SEED);
+		let buyer: T::AccountId = account("buyer", SEED, SEED);
 		<T as pallet_nfts::Config>::Currency::make_free_balance_be(&buyer, DepositBalanceOf::<T>::max_value());
+		let amount: BalanceOf<T> = 1u32.into();
+		//let origin = ensure_signed(buyer.clone());
+		let user_lookup = <T::Lookup as StaticLookup>::unlookup(buyer.clone());
+		let asset_id = T::Helper::to_asset(1);
+		
+		Assets::<T, Instance1>::create(RawOrigin::Signed(buyer.clone()).into(), asset_id.clone().into(), user_lookup.clone(), amount);
+		let amount2: BalanceOf<T> = 10000000u32.into();
+		Assets::<T, Instance1>::mint(RawOrigin::Signed(buyer.clone()).into(), asset_id.into(), user_lookup, amount2);
 		#[extrinsic_call]
 		buy_nft(RawOrigin::Signed(buyer), 0.into(), 1.into());
 
 		//assert_eq!(Something::<T>::get(), Some(101u32));
-	}   */
+	}   
 
 	impl_benchmark_test_suite!(CommunityProjects, crate::mock::new_test_ext(), crate::mock::Test);
 }

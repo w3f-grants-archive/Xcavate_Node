@@ -60,19 +60,23 @@ pub mod pallet {
 	pub struct NftHelper;
 
 	#[cfg(feature = "runtime-benchmarks")]
-	pub trait BenchmarkHelper<CollectionId, ItemId> {
+	pub trait BenchmarkHelper<CollectionId, ItemId, AssetId, T> {
 		fn to_collection(i: u32) -> CollectionId;
 		fn to_nft(i: u32) -> ItemId;
+		fn to_asset(i: u32) -> AssetId;
 	}
 
 	#[cfg(feature = "runtime-benchmarks")]
-	impl<CollectionId: From<u32>, ItemId: From<u32>> BenchmarkHelper<CollectionId, ItemId>
+	impl<CollectionId: From<u32>, ItemId: From<u32>, T: Config> BenchmarkHelper<CollectionId, ItemId, AssetId<T>, T>
 		for NftHelper
 	{
 		fn to_collection(i: u32) -> CollectionId {
 			i.into()
 		}
 		fn to_nft(i: u32) -> ItemId {
+			i.into()
+		}
+		fn to_asset(i: u32) -> AssetId<T> {
 			i.into()
 		}
 	}
@@ -152,7 +156,7 @@ pub mod pallet {
 		/// The maximum amount of nfts for a collection.
 		type MaxNftInCollection: Get<u32>;
 		#[cfg(feature = "runtime-benchmarks")]
-		type Helper: crate::BenchmarkHelper<<Self as pallet::Config>::CollectionId, <Self as pallet::Config>::ItemId>;
+		type Helper: crate::BenchmarkHelper<<Self as pallet::Config>::CollectionId, <Self as pallet::Config>::ItemId, <Self as pallet_assets::Config<Instance1>>::AssetId, Self>;
 		/// lose coupling of pallet timestamp.
 		type TimeProvider: UnixTime;
 		/// The maximum amount of projects that can run at the same time.
