@@ -8,7 +8,6 @@ use crate::Config;
 use crate::{BalanceOf, BoundedNftDonationTypes, NftDonationTypes};
 use sp_core::{bounded::BoundedVec, Pair};
 
-
 macro_rules! bvec {
 	($( $x:tt )*) => {
 		vec![$( $x )*].try_into().unwrap()
@@ -27,7 +26,12 @@ fn get_project_nfts(mut n: u32) -> BoundedNftDonationTypes<Test> {
 		.expect("bound is ensured; qed")
 }
 
-fn get_nft_metadata(mut n: u32) -> BoundedVec<BoundedVec<u8, <Test as pallet_nfts::Config>::StringLimit>, <Test as Config>::MaxNftTypes> {
+fn get_nft_metadata(
+	mut n: u32,
+) -> BoundedVec<
+	BoundedVec<u8, <Test as pallet_nfts::Config>::StringLimit>,
+	<Test as Config>::MaxNftTypes,
+> {
 	let max = <Test as Config>::MaxNftTypes::get();
 	if n > max {
 		n = max
@@ -392,3 +396,4 @@ fn delete_project_works() {
 		assert_eq!(CommunityProjects::ongoing_projects(0), None);
 	})
 }
+ 

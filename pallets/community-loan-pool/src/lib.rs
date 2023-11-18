@@ -222,7 +222,7 @@ pub mod pallet {
 		type WeightInfo: WeightInfo;
 
 		#[cfg(feature = "runtime-benchmarks")]
-		type Helper: crate::BenchmarkHelper<Self::CollectionId, Self::ItemId>;
+		type Helper: crate::BenchmarkHelper<<Self as pallet::Config>::CollectionId, <Self as pallet::Config>::ItemId>;
 
 		/// The amount of time given to vote for a proposal.
 		type VotingTime: Get<BlockNumberFor<Self>>;
@@ -232,7 +232,26 @@ pub mod pallet {
 
 		/// The maximum amount of milestones for a lone.
 		type MaxMilestonesPerProject: Get<u32>;
+
+		type CollectionId: IsType<<Self as pallet_nfts::Config>::CollectionId>
+			+ Parameter
+			+ From<u32>
+			+ Ord
+			+ Copy
+			+ MaxEncodedLen
+			+ Encode;
+
+		type ItemId: IsType<<Self as pallet_nfts::Config>::ItemId>
+			+ Parameter
+			+ From<u32>
+			+ Ord
+			+ Copy
+			+ MaxEncodedLen
+			+ Encode;
 	}
+
+	pub type CollectionId<T> = <T as Config>::CollectionId;
+	pub type ItemId<T> = <T as Config>::ItemId;
 
 	/// Vec of admins who are able to vote.
 	#[pallet::storage]
@@ -317,7 +336,7 @@ pub mod pallet {
 		_,
 		Twox64Concat,
 		LoanIndex,
-		LoanInfo<BalanceOf<T>, T::CollectionId, T::ItemId, T>,
+		LoanInfo<BalanceOf<T>, <T as pallet::Config>::CollectionId, <T as pallet::Config>::ItemId, T>,
 		OptionQuery,
 	>;
 
@@ -492,8 +511,6 @@ pub mod pallet {
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T>
-	where
-		<T as pallet_nfts::Config>::ItemId: From<u32>,
 	{
 		fn on_initialize(n: frame_system::pallet_prelude::BlockNumberFor<T>) -> Weight {
 			let mut weight = T::DbWeight::get().reads_writes(1, 1);
@@ -1015,8 +1032,6 @@ pub mod pallet {
 
 		/// Approves the proposal and creates the loan.
 		fn approve_loan_proposal(proposal_index: ProposalIndex) -> DispatchResult
-		where
-			<T as pallet_nfts::Config>::ItemId: From<u32>,
 		{
 			let proposal = <Proposals<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
 			//let total_loan_amount = Self::u64_to_balance_option(Self::total_loan_amount()).unwrap();
@@ -1036,13 +1051,14 @@ pub mod pallet {
 			let available_amount = Self::u64_to_balance_option(amount)?;
 			let loan_apy = proposal.apr_rate;
 			if pallet_nfts::NextCollectionId::<T>::get().is_none() {
-				pallet_nfts::NextCollectionId::<T>::set(T::CollectionId::initial_value());
+				pallet_nfts::NextCollectionId::<T>::set(<T as pallet_nfts::Config>::CollectionId::initial_value());
 			};
 			let collection_id =
 				pallet_nfts::NextCollectionId::<T>::get().ok_or(Error::<T>::UnknownCollection)?;
 			let next_collection_id = collection_id.increment();
 			pallet_nfts::NextCollectionId::<T>::set(next_collection_id);
-			let item_id: T::ItemId = proposal_index.into();
+			let collection_id: CollectionId<T> = collection_id.into();
+			let item_id: <T as pallet::Config>::ItemId = proposal_index.into();
 			let loan_info = LoanInfo {
 				borrower: user.clone(),
 				loan_amount: value,
@@ -1064,7 +1080,7 @@ pub mod pallet {
 			// calls the create collection function from the uniques pallet, and set the admin as
 			// the admin of the collection
 			pallet_nfts::Pallet::<T>::do_create_collection(
-				collection_id,
+				collection_id.into(),
 				Self::account_id(),
 				Self::account_id(),
 				Self::default_collection_config(),
@@ -1072,14 +1088,14 @@ pub mod pallet {
 				pallet_nfts::Event::Created {
 					creator: Self::account_id(),
 					owner: Self::account_id(),
-					collection: collection_id,
+					collection: collection_id.into(),
 				},
 			)?;
 			// calls the mint collection function from the uniques pallet, mints a nft and puts
 			// the loan contract as the owner
 			pallet_nfts::Pallet::<T>::do_mint(
-				collection_id,
-				item_id,
+				collection_id.into(),
+				item_id.into(),
 				Some(Self::account_id()),
 				Self::account_id(),
 				Self::default_item_config(),
@@ -1170,7 +1186,7 @@ pub mod pallet {
 			ensure!(loan.borrowed_amount.is_zero(), Error::<T>::LoanStillOngoing);
 			let collection_id = loan.collection_id;
 			let item_id = loan.item_id;
-			pallet_nfts::Pallet::<T>::do_burn(collection_id, item_id, |_| Ok(()))?;
+			pallet_nfts::Pallet::<T>::do_burn(collection_id.into(), item_id.into(), |_| Ok(()))?;
 			let mut loans = Self::ongoing_loans();
 			let index = loans.iter().position(|x| *x == loan_id).unwrap();
 			loans.remove(index);
@@ -1221,7 +1237,7 @@ pub mod pallet {
 		}
 
 		fn default_collection_config(
-		) -> CollectionConfig<BalanceOf1<T>, BlockNumberFor<T>, T::CollectionId> {
+		) -> CollectionConfig<BalanceOf1<T>, BlockNumberFor<T>, <T as pallet_nfts::Config>::CollectionId> {
 			Self::collection_config_from_disabled_settings(
 				CollectionSetting::DepositRequired.into(),
 			)
@@ -1229,7 +1245,7 @@ pub mod pallet {
 
 		fn collection_config_from_disabled_settings(
 			settings: BitFlags<CollectionSetting>,
-		) -> CollectionConfig<BalanceOf1<T>, BlockNumberFor<T>, T::CollectionId> {
+		) -> CollectionConfig<BalanceOf1<T>, BlockNumberFor<T>, <T as pallet_nfts::Config>::CollectionId> {
 			CollectionConfig {
 				settings: CollectionSettings::from_disabled(settings),
 				max_supply: None,

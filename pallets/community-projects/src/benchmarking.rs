@@ -7,27 +7,40 @@ use crate::Pallet as CommunityProjects;
 use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
 const SEED: u32 = 0;
-use frame_support::traits::Get;
 use frame_support::sp_runtime::traits::Bounded;
+use frame_support::traits::Get;
 type DepositBalanceOf<T> = <<T as pallet_nfts::Config>::Currency as Currency<
 	<T as frame_system::Config>::AccountId,
 >>::Balance;
 use pallet_assets::Pallet as Assets;
+use frame_support::assert_ok;
 
-fn setup_listing<T: Config>(u: u32) -> (T::AccountId, BoundedNftDonationTypes<T>, BoundedVec<BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>, <T as Config>::MaxNftTypes>, u32, BalanceOf<T>, BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>) {
+fn setup_listing<T: Config>(
+	u: u32,
+) -> (
+	T::AccountId,
+	BoundedNftDonationTypes<T>,
+	BoundedVec<BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>, <T as Config>::MaxNftTypes>,
+	u32,
+	BalanceOf<T>,
+	BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>,
+) {
 	let caller: T::AccountId = account("caller", u, SEED);
 	let project_types = get_project_nfts::<T>(4);
-	<T as pallet_nfts::Config>::Currency::make_free_balance_be(&caller, DepositBalanceOf::<T>::max_value());
+	<T as pallet_nfts::Config>::Currency::make_free_balance_be(
+		&caller,
+		DepositBalanceOf::<T>::max_value(),
+	);
 	let metadatas = get_nft_metadata::<T>(4);
 	let duration = 12;
 	let value: BalanceOf<T> = 100u32.into();
-	let single_metadata = vec![0; <T as pallet_nfts::Config>::StringLimit::get() as usize].try_into().unwrap();
+	let single_metadata = vec![0; <T as pallet_nfts::Config>::StringLimit::get() as usize]
+		.try_into()
+		.unwrap();
 	(caller, project_types, metadatas, duration, value, single_metadata)
 }
 
-fn setup_asset<T: Config>() {
-
-}
+fn setup_asset<T: Config>() {}
 
 #[benchmarks]
 mod benchmarks {
@@ -35,32 +48,56 @@ mod benchmarks {
 
 	#[benchmark]
 	fn list_project() {
-		let (caller, project_types, metadatas, duration, value, single_metadata) = setup_listing::<T>(SEED);
+		let (caller, project_types, metadatas, duration, value, single_metadata) =
+			setup_listing::<T>(SEED);
 		let amount: BalanceOf<T> = 1u32.into();
 		#[extrinsic_call]
-		list_project(RawOrigin::Signed(caller), project_types, metadatas, duration, value, single_metadata);
+		list_project(
+			RawOrigin::Signed(caller),
+			project_types,
+			metadatas,
+			duration,
+			value,
+			single_metadata,
+		);
 		assert_eq!(CommunityProjects::<T>::listed_nfts().len(), 6);
 	}
 
-  	#[benchmark]
- 	fn buy_nft() {
-		let (caller, project_types, metadatas, duration, value, single_metadata) = setup_listing::<T>(SEED);
-		CommunityProjects::<T>::list_project(RawOrigin::Signed(caller).into(), project_types, metadatas, duration, value, single_metadata);
+	#[benchmark]
+	fn buy_nft() {
+		let (caller, project_types, metadatas, duration, value, single_metadata) =
+			setup_listing::<T>(SEED);
+		CommunityProjects::<T>::list_project(
+			RawOrigin::Signed(caller).into(),
+			project_types,
+			metadatas,
+			duration,
+			value,
+			single_metadata,
+		);
 		let buyer: T::AccountId = account("buyer", SEED, SEED);
-		<T as pallet_nfts::Config>::Currency::make_free_balance_be(&buyer, DepositBalanceOf::<T>::max_value());
+		<T as pallet_nfts::Config>::Currency::make_free_balance_be(
+			&buyer,
+			DepositBalanceOf::<T>::max_value(),
+		);
 		let amount: BalanceOf<T> = 1u32.into();
 		//let origin = ensure_signed(buyer.clone());
 		let user_lookup = <T::Lookup as StaticLookup>::unlookup(buyer.clone());
-		let asset_id = T::Helper::to_asset(1);
-		
-		Assets::<T, Instance1>::create(RawOrigin::Signed(buyer.clone()).into(), asset_id.clone().into(), user_lookup.clone(), amount);
-		let amount2: BalanceOf<T> = 10000000u32.into();
-		Assets::<T, Instance1>::mint(RawOrigin::Signed(buyer.clone()).into(), asset_id.into(), user_lookup, amount2);
+		let asset_id = <T as pallet::Config>::Helper::to_asset(1);
+		let amount2: BalanceOf<T> = 4294967295u32.into();
+		let amount2: BalanceOf<T> = 4294967295u32.into();
+		assert_ok!(Assets::<T, Instance1>::mint(
+			RawOrigin::Signed(buyer.clone()).into(),
+			asset_id.clone().into(),
+			user_lookup,
+			amount2,
+		));
+		assert_eq!(Assets::<T, Instance1>::balance(asset_id, buyer.clone()), amount2);
 		#[extrinsic_call]
 		buy_nft(RawOrigin::Signed(buyer), 0.into(), 1.into());
 
 		//assert_eq!(Something::<T>::get(), Some(101u32));
-	}   
+	}
 
 	impl_benchmark_test_suite!(CommunityProjects, crate::mock::new_test_ext(), crate::mock::Test);
 }
@@ -77,13 +114,20 @@ fn get_project_nfts<T: Config>(mut n: u32) -> BoundedNftDonationTypes<T> {
 		.expect("bound is ensured; qed")
 }
 
-fn get_nft_metadata<T: Config>(mut n: u32) -> BoundedVec<BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>, <T as Config>::MaxNftTypes> {
+fn get_nft_metadata<T: Config>(
+	mut n: u32,
+) -> BoundedVec<BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>, <T as Config>::MaxNftTypes>
+{
 	let max = <T as Config>::MaxNftTypes::get();
 	if n > max {
 		n = max
 	}
 	(1..=n)
-		.map(|_| vec![0; <T as pallet_nfts::Config>::StringLimit::get() as usize].try_into().unwrap())
+		.map(|_| {
+			vec![0; <T as pallet_nfts::Config>::StringLimit::get() as usize]
+				.try_into()
+				.unwrap()
+		})
 		.collect::<Vec<BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>>>()
 		.try_into()
 		.expect("bound is ensured; qed")

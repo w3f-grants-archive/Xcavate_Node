@@ -103,7 +103,7 @@ mod benchmarks {
 		assert_eq!(CommunityLoanPool::<T>::ongoing_votes(proposal_id).unwrap().yes_votes, 2);
 	}
 
-	/* #[benchmark]
+	#[benchmark]
 	fn withdraw() {
 		let alice = account("alice", SEED, SEED);
 		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), alice);
@@ -138,7 +138,7 @@ mod benchmarks {
 
 		#[extrinsic_call]
 		withdraw(RawOrigin::Signed(caller), 1, value);
-	} */
+	} 
 
 	impl_benchmark_test_suite!(CommunityLoanPool, crate::mock::new_test_ext(), crate::mock::Test);
 }
@@ -165,8 +165,8 @@ fn assert_last_event<T: Config>(generic_event: <T as Config>::RuntimeEvent) {
 	frame_system::Pallet::<T>::assert_last_event(generic_event.into());
 }
 
-/* fn run_to_block<T: Config>(new_block: frame_system::pallet_prelude::BlockNumberFor<T>) {
+fn run_to_block<T: Config>(new_block: frame_system::pallet_prelude::BlockNumberFor<T>) {
 	frame_system::Pallet::<T>::set_block_number(new_block);
 	frame_system::Pallet::<T>::on_initialize(frame_system::Pallet::<T>::block_number());
 	CommunityLoanPool::<T>::on_initialize(frame_system::Pallet::<T>::block_number());
-} */
+} 

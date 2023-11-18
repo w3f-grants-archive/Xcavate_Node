@@ -488,6 +488,8 @@ impl pallet_community_loan_pool::Config for Runtime {
 	type VotingTime = VotingTime;
 	type MaxCommitteeMembers = MaximumCommitteeMembers;
 	type MaxMilestonesPerProject = MaxMilestones;
+	type CollectionId = u32;
+	type ItemId = u32;
 }
 
 parameter_types! {
@@ -521,6 +523,8 @@ impl pallet_nft_marketplace::Config for Runtime {
 	type MaxNftInCollection = MaxNftsInCollection;
 	#[cfg(feature = "runtime-benchmarks")]
 	type Helper = pallet_nft_marketplace::NftHelper;
+	type CollectionId = u32;
+	type ItemId = u32;
 }
 
 parameter_types! {
@@ -1514,6 +1518,7 @@ mod benches {
 		[pallet_community_loan_pool, CommunityLoanPool]
 		[pallet_xcavate_staking, XcavateStaking]
 		[pallet_nft_marketplace, NftMarketplace]
+		[pallet_community_projects, CommunityProjects]
 		[pallet_nfts, Nfts]
 		[pallet_uniques, Uniques]
 		[pallet_assets, Assets]

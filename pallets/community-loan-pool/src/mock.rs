@@ -193,6 +193,8 @@ impl pallet_community_loan_pool::Config for Test {
 	type VotingTime = VotingTime;
 	type MaxCommitteeMembers = MaximumCommitteeMembers;
 	type MaxMilestonesPerProject = MaxMilestones;
+	type CollectionId = u32;
+	type ItemId = u32;
 }
 
 // Build genesis storage according to the mock runtime.

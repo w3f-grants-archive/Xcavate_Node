@@ -43,6 +43,9 @@ pub const MILLISECS_PER_BLOCK: u64 = 6000;
 pub const MINUTES: BlockNumber = 60_000 / (MILLISECS_PER_BLOCK as BlockNumber);
 pub const HOURS: BlockNumber = MINUTES * 60;
 pub const DAYS: BlockNumber = HOURS * 24;
+pub const SEED: u32 = 0;
+
+use frame_benchmarking::account;
 
 // Configure a mock runtime to test the pallet.
 frame_support::construct_runtime!(
@@ -220,7 +223,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 	.unwrap();
 
 	pallet_assets::GenesisConfig::<Test, Instance1> {
-		assets: vec![(1, [0; 32].into(), true, 1)], // Genesis assets: id, owner, is_sufficient, min_balance
+		assets: vec![(1, account("buyer", SEED, SEED), true, 1)], // Genesis assets: id, owner, is_sufficient, min_balance
 		metadata: vec![(1, "XUSD".into(), "XUSD".into(), 0)], // Genesis metadata: id, name, symbol, decimals
 		accounts: vec![
 			(1, [0; 32].into(), 20_000_000),

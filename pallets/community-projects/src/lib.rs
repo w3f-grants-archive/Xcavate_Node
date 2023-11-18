@@ -67,8 +67,8 @@ pub mod pallet {
 	}
 
 	#[cfg(feature = "runtime-benchmarks")]
-	impl<CollectionId: From<u32>, ItemId: From<u32>, T: Config> BenchmarkHelper<CollectionId, ItemId, AssetId<T>, T>
-		for NftHelper
+	impl<CollectionId: From<u32>, ItemId: From<u32>, T: Config>
+		BenchmarkHelper<CollectionId, ItemId, AssetId<T>, T> for NftHelper
 	{
 		fn to_collection(i: u32) -> CollectionId {
 			i.into()
@@ -156,7 +156,12 @@ pub mod pallet {
 		/// The maximum amount of nfts for a collection.
 		type MaxNftInCollection: Get<u32>;
 		#[cfg(feature = "runtime-benchmarks")]
-		type Helper: crate::BenchmarkHelper<<Self as pallet::Config>::CollectionId, <Self as pallet::Config>::ItemId, <Self as pallet_assets::Config<Instance1>>::AssetId, Self>;
+		type Helper: crate::BenchmarkHelper<
+			<Self as pallet::Config>::CollectionId,
+			<Self as pallet::Config>::ItemId,
+			<Self as pallet_assets::Config<Instance1>>::AssetId,
+			Self,
+		>;
 		/// lose coupling of pallet timestamp.
 		type TimeProvider: UnixTime;
 		/// The maximum amount of projects that can run at the same time.
@@ -408,7 +413,10 @@ pub mod pallet {
 		pub fn list_project(
 			origin: OriginFor<T>,
 			nft_types: BoundedNftDonationTypes<T>,
-			metadata: BoundedVec<BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>, <T as Config>::MaxNftTypes>, 
+			metadata: BoundedVec<
+				BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>,
+				<T as Config>::MaxNftTypes,
+			>,
 			duration: u32,
 			price: BalanceOf<T>,
 			data: BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>,
@@ -524,7 +532,7 @@ pub mod pallet {
 				origin,
 				asset_id.into().into(),
 				user_lookup,
-				nft.price /* * Self::u64_to_balance_option(1000000000000).unwrap_or_default() */,
+				nft.price, /* * Self::u64_to_balance_option(1000000000000).unwrap_or_default() */
 			)
 			.map_err(|_| Error::<T>::NotEnoughFunds)?;
 			pallet_nfts::Pallet::<T>::do_transfer(
