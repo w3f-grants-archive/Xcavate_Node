@@ -148,6 +148,8 @@ impl pallet_nft_marketplace::Config for Test {
 	type Helper = NftHelper;
 	type MaxListedNfts = MaxListedNft;
 	type MaxNftInCollection = MaxNftsInCollection;
+	type CollectionId = u32;
+	type ItemId = u32;
 }
 
 // Build genesis storage according to the mock runtime.
