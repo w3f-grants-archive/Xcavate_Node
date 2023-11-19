@@ -452,7 +452,7 @@ parameter_types! {
 	pub const MaxLoans: u32 = 10000;
 	pub const VotingTime: BlockNumber = 10;
 	pub const MaximumCommitteeMembers: u32 = 10;
-	pub const MaxMilestones: u32 = 8;
+	pub const MaxMilestones: u32 = 10;
 }
 
 /// Configure the pallet-community-loan-pool in pallets/community-loan-pool.
@@ -544,8 +544,8 @@ impl pallet_community_projects::Config for Runtime {
 	type MaxNftTypes = MaxNftType;
 	type MaxListedNfts = MaxListedNftProject;
 	type MaxNftInCollection = MaxNftsInCollectionProject;
-	#[cfg(feature = "runtime-benchmarks")]
-	type Helper = pallet_community_projects::NftHelper;
+/* 	#[cfg(feature = "runtime-benchmarks")]
+	type Helper = pallet_community_projects::NftHelper; */
 	type TimeProvider = Timestamp;
 	type MaxOngoingProjects = MaxOngoingProject;
 	type MaxNftHolder = MaxNftHolders;
@@ -1518,7 +1518,6 @@ mod benches {
 		[pallet_community_loan_pool, CommunityLoanPool]
 		[pallet_xcavate_staking, XcavateStaking]
 		[pallet_nft_marketplace, NftMarketplace]
-		[pallet_community_projects, CommunityProjects]
 		[pallet_nfts, Nfts]
 		[pallet_uniques, Uniques]
 		[pallet_assets, Assets]

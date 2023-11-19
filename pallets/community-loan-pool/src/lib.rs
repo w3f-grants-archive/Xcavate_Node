@@ -654,7 +654,7 @@ pub mod pallet {
 		///
 		/// Emits `MilestoneProposed` event when succesfful
 		#[pallet::call_index(1)]
-		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::propose_milestone())]
 		pub fn propose_milestone(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let loan = Self::loans(loan_id).ok_or(Error::<T>::InvalidIndex)?;
@@ -694,7 +694,7 @@ pub mod pallet {
 		///
 		/// Emits `DeletionProposed` event when succesfful
 		#[pallet::call_index(2)]
-		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::propose_milestone())]
 		pub fn propose_deletion(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
 			let origin = ensure_signed(origin.clone())?;
 			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
@@ -731,7 +731,7 @@ pub mod pallet {
 		///
 		/// Emits `Withdraw` event when succesfful
 		#[pallet::call_index(3)]
-		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::withdraw())]
 		pub fn withdraw(
 			origin: OriginFor<T>,
 			loan_id: LoanIndex,
@@ -775,7 +775,7 @@ pub mod pallet {
 		///
 		/// Emits `LoanUpdated` event when succesfful
 		#[pallet::call_index(4)]
-		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::repay())]
 		pub fn repay(
 			origin: OriginFor<T>,
 			loan_id: LoanIndex,
@@ -818,7 +818,7 @@ pub mod pallet {
 		///
 		/// Emits `MilestonesSet` event when succesfful
 		#[pallet::call_index(5)]
-		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::set_milestones())]
 		pub fn set_milestones(
 			origin: OriginFor<T>,
 			proposal_index: ProposalIndex,
@@ -866,7 +866,7 @@ pub mod pallet {
 		///
 		/// Emits `VotedOnProposal` event when succesfful.
 		#[pallet::call_index(6)]
-		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::vote_on_proposal())]
 		pub fn vote_on_proposal(
 			origin: OriginFor<T>,
 			proposal_index: ProposalIndex,
@@ -907,7 +907,7 @@ pub mod pallet {
 		///
 		/// Emits `VotedOnMilestone` event when succesfful.
 		#[pallet::call_index(7)]
-		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::vote_on_milestone_proposal())]
 		pub fn vote_on_milestone_proposal(
 			origin: OriginFor<T>,
 			proposal_index: ProposalIndex,
@@ -946,7 +946,7 @@ pub mod pallet {
 		///
 		/// Emits `VotedOnDeletion` event when succesfful.
 		#[pallet::call_index(8)]
-		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::vote_on_deletion_proposal())]
 		pub fn vote_on_deletion_proposal(
 			origin: OriginFor<T>,
 			proposal_index: ProposalIndex,
@@ -984,7 +984,7 @@ pub mod pallet {
 		///
 		/// Emits `CommiteeMemberAdded` event when succesfful.
 		#[pallet::call_index(9)]
-		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::add_committee_member())]
 		pub fn add_committee_member(
 			origin: OriginFor<T>,
 			member: AccountIdOf<T>,
