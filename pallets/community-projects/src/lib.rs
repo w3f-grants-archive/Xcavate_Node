@@ -81,6 +81,7 @@ pub mod pallet {
 		}
 	}
 
+	/// Details about a project.
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
 	#[scale_info(skip_type_params(T))]
@@ -95,6 +96,7 @@ pub mod pallet {
 		pub strikes: u8,
 	}
 
+	/// Details about a nft.
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
 	#[scale_info(skip_type_params(T))]
@@ -105,6 +107,7 @@ pub mod pallet {
 		pub item_id: ItemId,
 	}
 
+	/// Struct Nft donation type.
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
 	pub struct NftDonationTypes<Balance> {
@@ -171,12 +174,14 @@ pub mod pallet {
 		#[pallet::constant]
 		type MaxNftHolder: Get<u32>;
 
+		/// Asset id type from pallet assets.
 		type AssetId: IsType<<Self as pallet_assets::Config<Instance1>>::AssetId>
 			+ Parameter
 			+ From<u32>
 			+ Ord
 			+ Copy;
 
+		/// Collection id type from pallet nfts.
 		type CollectionId: IsType<<Self as pallet_nfts::Config>::CollectionId>
 			+ Parameter
 			+ From<u32>
@@ -185,6 +190,7 @@ pub mod pallet {
 			+ MaxEncodedLen
 			+ Encode;
 
+		/// Item id type from pallet nfts.
 		type ItemId: IsType<<Self as pallet_nfts::Config>::ItemId>
 			+ Parameter
 			+ From<u32>
@@ -195,7 +201,6 @@ pub mod pallet {
 	}
 
 	pub type AssetId<T> = <T as Config>::AssetId;
-
 	pub type CollectionId<T> = <T as Config>::CollectionId;
 	pub type ItemId<T> = <T as Config>::ItemId;
 
@@ -227,7 +232,7 @@ pub mod pallet {
 		OptionQuery,
 	>;
 
-	/// Mapping from collection id to the project
+	/// Mapping from collection id to the project.
 	#[pallet::storage]
 	#[pallet::getter(fn ongoing_projects)]
 	pub(super) type OngoingProjects<T: Config> = StorageMap<
@@ -297,7 +302,7 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
-	/// Mapping of collection id and account id to the voting power
+	/// Mapping of collection id and account id to the voting power.
 	#[pallet::storage]
 	#[pallet::getter(fn voting_power)]
 	pub(super) type VotingPower<T: Config> = StorageMap<
@@ -333,7 +338,7 @@ pub mod pallet {
 		ProjectLaunched { collection_index: <T as pallet::Config>::CollectionId },
 		/// A Voting period has started.
 		VotingPeriodStarted { collection_index: <T as pallet::Config>::CollectionId },
-		/// Funds has been send to the project
+		/// Funds has been sent to the project.
 		FundsDestributed {
 			collection_index: <T as pallet::Config>::CollectionId,
 			owner: AccountIdOf<T>,
@@ -347,7 +352,7 @@ pub mod pallet {
 
 	#[pallet::error]
 	pub enum Error<T> {
-		/// Max amount of listed Nfts reached.
+		/// Max amount of listed nfts reached.
 		TooManyListedNfts,
 		/// Too many nfts for this collection.
 		TooManyNfts,
@@ -357,14 +362,23 @@ pub mod pallet {
 		InvalidIndex,
 		/// The buyer doesn't have enough funds.
 		NotEnoughFunds,
+		/// A collection is unknown.
 		UnknownCollection,
+		/// Error during type conversion.
 		ConversionError,
+		/// Maximum amount of projects already exist.
 		TooManyProjects,
+		/// A user has already voted during a voting period.
 		AlreadyVoted,
+		/// Maximum amount of voters has been reached.
 		TooManyVoters,
+		/// No permission.
 		InsufficientPermission,
+		/// No voting period ongoing.
 		NoOngoingVotingPeriod,
+		/// This account has no voting power.
 		NoFundsRemaining,
+		/// Metadata is not the same amount as nft types.
 		WrongAmountOfMetadata,
 	}
 
@@ -408,6 +422,19 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
+
+		/// Creates a new project and list the nfts for the project on the marketplace.
+		///
+		/// The origin must be Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `nft_types`: The different nft types that the project creator wants to offer for the project.
+		/// - `metadata`: Different metadatas for the different nft types.
+		/// - `duration`: Amount of months that the project will need.
+		/// - `price`: Amount of funds that needs to be raised.
+		/// - `data`: Metadata of the project collection.
+		///
+		/// Emits `ProjectListed` event when succesfful
 		#[pallet::call_index(0)]
 		#[pallet::weight(0)]
 		pub fn list_project(
@@ -506,9 +533,22 @@ pub mod pallet {
 				None,
 				None,
 			)?;
+			Self::deposit_event(Event::<T>::ProjectListed {
+				collection_index: collection_id,
+				seller: signer,
+			});
 			Ok(())
 		}
 
+		/// Buy listed nft from the marketplace.
+		///
+		/// The origin must be Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `collection_id`: The collection that the investor wants to buy from.
+		/// - `item_id`: The item the investor wants to buy.
+		///
+		/// Emits `NftBought` event when succesfful
 		#[pallet::call_index(1)]
 		#[pallet::weight(0)]
 		pub fn buy_nft(
@@ -579,6 +619,15 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Nft holder vote on milestone during voting period.
+		///
+		/// The origin must be Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `collection_id`: The collection for a project that the user wants to vote for.
+		/// - `vote`: Must be either a Yes vote or a No vote.
+		///
+		/// Emits `VotedOnMilestone` event when succesfful
 		#[pallet::call_index(2)]
 		#[pallet::weight(0)]
 		pub fn vote_on_milestone(
@@ -612,34 +661,14 @@ pub mod pallet {
 			});
 			Ok(())
 		}
-
-		/* 		#[pallet::call_index(3)]
-		#[pallet::weight(0)]
-		pub fn test_transfer(
-			origin: OriginFor<T>,
-			id: T::AssetIdParameter,
-			target: AccountIdLookupOf<T>,
-			amount: BalanceOf<T>,
-		) -> DispatchResult {
-			let signer = ensure_signed(origin.clone())?;
-			let user_lookup = <T::Lookup as StaticLookup>::unlookup(signer.clone());
-			let asset_id: AssetId<T> = 1.into();
-			pallet_assets::Pallet::<T, Instance1>::transfer(
-				origin,
-				asset_id.into().into(),
-				user_lookup,
-				amount,
-			)?;
-			Ok(())
-		} */
 	}
 	impl<T: Config> Pallet<T> {
-		/// Get the account id of the pallet
+		/// Get the account id of the pallet.
 		pub fn account_id() -> AccountIdOf<T> {
 			T::PalletId::get().into_account_truncating()
 		}
 
-		/// launch the project and delete all remaining nfts
+		/// launch the project and delete all remaining nfts.
 		fn launch_project(collection_id: <T as pallet::Config>::CollectionId) -> DispatchResult {
 			let remaining_nfts = ListedNftsOfCollection::<T>::take(collection_id);
 			for item in remaining_nfts {
@@ -667,6 +696,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Starts a voting period and enables nft holders from a collection to vote.
 		fn start_voting_period(
 			collection_id: <T as pallet::Config>::CollectionId,
 		) -> DispatchResult {
@@ -685,6 +715,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Starts a milestone period after a voting period has ended.
 		fn start_milestone_period(
 			collection_id: <T as pallet::Config>::CollectionId,
 		) -> DispatchResult {
@@ -698,6 +729,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Distributes funds after a successful voting for the project. 
 		fn distribute_funds(collection_id: <T as pallet::Config>::CollectionId) -> DispatchResult {
 			let mut project =
 				OngoingProjects::<T>::take(collection_id).ok_or(Error::<T>::InvalidIndex)?;
@@ -723,6 +755,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Evaluates if the project has 3 or more strikes and calls the delete delete_project_refund if its the case.
 		fn ckeck_strikes(collection_id: <T as pallet::Config>::CollectionId) -> DispatchResult {
 			let mut project = Self::ongoing_projects(collection_id).unwrap();
 			project.strikes += 1;
@@ -733,6 +766,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Deletes the project and refunds the remaining funds to the holders.
 		fn delete_project_refund(
 			collection_id: <T as pallet::Config>::CollectionId,
 		) -> DispatchResult {
@@ -760,6 +794,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Deletes the projects once all milestones has been reached.
 		fn delete_project(collection_id: <T as pallet::Config>::CollectionId) -> DispatchResult {
 			OngoingProjects::<T>::take(collection_id).ok_or(Error::<T>::InvalidIndex)?;
 			Self::deposit_event(Event::<T>::ProjectDeleted { collection_id });
