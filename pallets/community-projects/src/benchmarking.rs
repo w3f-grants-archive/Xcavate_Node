@@ -4,6 +4,7 @@ use super::*;
 
 #[allow(unused)]
 use crate::Pallet as CommunityProjects;
+use sp_std::prelude::*;
 use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
 const SEED: u32 = 0;
@@ -14,6 +15,7 @@ type DepositBalanceOf<T> = <<T as pallet_nfts::Config>::Currency as Currency<
 >>::Balance;
 use pallet_assets::Pallet as Assets;
 use frame_support::assert_ok;
+use frame_support::traits::Hooks;
 
 fn setup_listing<T: Config>(
 	u: u32,
@@ -60,7 +62,7 @@ mod benchmarks {
 			value,
 			single_metadata,
 		);
-		assert_eq!(CommunityProjects::<T>::listed_nfts().len(), 6);
+		assert_eq!(CommunityProjects::<T>::listed_nfts().len(), 10);
 	}
 
 	#[benchmark]
@@ -85,7 +87,13 @@ mod benchmarks {
 		let user_lookup = <T::Lookup as StaticLookup>::unlookup(buyer.clone());
 		let asset_id = <T as pallet::Config>::Helper::to_asset(1);
 		let amount2: BalanceOf<T> = 4294967295u32.into();
-		let amount2: BalanceOf<T> = 4294967295u32.into();
+		let root_account: T::AccountId = account("Alice", SEED, SEED);
+		assert_ok!(Assets::<T, Instance1>::create(
+			RawOrigin::Signed(buyer.clone()).into(),
+			asset_id.clone().into(),
+			user_lookup.clone(),
+			amount,
+		));
 		assert_ok!(Assets::<T, Instance1>::mint(
 			RawOrigin::Signed(buyer.clone()).into(),
 			asset_id.clone().into(),
@@ -95,6 +103,50 @@ mod benchmarks {
 		assert_eq!(Assets::<T, Instance1>::balance(asset_id, buyer.clone()), amount2);
 		#[extrinsic_call]
 		buy_nft(RawOrigin::Signed(buyer), 0.into(), 1.into());
+
+		//assert_eq!(Something::<T>::get(), Some(101u32));
+	}
+
+	#[benchmark]
+	fn vote_on_milestone() {
+		let (caller, project_types, metadatas, duration, value, single_metadata) =
+			setup_listing::<T>(SEED);
+		CommunityProjects::<T>::list_project(
+			RawOrigin::Signed(caller).into(),
+			project_types,
+			metadatas,
+			duration,
+			value,
+			single_metadata,
+		);
+		let buyer: T::AccountId = account("buyer", SEED, SEED);
+		<T as pallet_nfts::Config>::Currency::make_free_balance_be(
+			&buyer,
+			DepositBalanceOf::<T>::max_value(),
+		);
+		let amount: BalanceOf<T> = 1u32.into();
+		//let origin = ensure_signed(buyer.clone());
+		let user_lookup = <T::Lookup as StaticLookup>::unlookup(buyer.clone());
+		let asset_id = <T as pallet::Config>::Helper::to_asset(1);
+		let amount2: BalanceOf<T> = 4294967295u32.into();
+		let root_account: T::AccountId = account("Alice", SEED, SEED);
+		assert_ok!(Assets::<T, Instance1>::create(
+			RawOrigin::Signed(buyer.clone()).into(),
+			asset_id.clone().into(),
+			user_lookup.clone(),
+			amount,
+		));
+		assert_ok!(Assets::<T, Instance1>::mint(
+			RawOrigin::Signed(buyer.clone()).into(),
+			asset_id.clone().into(),
+			user_lookup,
+			amount2,
+		));
+		assert_eq!(Assets::<T, Instance1>::balance(asset_id, buyer.clone()), amount2);
+		CommunityProjects::<T>::buy_nft(RawOrigin::Signed(buyer.clone()).into(), 0.into(), 1.into());
+		run_to_block::<T>(11u32.into());
+		#[extrinsic_call]
+		vote_on_milestone(RawOrigin::Signed(buyer), 0.into(), crate::Vote::Yes);
 
 		//assert_eq!(Something::<T>::get(), Some(101u32));
 	}
@@ -132,3 +184,16 @@ fn get_nft_metadata<T: Config>(
 		.try_into()
 		.expect("bound is ensured; qed")
 }
+
+fn run_to_block<T: Config>(new_block: frame_system::pallet_prelude::BlockNumberFor<T>) {
+	while frame_system::Pallet::<T>::block_number() < new_block{
+		if frame_system::Pallet::<T>::block_number() > 0u32.into() {
+			CommunityProjects::<T>::on_initialize(frame_system::Pallet::<T>::block_number());
+			frame_system::Pallet::<T>::on_finalize(frame_system::Pallet::<T>::block_number());
+		}
+		frame_system::Pallet::<T>::reset_events();
+		frame_system::Pallet::<T>::set_block_number(frame_system::Pallet::<T>::block_number() + 1u32.into());
+		frame_system::Pallet::<T>::on_initialize(frame_system::Pallet::<T>::block_number());
+		CommunityProjects::<T>::on_initialize(frame_system::Pallet::<T>::block_number());
+	}
+} 

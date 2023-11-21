@@ -539,13 +539,14 @@ parameter_types! {
 /// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
 impl pallet_community_projects::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_community_projects::weights::SubstrateWeight<Runtime>;
 	type Currency = Balances;
 	type PalletId = CommunityProjectPalletId;
 	type MaxNftTypes = MaxNftType;
 	type MaxListedNfts = MaxListedNftProject;
 	type MaxNftInCollection = MaxNftsInCollectionProject;
-/* 	#[cfg(feature = "runtime-benchmarks")]
-	type Helper = pallet_community_projects::NftHelper; */
+ 	#[cfg(feature = "runtime-benchmarks")]
+	type Helper = pallet_community_projects::NftHelper; 
 	type TimeProvider = Timestamp;
 	type MaxOngoingProjects = MaxOngoingProject;
 	type MaxNftHolder = MaxNftHolders;
@@ -1518,6 +1519,7 @@ mod benches {
 		[pallet_community_loan_pool, CommunityLoanPool]
 		[pallet_xcavate_staking, XcavateStaking]
 		[pallet_nft_marketplace, NftMarketplace]
+		[pallet_community_projects, CommunityProject]
 		[pallet_nfts, Nfts]
 		[pallet_uniques, Uniques]
 		[pallet_assets, Assets]

@@ -30,6 +30,8 @@ mod tests;
 
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
+pub mod weights;
+pub use weights::*;
 
 pub type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
 
@@ -145,6 +147,8 @@ pub mod pallet {
 	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+		/// Type representing the weight of this pallet.
+		type WeightInfo: WeightInfo;
 		/// The currency type.
 		type Currency: Currency<AccountIdOf<Self>> + ReservableCurrency<AccountIdOf<Self>>;
 		/// The marketplace's pallet id, used for deriving its sovereign account ID.
@@ -436,7 +440,7 @@ pub mod pallet {
 		///
 		/// Emits `ProjectListed` event when succesfful
 		#[pallet::call_index(0)]
-		#[pallet::weight(0)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::list_project())]
 		pub fn list_project(
 			origin: OriginFor<T>,
 			nft_types: BoundedNftDonationTypes<T>,
@@ -550,7 +554,7 @@ pub mod pallet {
 		///
 		/// Emits `NftBought` event when succesfful
 		#[pallet::call_index(1)]
-		#[pallet::weight(0)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::buy_nft())]
 		pub fn buy_nft(
 			origin: OriginFor<T>,
 			collection_id: <T as pallet::Config>::CollectionId,
@@ -629,7 +633,7 @@ pub mod pallet {
 		///
 		/// Emits `VotedOnMilestone` event when succesfful
 		#[pallet::call_index(2)]
-		#[pallet::weight(0)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::vote_on_milestone())]
 		pub fn vote_on_milestone(
 			origin: OriginFor<T>,
 			collection_id: <T as pallet::Config>::CollectionId,
