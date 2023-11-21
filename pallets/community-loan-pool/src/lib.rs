@@ -1,8 +1,6 @@
+// Ensure we're `no_std` when compiling for Wasm.
 #![cfg_attr(not(feature = "std"), no_std)]
 
-/// Edit this file to define custom logic or remove it if it is not needed.
-/// Learn more about FRAME and the core library of Substrate FRAME pallets:
-/// <https://docs.substrate.io/reference/frame-pallets/>
 pub use pallet::*;
 pub use weights::WeightInfo;
 
@@ -31,7 +29,8 @@ use frame_support::{
 	pallet_prelude::*,
 	sp_runtime,
 	traits::{
-		Currency, ExistenceRequirement::KeepAlive, Get, OnUnbalanced, ReservableCurrency, UnixTime,
+		Currency, ExistenceRequirement::KeepAlive, Get, Incrementable, OnUnbalanced,
+		ReservableCurrency, UnixTime,
 	},
 	PalletId,
 };
@@ -105,7 +104,7 @@ pub mod pallet {
 	pub type ProposalIndex = u32;
 	pub type LoanIndex = u32;
 
-	/// A loan proposal
+	/// Loan proposal with the details.
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
 	#[scale_info(skip_type_params(T))]
@@ -119,6 +118,7 @@ pub mod pallet {
 		created_at: BlockNumber,
 	}
 
+	/// Infos from milestone proposals.
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
 	#[scale_info(skip_type_params(T))]
@@ -127,7 +127,7 @@ pub mod pallet {
 		bond: Balance,
 	}
 
-	/// loan info
+	/// Infos for loan.
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
 	#[scale_info(skip_type_params(T))]
@@ -145,13 +145,14 @@ pub mod pallet {
 		pub withdraw_lock: bool,
 	}
 
-	/// AccountId storage
+	/// AccountId storage.
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
 	pub struct PalletIdStorage<T: Config> {
 		pallet_id: AccountIdOf<T>,
 	}
 
+	/// Vote enum.
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
 	pub enum Vote {
@@ -159,6 +160,7 @@ pub mod pallet {
 		No,
 	}
 
+	/// Voting stats.
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
 	pub struct VoteStats {
@@ -183,10 +185,10 @@ pub mod pallet {
 		/// Origin from which approves must come.
 		type ApproveOrigin: EnsureOrigin<Self::RuntimeOrigin>;
 
-		/// Origin who can add or remove committee members
+		/// Origin who can add or remove committee members.
 		type CommitteeOrigin: EnsureOrigin<Self::RuntimeOrigin>;
 
-		/// Origin who can delete loans
+		/// Origin who can delete loans.
 		type DeleteOrigin: EnsureOrigin<Self::RuntimeOrigin>;
 
 		/// Fraction of a proposal's value that should be bonded in order to place the proposal.
@@ -213,32 +215,51 @@ pub mod pallet {
 		#[pallet::constant]
 		type MaxOngoingLoans: Get<u32>;
 
-		/// lose coupling of pallet timestamp
+		/// lose coupling of pallet timestamp.
 		type TimeProvider: UnixTime;
 
-		/// Type representing the weight of this pallet
+		/// Type representing the weight of this pallet.
 		type WeightInfo: WeightInfo;
 
 		#[cfg(feature = "runtime-benchmarks")]
-		type Helper: crate::BenchmarkHelper<Self::CollectionId, Self::ItemId>;
+		type Helper: crate::BenchmarkHelper<<Self as pallet::Config>::CollectionId, <Self as pallet::Config>::ItemId>;
 
-		/// The amount of time given to vote for a proposal
+		/// The amount of time given to vote for a proposal.
 		type VotingTime: Get<BlockNumberFor<Self>>;
 
-		/// The maximum amount of commitee members
+		/// The maximum amount of commitee members.
 		type MaxCommitteeMembers: Get<u32>;
 
-		/// The maximum of milestones for a lone
+		/// The maximum amount of milestones for a lone.
 		type MaxMilestonesPerProject: Get<u32>;
+
+		type CollectionId: IsType<<Self as pallet_nfts::Config>::CollectionId>
+			+ Parameter
+			+ From<u32>
+			+ Ord
+			+ Copy
+			+ MaxEncodedLen
+			+ Encode;
+
+		type ItemId: IsType<<Self as pallet_nfts::Config>::ItemId>
+			+ Parameter
+			+ From<u32>
+			+ Ord
+			+ Copy
+			+ MaxEncodedLen
+			+ Encode;
 	}
 
-	/// Vec of admins who are able to vote
+	pub type CollectionId<T> = <T as Config>::CollectionId;
+	pub type ItemId<T> = <T as Config>::ItemId;
+
+	/// Vec of admins who are able to vote.
 	#[pallet::storage]
 	#[pallet::getter(fn voting_committee)]
 	pub(super) type VotingCommittee<T: Config> =
 		StorageValue<_, BoundedVec<AccountIdOf<T>, T::MaxOngoingLoans>, ValueQuery>;
 
-	/// Number of proposals that have been made.
+	/// Number of loans that have been made.
 	#[pallet::storage]
 	#[pallet::getter(fn loan_count)]
 	pub(super) type LoanCount<T> = StorageValue<_, ProposalIndex, ValueQuery>;
@@ -248,27 +269,27 @@ pub mod pallet {
 	#[pallet::getter(fn proposal_count)]
 	pub(super) type ProposalCount<T> = StorageValue<_, ProposalIndex, ValueQuery>;
 
-	/// Number of milestone proposal that have been made.
+	/// Number of milestone proposals that have been made.
 	#[pallet::storage]
 	#[pallet::getter(fn milestone_proposal_count)]
 	pub(super) type MilestoneProposalCount<T> = StorageValue<_, ProposalIndex, ValueQuery>;
 
-	/// Number of deletion proposal that have been made
+	/// Number of deletion proposals that have been made.
 	#[pallet::storage]
 	#[pallet::getter(fn deletion_proposal_count)]
 	pub(super) type DeletionProposalCount<T> = StorageValue<_, ProposalIndex, ValueQuery>;
 
-	/// Total amount of loan funds
+	/// Total amount of loan funds.
 	#[pallet::storage]
 	#[pallet::getter(fn total_loan_amount)]
 	pub(super) type TotalLoanAmount<T> = StorageValue<_, u64, ValueQuery>;
 
-	/// Amount of founds that is still on the pallet but is reserved for loan
+	/// Amount of founds that is still on the pallet but is reserved for loan.
 	#[pallet::storage]
 	#[pallet::getter(fn reserved_loan_amount)]
 	pub(super) type ReservedLoanAmount<T> = StorageValue<_, u64, ValueQuery>;
 
-	/// All currently ongoing loans
+	/// All currently ongoing loans.
 	#[pallet::storage]
 	#[pallet::getter(fn ongoing_loans)]
 	pub(super) type OngoingLoans<T: Config> =
@@ -285,7 +306,7 @@ pub mod pallet {
 		OptionQuery,
 	>;
 
-	/// Milestone proposal that has been made.
+	/// Milestone proposals that has been made.
 	#[pallet::storage]
 	#[pallet::getter(fn milestone_proposals)]
 	pub(super) type MilestoneProposals<T> =
@@ -293,8 +314,8 @@ pub mod pallet {
 
 	/// Milestone proposal that has been made.
 	#[pallet::storage]
-	#[pallet::getter(fn milestone_bond)]
-	pub(super) type MilestoneBond<T> = StorageMap<
+	#[pallet::getter(fn milestone_info)]
+	pub(super) type MilestoneInfo<T> = StorageMap<
 		_,
 		Twox64Concat,
 		ProposalIndex,
@@ -302,60 +323,60 @@ pub mod pallet {
 		OptionQuery,
 	>;
 
-	/// Deletion proposal that has been made.
+	/// Deletion proposals that have been made.
 	#[pallet::storage]
 	#[pallet::getter(fn deletion_proposals)]
 	pub(super) type DeletionProposals<T> =
 		StorageMap<_, Twox64Concat, ProposalIndex, LoanIndex, OptionQuery>;
 
-	/// Mapping of ongoing loans
+	/// Mapping of ongoing loans.
 	#[pallet::storage]
 	#[pallet::getter(fn loans)]
 	pub(super) type Loans<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
 		LoanIndex,
-		LoanInfo<BalanceOf<T>, T::CollectionId, T::ItemId, T>,
+		LoanInfo<BalanceOf<T>, <T as pallet::Config>::CollectionId, <T as pallet::Config>::ItemId, T>,
 		OptionQuery,
 	>;
 
-	/// Mapping of ongoing votes
+	/// Mapping of ongoing votes.
 	#[pallet::storage]
 	#[pallet::getter(fn ongoing_votes)]
 	pub(super) type OngoingVotes<T: Config> =
 		StorageMap<_, Twox64Concat, ProposalIndex, VoteStats, OptionQuery>;
 
-	/// Mapping of ongoing votes
+	/// Mapping of ongoing milstone votes.
 	#[pallet::storage]
 	#[pallet::getter(fn ongoing_milestone_votes)]
 	pub(super) type OngoingMilestoneVotes<T: Config> =
 		StorageMap<_, Twox64Concat, ProposalIndex, VoteStats, OptionQuery>;
 
-	/// Mapping of ongoing deletion votes
+	/// Mapping of ongoing deletion votes.
 	#[pallet::storage]
 	#[pallet::getter(fn ongoing_deletion_votes)]
 	pub(super) type OngoingDeletionVotes<T: Config> =
 		StorageMap<_, Twox64Concat, ProposalIndex, VoteStats, OptionQuery>;
 
-	/// Mapping of user who voted for a proposal
+	/// Mapping of user who voted for a proposal.
 	#[pallet::storage]
 	#[pallet::getter(fn user_milestone_votes)]
 	pub(super) type UserMilestoneVotes<T: Config> =
 		StorageMap<_, Twox64Concat, (ProposalIndex, AccountIdOf<T>), Vote, OptionQuery>;
 
-	/// Mapping of user who voted for a milestone proposal
+	/// Mapping of user who voted for a milestone proposal.
 	#[pallet::storage]
 	#[pallet::getter(fn user_votes)]
 	pub(super) type UserVotes<T: Config> =
 		StorageMap<_, Twox64Concat, (ProposalIndex, AccountIdOf<T>), Vote, OptionQuery>;
 
-	/// Mapping of user who voted for a deletion proposal
+	/// Mapping of user who voted for a deletion proposal.
 	#[pallet::storage]
 	#[pallet::getter(fn user_deletion_votes)]
 	pub(super) type UserDeletionVotes<T: Config> =
 		StorageMap<_, Twox64Concat, (ProposalIndex, AccountIdOf<T>), Vote, OptionQuery>;
 
-	/// Stores the project keys and round types ending on a given block
+	/// Stores the project keys and round types ending on a given block.
 	#[pallet::storage]
 	pub type RoundsExpiring<T: Config> = StorageMap<
 		_,
@@ -365,7 +386,7 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
-	/// Stores the project keys and round types ending on a given block
+	/// Stores the project keys and round types ending on a given block for milestone votings.
 	#[pallet::storage]
 	pub type MilestoneRoundsExpiring<T: Config> = StorageMap<
 		_,
@@ -375,7 +396,7 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
-	/// Stores the project keys and round types ending on a given block
+	/// Stores the project keys and round types ending on a given block for deletion votings.
 	#[pallet::storage]
 	pub type DeletionRoundsExpiring<T: Config> = StorageMap<
 		_,
@@ -395,7 +416,7 @@ pub mod pallet {
 	#[pallet::genesis_build]
 	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
 		fn build(&self) {
-			// Create Treasury account
+			// Create community loan pool account
 			let account_id = <Pallet<T>>::account_id();
 			let min = <T as pallet::Config>::Currency::minimum_balance();
 			if <T as pallet::Config>::Currency::free_balance(&account_id) < min {
@@ -406,92 +427,97 @@ pub mod pallet {
 
 	#[pallet::error]
 	pub enum Error<T> {
-		/// Proposer's balance is too low
+		/// Proposer's balance is too low.
 		InsufficientProposersBalance,
-		/// Loan pool's balance is too low
+		/// Loan pool's balance is too low.
 		InsufficientLoanPoolBalance,
-		/// No proposal index
+		/// No proposal index.
 		InvalidIndex,
-		/// The caller doesn't have enough permission
+		/// The caller doesn't have enough permission.
 		InsufficientPermission,
-		/// Max amount of ongoing loan reached
+		/// Max amount of ongoing loan reached.
 		TooManyLoans,
-		/// User has already voted
+		/// User has already voted.
 		AlreadyVoted,
-		/// Loan got not approved
+		/// Loan got not approved.
 		NotApproved,
-		/// The account is already a member in the voting committee
+		/// The account is already a member in the voting committee.
 		AlreadyMember,
-		/// There are already enough committee members
+		/// There are already enough committee members.
 		TooManyMembers,
-		/// There are not enough funds available in the loan
+		/// There are not enough funds available in the loan.
 		NotEnoughFundsToWithdraw,
-		/// The loan is still ongoing
+		/// The loan is still ongoing.
 		LoanStillOngoing,
-		/// All milestones has been accomplished
+		/// All milestones have been accomplished.
 		NoMilestonesLeft,
-		/// Milestones of the loan have to be 100 % in Sum
+		/// Milestones of the loan have to be 100 % in sum
 		MilestonesHaveToCoverLoan,
-		/// Withdrawl is locked during ongoing voting for deletion
+		/// Withdrawl is locked during ongoing voting for deletion.
 		DeletionVotingOngoing,
-		/// The beneficiary didn't borrow that much funds
+		/// The beneficiary didn't borrow that much funds.
 		WantsToRepayTooMuch,
-		/// There are not enough funds available in the loan pallet
+		/// There are not enough funds available in the loan pallet.
 		NotEnoughLoanFundsAvailable,
-		/// The Milestones for the proposal have already been set
+		/// The Milestones for the proposal have already been set.
 		MilestonesAlreadySet,
-		/// There has been no milestones set in the proposal
+		/// There has been no milestones set in the proposal.
 		NoMilestones,
+		/// There is an issue by calling the next collection id.
+		UnknownCollection,
+		/// Error by convertion to balance type.
+		ConversionError,
+		ArithmeticUnderflow,
+		/// Error by dividing a number.
+		DivisionError,
 	}
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// New Proposal
+		/// New proposal has been created.
 		Proposed { proposal_index: ProposalIndex },
-		/// New Milestone Proposal
+		/// New milestone proposal has been created.
 		MilestoneProposed { proposal_index: ProposalIndex },
-		/// New Deletion Proposal
+		/// New deletion proposal has been created.
 		DeletionProposed { proposal_index: ProposalIndex, loan_index: LoanIndex },
-		/// Proposal has been approved
+		/// Proposal has been approved.
 		Approved { proposal_index: ProposalIndex },
-		/// Proposal has been rejected
+		/// Proposal has been rejected.
 		Rejected { proposal_index: ProposalIndex },
-		/// Loan has been deleted
+		/// Loan has been deleted.
 		Deleted { loan_index: LoanIndex },
-		/// Charged APY
+		/// Apy has been charged.
 		ApyCharged { loan_index: LoanIndex },
-		/// Loan has been updated
+		/// Loan has been updated.
 		LoanUpdated { loan_index: LoanIndex },
-		/// User withdraw money
+		/// User withdrew money.
 		Withdraw { loan_index: LoanIndex, amount: BalanceOf<T> },
-		/// Voted on a proposal
+		/// Voted on a proposal.
 		VotedOnProposal { proposal_index: ProposalIndex, member: AccountIdOf<T>, vote: Vote },
-		/// Voted on a milestone
+		/// Voted on a milestone.
 		VotedOnMilestone { proposal_index: ProposalIndex, member: AccountIdOf<T>, vote: Vote },
-		/// Voted on a deletion
+		/// Voted on a deletion.
 		VotedOnDeletion { proposal_index: ProposalIndex, member: AccountIdOf<T>, vote: Vote },
-		/// A new committee member has been added
+		/// A new committee member has been added.
 		CommiteeMemberAdded { new_member: AccountIdOf<T> },
-		/// Milestone Proposal has been approved
+		/// Milestone Proposal has been approved.
 		MilestoneApproved { loan_id: LoanIndex },
-		/// Milestone Proposal has been rejected
+		/// Milestone Proposal has been rejected.
 		MilestoneRejected { proposal_index: ProposalIndex },
-		/// Milestones have been set for a proposal
+		/// Milestones have been set for a proposal.
 		MilestonesSet { proposal_index: ProposalIndex },
 	}
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T>
-	where
-		<T as pallet_nfts::Config>::CollectionId: From<u32>,
-		<T as pallet_nfts::Config>::ItemId: From<u32>,
 	{
 		fn on_initialize(n: frame_system::pallet_prelude::BlockNumberFor<T>) -> Weight {
 			let mut weight = T::DbWeight::get().reads_writes(1, 1);
 
 			let ended_votings = RoundsExpiring::<T>::take(n);
 
+			/// Checks if there is a voting for a loan is expiring this block.
 			ended_votings.iter().for_each(|item| {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
 				let voting_result = <OngoingVotes<T>>::take(item);
@@ -507,6 +533,7 @@ pub mod pallet {
 
 			let ended_milestone_votes = MilestoneRoundsExpiring::<T>::take(n);
 
+			/// checks if there is a voting for a milestone is expiring this block
 			ended_milestone_votes.iter().for_each(|item| {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
 				let voting_result = <OngoingMilestoneVotes<T>>::take(item);
@@ -525,6 +552,7 @@ pub mod pallet {
 
 			let ended_deletion_votes = DeletionRoundsExpiring::<T>::take(n);
 
+			/// checks if there is a voting for a loan deletion is expiring this block
 			ended_deletion_votes.iter().for_each(|item| {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
 				let voting_result = <OngoingDeletionVotes<T>>::take(item);
@@ -545,6 +573,7 @@ pub mod pallet {
 			weight
 		}
 
+		/// Charging loan apy every block for testing purpose
 		fn on_finalize(_n: frame_system::pallet_prelude::BlockNumberFor<T>) {
 			//let block = n.saturated_into::<u64>();
 			//if block % 10 == 0 {
@@ -555,8 +584,18 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		/// Apply for a loan. A deposit amount is reserved
+		/// Creates a proposal for a loan. A deposit amount is reserved
 		/// and slashed if the proposal is rejected. It is returned once the proposal is awarded.
+		///
+		/// The origin must be Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `amount`: The amount of token that the real estate developer wants to lend.
+		/// - `beneficiary`: The account that should be able to receive the funds.
+		/// - `developer_experience`: Amout of years that the real estate developer has in experience.
+		/// - `loan_term`: Estimated duration of the loan in months.
+		///
+		/// Emits `Proposed` event when succesfful
 		#[pallet::call_index(0)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::propose())]
 		pub fn propose(
@@ -568,8 +607,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let beneficiary = T::Lookup::lookup(beneficiary)?;
-			let total_loan_amount =
-				Self::u64_to_balance_option(Self::reserved_loan_amount()).unwrap();
+			let total_loan_amount = Self::u64_to_balance_option(Self::reserved_loan_amount())?;
 			//let decimal = 1000000000000_u64.saturated_into();
 			ensure!(
 				<T as pallet::Config>::Currency::free_balance(&Self::account_id())
@@ -607,9 +645,16 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Applying for the next milestone in the ongoing loan.
+		/// Creates a proposal for the next milestone in the loan.
+		///
+		/// The origin must be Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `loan_id`: The index of the loan.
+		///
+		/// Emits `MilestoneProposed` event when succesfful
 		#[pallet::call_index(1)]
-		#[pallet::weight(0)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::propose_milestone())]
 		pub fn propose_milestone(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let loan = Self::loans(loan_id).ok_or(Error::<T>::InvalidIndex)?;
@@ -631,7 +676,7 @@ pub mod pallet {
 				.map_err(|_| Error::<T>::InsufficientProposersBalance)?;
 
 			let milestone_details = MilestoneProposalInfo { proposer: origin, bond };
-			MilestoneBond::<T>::insert(milestone_proposal_index, milestone_details);
+			MilestoneInfo::<T>::insert(milestone_proposal_index, milestone_details);
 			MilestoneProposals::<T>::insert(milestone_proposal_index, loan_id);
 			MilestoneProposalCount::<T>::put(milestone_proposal_index);
 			Self::deposit_event(Event::MilestoneProposed {
@@ -640,8 +685,16 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Creates a proposal for loan deletion.
+		///
+		/// The origin must be the borrower of the loan, Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `loan_id`: The index of the loan.
+		///
+		/// Emits `DeletionProposed` event when succesfful
 		#[pallet::call_index(2)]
-		#[pallet::weight(0)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::propose_milestone())]
 		pub fn propose_deletion(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
 			let origin = ensure_signed(origin.clone())?;
 			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
@@ -668,12 +721,17 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Withdraw an certain amount of the loan from the pallet.
+		/// Lets the real estate developer withdraw the funds from the loan.
 		///
-		/// May only be called from the loan borrower.
-
+		/// The origin must be the borrower of the loan, Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `loan_id`: The index of the loan.
+		/// - `amount`: The amount of token the real estate developer wants to withdraw.
+		///
+		/// Emits `Withdraw` event when succesfful
 		#[pallet::call_index(3)]
-		#[pallet::weight(0)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::withdraw())]
 		pub fn withdraw(
 			origin: OriginFor<T>,
 			loan_id: LoanIndex,
@@ -685,7 +743,7 @@ pub mod pallet {
 			ensure!(amount <= loan.available_amount, Error::<T>::NotEnoughFundsToWithdraw);
 			ensure!(!loan.withdraw_lock, Error::<T>::DeletionVotingOngoing);
 			let loan_pallet = Self::account_id();
-			let sending_amount = Self::balance_to_u64(amount).unwrap();
+			let sending_amount = Self::balance_to_u64(amount)?;
 			// For unit tests the line with the
 			<T as pallet::Config>::Currency::transfer(
 				&loan_pallet,
@@ -699,19 +757,25 @@ pub mod pallet {
 			loan.borrowed_amount = loan.borrowed_amount.saturating_add(amount);
 			loan.available_amount = loan.available_amount.saturating_sub(amount);
 			Loans::<T>::insert(loan_id, loan);
-			let reserved_value =
-				Self::reserved_loan_amount() - Self::balance_to_u64(amount).unwrap();
+			let reserved_value = Self::reserved_loan_amount()
+				.checked_sub(Self::balance_to_u64(amount)?)
+				.ok_or(Error::<T>::ArithmeticUnderflow)?;
 			ReservedLoanAmount::<T>::put(reserved_value);
 			Self::deposit_event(Event::<T>::Withdraw { loan_index: loan_id, amount });
 			Ok(())
 		}
 
-		/// Repays a certain amount of the loan from the pallet.
+		/// Lets the real estate developer repay the borrowed funds from the loan
 		///
-		/// May only be called from the loan borrower.
-
+		/// The origin must be signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `loan_id`: The index of the loan.
+		/// - `amount`: The amount of token the real estate developer wants to repay
+		///
+		/// Emits `LoanUpdated` event when succesfful
 		#[pallet::call_index(4)]
-		#[pallet::weight(0)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::repay())]
 		pub fn repay(
 			origin: OriginFor<T>,
 			loan_id: LoanIndex,
@@ -722,12 +786,12 @@ pub mod pallet {
 			ensure!(amount <= loan.borrowed_amount, Error::<T>::WantsToRepayTooMuch);
 			//ensure!(signer == loan.contract_account_id, Error::<T>::InsufficientPermission);
 			let loan_pallet = Self::account_id();
-			let sending_amount = Self::balance_to_u64(amount).unwrap();
+			let sending_amount = Self::balance_to_u64(amount)?;
 			<T as pallet::Config>::Currency::transfer(
 				&signer,
 				&loan_pallet,
 				// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
-				(sending_amount as u128 * 1000000000000).try_into().ok().unwrap(),
+				(sending_amount as u128 * 1000000000000).try_into().ok().unwrap_or_default(),
 				//amount,
 				KeepAlive,
 			)
@@ -735,16 +799,26 @@ pub mod pallet {
 			loan.borrowed_amount = loan.borrowed_amount.saturating_sub(amount);
 			loan.current_loan_balance = loan.current_loan_balance.saturating_sub(amount);
 			Loans::<T>::insert(loan_id, loan);
-			let new_value = Self::total_loan_amount() - Self::balance_to_u64(amount).unwrap();
+			let new_value = Self::total_loan_amount()
+				.checked_sub(Self::balance_to_u64(amount)?)
+				.ok_or(Error::<T>::ArithmeticUnderflow)?;
 			TotalLoanAmount::<T>::put(new_value);
 			Self::deposit_event(Event::<T>::LoanUpdated { loan_index: loan_id });
 			Ok(())
 		}
 
-		/// The committee sets the milestone distribution for the loan
-
-		#[pallet::call_index(55)]
-		#[pallet::weight(0)]
+		/// Lets the committee set the milestones for a loan.
+		///	The caller automaticly votes yes for the proposal by calling this function.
+		///
+		/// The origin must be a member of the committee, signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `proposal_index`: The index of the proposal.
+		/// - `proposed_milestones`: A vector with the different milestone percentages, it must be 100 in sum.
+		///
+		/// Emits `MilestonesSet` event when succesfful
+		#[pallet::call_index(5)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::set_milestones())]
 		pub fn set_milestones(
 			origin: OriginFor<T>,
 			proposal_index: ProposalIndex,
@@ -782,9 +856,17 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Let committee members vote for a proposal
-		#[pallet::call_index(5)]
-		#[pallet::weight(0)]
+		/// Let committee members vote for a proposal.
+		///
+		/// The origin must be a member of the committee, signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `proposal_index`: The index of the proposal.
+		/// - `vote`: Must be either a Yes vote or a No vote.
+		///
+		/// Emits `VotedOnProposal` event when succesfful.
+		#[pallet::call_index(6)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::vote_on_proposal())]
 		pub fn vote_on_proposal(
 			origin: OriginFor<T>,
 			proposal_index: ProposalIndex,
@@ -815,9 +897,17 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Let committee vote on milestone proposal
-		#[pallet::call_index(6)]
-		#[pallet::weight(0)]
+		/// Let committee vote on milestone proposal.
+		///
+		/// The origin must be a member of the committee, signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `proposal_index`: The index of the proposal.
+		/// - `vote`: Must be either a Yes vote or a No vote.
+		///
+		/// Emits `VotedOnMilestone` event when succesfful.
+		#[pallet::call_index(7)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::vote_on_milestone_proposal())]
 		pub fn vote_on_milestone_proposal(
 			origin: OriginFor<T>,
 			proposal_index: ProposalIndex,
@@ -846,9 +936,17 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Let committee vote on deletion proposal
-		#[pallet::call_index(7)]
-		#[pallet::weight(0)]
+		/// Let committee vote on deletion proposal.
+		///
+		/// The origin must be a member of the committee, signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `proposal_index`: The index of the proposal.
+		/// - `vote`: Must be either a Yes vote or a No vote.
+		///
+		/// Emits `VotedOnDeletion` event when succesfful.
+		#[pallet::call_index(8)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::vote_on_deletion_proposal())]
 		pub fn vote_on_deletion_proposal(
 			origin: OriginFor<T>,
 			proposal_index: ProposalIndex,
@@ -877,9 +975,16 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Adding a new address to the vote committee
-		#[pallet::call_index(8)]
-		#[pallet::weight(0)]
+		/// Adding a new address to the vote committee.
+		///
+		/// The origin must be the sudo.
+		///
+		/// Parameters:
+		/// - `member`: The address of the new committee member.
+		///
+		/// Emits `CommiteeMemberAdded` event when succesfful.
+		#[pallet::call_index(9)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::add_committee_member())]
 		pub fn add_committee_member(
 			origin: OriginFor<T>,
 			member: AccountIdOf<T>,
@@ -897,10 +1002,12 @@ pub mod pallet {
 	//** Our helper functions.**//
 
 	impl<T: Config> Pallet<T> {
+		/// Get the account id of the pallet.
 		pub fn account_id() -> AccountIdOf<T> {
 			T::PalletId::get().into_account_truncating()
 		}
 
+		/// The needed bond for a proposal whose spend is `value`.
 		fn calculate_bond(value: BalanceOf<T>) -> BalanceOf<T> {
 			let mut r = T::ProposalBondMinimum::get().max(T::ProposalBond::get() * value);
 			if let Some(m) = T::ProposalBondMaximum::get() {
@@ -909,6 +1016,7 @@ pub mod pallet {
 			r
 		}
 
+		/// Rejects the proposal for a loan.
 		fn reject_loan_proposal(proposal_index: ProposalIndex) -> DispatchResult {
 			let proposal = <Proposals<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
 			let value = proposal.bond;
@@ -922,10 +1030,8 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Approves the proposal and creates the loan.
 		fn approve_loan_proposal(proposal_index: ProposalIndex) -> DispatchResult
-		where
-			<T as pallet_nfts::Config>::CollectionId: From<u32>,
-			<T as pallet_nfts::Config>::ItemId: From<u32>,
 		{
 			let proposal = <Proposals<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
 			//let total_loan_amount = Self::u64_to_balance_option(Self::total_loan_amount()).unwrap();
@@ -942,10 +1048,17 @@ pub mod pallet {
 				* milestones[0].percentage_to_unlock.deconstruct() as u64
 				/ 100;
 			milestones.remove(0);
-			let available_amount = Self::u64_to_balance_option(amount).unwrap();
+			let available_amount = Self::u64_to_balance_option(amount)?;
 			let loan_apy = proposal.apr_rate;
-			let collection_id: T::CollectionId = proposal_index.into();
-			let item_id: T::ItemId = proposal_index.into();
+			if pallet_nfts::NextCollectionId::<T>::get().is_none() {
+				pallet_nfts::NextCollectionId::<T>::set(<T as pallet_nfts::Config>::CollectionId::initial_value());
+			};
+			let collection_id =
+				pallet_nfts::NextCollectionId::<T>::get().ok_or(Error::<T>::UnknownCollection)?;
+			let next_collection_id = collection_id.increment();
+			pallet_nfts::NextCollectionId::<T>::set(next_collection_id);
+			let collection_id: CollectionId<T> = collection_id.into();
+			let item_id: <T as pallet::Config>::ItemId = proposal_index.into();
 			let loan_info = LoanInfo {
 				borrower: user.clone(),
 				loan_amount: value,
@@ -967,7 +1080,7 @@ pub mod pallet {
 			// calls the create collection function from the uniques pallet, and set the admin as
 			// the admin of the collection
 			pallet_nfts::Pallet::<T>::do_create_collection(
-				collection_id,
+				collection_id.into(),
 				Self::account_id(),
 				Self::account_id(),
 				Self::default_collection_config(),
@@ -975,24 +1088,23 @@ pub mod pallet {
 				pallet_nfts::Event::Created {
 					creator: Self::account_id(),
 					owner: Self::account_id(),
-					collection: collection_id,
+					collection: collection_id.into(),
 				},
 			)?;
 			// calls the mint collection function from the uniques pallet, mints a nft and puts
 			// the loan contract as the owner
 			pallet_nfts::Pallet::<T>::do_mint(
-				collection_id,
-				item_id,
+				collection_id.into(),
+				item_id.into(),
 				Some(Self::account_id()),
 				Self::account_id(),
 				Self::default_item_config(),
 				|_, _| Ok(()),
 			)?;
 
-			let new_value = Self::total_loan_amount() + Self::balance_to_u64(value).unwrap();
+			let new_value = Self::total_loan_amount() + Self::balance_to_u64(value)?;
 			TotalLoanAmount::<T>::put(new_value);
-			let reserved_value =
-				Self::reserved_loan_amount() + Self::balance_to_u64(value).unwrap();
+			let reserved_value = Self::reserved_loan_amount() + Self::balance_to_u64(value)?;
 			ReservedLoanAmount::<T>::put(reserved_value);
 			Proposals::<T>::remove(proposal_index);
 			LoanCount::<T>::put(loan_index);
@@ -1000,7 +1112,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		// Work in progress, to be implmented in the future
+		/// Charges the apy and adds the amount to the loan.
 		fn charge_apy() -> DispatchResult {
 			let ongoing_loans = Self::ongoing_loans();
 			for i in ongoing_loans {
@@ -1008,10 +1120,10 @@ pub mod pallet {
 				let mut loan = <Loans<T>>::take(loan_index).ok_or(Error::<T>::InvalidIndex)?;
 				let current_timestamp = T::TimeProvider::now().as_secs();
 				let time_difference = current_timestamp - loan.last_timestamp;
-				let loan_amount = Self::balance_to_u64(loan.current_loan_balance).unwrap();
+				let loan_amount = Self::balance_to_u64(loan.current_loan_balance)?;
 				let interests =
 					loan_amount * time_difference * loan.loan_apy / 365 / 60 / 60 / 24 / 100 / 100;
-				let interest_balance = Self::u64_to_balance_option(interests).unwrap();
+				let interest_balance = Self::u64_to_balance_option(interests)?;
 				loan.borrowed_amount += interest_balance;
 				loan.current_loan_balance += interest_balance;
 				loan.last_timestamp = current_timestamp;
@@ -1023,6 +1135,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Add the unlocked milestone when a milestone gets approved.
 		fn updating_available_amount(
 			loan_id: LoanIndex,
 			proposal_index: &ProposalIndex,
@@ -1030,19 +1143,20 @@ pub mod pallet {
 			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			let loan_amount = loan.loan_amount;
 			let mut loan_milestones = loan.milestones;
-			let added_available_amount = Self::balance_to_u64(loan_amount).unwrap()
-				* loan_milestones[0].percentage_to_unlock.deconstruct() as u64
-				/ 100;
+			let added_available_amount = Self::balance_to_u64(loan_amount)?
+				* (loan_milestones[0].percentage_to_unlock.deconstruct() as u64)
+					.checked_div(100)
+					.ok_or(Error::<T>::DivisionError)?;
 			loan_milestones.remove(0);
 			let new_available_amount = loan
 				.available_amount
-				.saturating_add(Self::u64_to_balance_option(added_available_amount).unwrap());
+				.saturating_add(Self::u64_to_balance_option(added_available_amount)?);
 			loan.milestones = loan_milestones;
 			loan.available_amount = new_available_amount;
-			let proposal_info = <MilestoneBond<T>>::take(proposal_index)
+			let proposal_info = <MilestoneInfo<T>>::take(proposal_index)
 				.ok_or(Error::<T>::InvalidIndex)
 				.unwrap();
-			let err_amount = <T as pallet::Config>::Currency::unreserve(
+			let _err_amount = <T as pallet::Config>::Currency::unreserve(
 				&proposal_info.proposer,
 				proposal_info.bond,
 			);
@@ -1051,8 +1165,9 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Rejects a milestone proposal.
 		fn reject_milestone(proposal_index: &ProposalIndex) -> DispatchResult {
-			let proposal_info = <MilestoneBond<T>>::take(proposal_index)
+			let proposal_info = <MilestoneInfo<T>>::take(proposal_index)
 				.ok_or(Error::<T>::InvalidIndex)
 				.unwrap();
 			let imbalance = <T as pallet::Config>::Currency::slash_reserved(
@@ -1065,17 +1180,19 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Deletes a loan when a deletion proposal has been successfull.
 		fn delete_loan(loan_id: LoanIndex) -> DispatchResult {
 			let loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(loan.borrowed_amount.is_zero(), Error::<T>::LoanStillOngoing);
 			let collection_id = loan.collection_id;
 			let item_id = loan.item_id;
-			pallet_nfts::Pallet::<T>::do_burn(collection_id, item_id, |_| Ok(()))?;
+			pallet_nfts::Pallet::<T>::do_burn(collection_id.into(), item_id.into(), |_| Ok(()))?;
 			let mut loans = Self::ongoing_loans();
 			let index = loans.iter().position(|x| *x == loan_id).unwrap();
 			loans.remove(index);
 			let reserved_loan = Self::reserved_loan_amount()
-				- Self::balance_to_u64(loan.current_loan_balance).unwrap();
+				.checked_sub(Self::balance_to_u64(loan.current_loan_balance)?)
+				.ok_or(Error::<T>::ArithmeticUnderflow)?;
 			ReservedLoanAmount::<T>::put(reserved_loan);
 			OngoingLoans::<T>::put(loans);
 			Loans::<T>::remove(loan_id);
@@ -1083,6 +1200,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Opens the withdraws again when a deletion proposal got rejected.
 		fn open_withdrawl(loan_id: LoanIndex) -> DispatchResult {
 			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			loan.withdraw_lock = false;
@@ -1090,6 +1208,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Calculates the apr for a loan.
 		fn calculate_apr(experience: u64, loan_term: u64) -> u64 {
 			let experinece_number: f32 = match experience {
 				1..=5 => 1.7,
@@ -1109,16 +1228,16 @@ pub mod pallet {
 			interest_points as u64
 		}
 
-		pub fn balance_to_u64(input: BalanceOf<T>) -> Option<u64> {
-			TryInto::<u64>::try_into(input).ok()
+		pub fn balance_to_u64(input: BalanceOf<T>) -> Result<u64, Error<T>> {
+			TryInto::<u64>::try_into(input).map_err(|_| Error::<T>::ConversionError)
 		}
 
-		pub fn u64_to_balance_option(input: u64) -> Option<BalanceOf<T>> {
-			input.try_into().ok()
+		pub fn u64_to_balance_option(input: u64) -> Result<BalanceOf<T>, Error<T>> {
+			input.try_into().map_err(|_| Error::<T>::ConversionError)
 		}
 
 		fn default_collection_config(
-		) -> CollectionConfig<BalanceOf1<T>, BlockNumberFor<T>, T::CollectionId> {
+		) -> CollectionConfig<BalanceOf1<T>, BlockNumberFor<T>, <T as pallet_nfts::Config>::CollectionId> {
 			Self::collection_config_from_disabled_settings(
 				CollectionSetting::DepositRequired.into(),
 			)
@@ -1126,7 +1245,7 @@ pub mod pallet {
 
 		fn collection_config_from_disabled_settings(
 			settings: BitFlags<CollectionSetting>,
-		) -> CollectionConfig<BalanceOf1<T>, BlockNumberFor<T>, T::CollectionId> {
+		) -> CollectionConfig<BalanceOf1<T>, BlockNumberFor<T>, <T as pallet_nfts::Config>::CollectionId> {
 			CollectionConfig {
 				settings: CollectionSettings::from_disabled(settings),
 				max_supply: None,

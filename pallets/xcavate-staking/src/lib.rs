@@ -1,10 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-/// Edit this file to define custom logic or remove it if it is not needed.
-/// Learn more about FRAME and the core library of Substrate FRAME pallets:
-/// <https://docs.substrate.io/reference/frame-pallets/>
-/// <https://docs.substrate.io/reference/frame-pallets/>
-/// <https://docs.substrate.io/reference/frame-pallets/>
 pub use pallet::*;
 pub use weights::WeightInfo;
 
@@ -55,7 +50,7 @@ pub mod pallet {
 	pub trait Config: frame_system::Config + pallet_community_loan_pool::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-		/// Type representing the weight of this pallet
+		/// Type representing the weight of this pallet.
 		type WeightInfo: WeightInfo;
 		/// The lockable currency type.
 		type Currency: Currency<Self::AccountId>
@@ -68,7 +63,7 @@ pub mod pallet {
 		/// The maximum amount of loans that can run at the same time.
 		#[pallet::constant]
 		type MaxStakers: Get<u32>;
-		/// lose coupling of pallet timestamp
+		/// Lose coupling of pallet timestamp.
 		type TimeProvider: UnixTime;
 	}
 
@@ -81,18 +76,19 @@ pub mod pallet {
 		pub timestamp: u64,
 	}
 
+	/// Mapping of the account to the staking info.
 	#[pallet::storage]
 	#[pallet::getter(fn ledger)]
 	pub type Ledger<T: Config> =
 		StorageMap<_, Twox64Concat, T::AccountId, LedgerAccount<BalanceOf<T>>, OptionQuery>;
 
-	/// All current stakers
+	/// All current stakers.
 	#[pallet::storage]
 	#[pallet::getter(fn active_stakers)]
 	pub type ActiveStakers<T: Config> =
 		StorageValue<_, BoundedVec<T::AccountId, T::MaxStakers>, ValueQuery>;
 
-	/// Number of proposals that have been made.
+	/// The total staked amount.
 	#[pallet::storage]
 	#[pallet::getter(fn total_stake)]
 	pub(super) type TotalStake<T> = StorageValue<_, BalanceOf<T>, ValueQuery>;
@@ -104,8 +100,6 @@ pub mod pallet {
 	pub enum Event<T: Config> {
 		/// Balance was locked successfully.
 		Locked { staker: <T as frame_system::Config>::AccountId, amount: BalanceOf<T> },
-		/// Lock was extended successfully.
-		ExtendedLock { staker: <T as frame_system::Config>::AccountId, amount: BalanceOf<T> },
 		/// Balance was unlocked successfully.
 		Unlocked { staker: <T as frame_system::Config>::AccountId, amount: BalanceOf<T> },
 		/// Rewards were claimed successfully.
@@ -125,11 +119,10 @@ pub mod pallet {
 		NoStakedAmount,
 		/// Too many stakers
 		TooManyStakers,
-		///
+		/// The staker does not exist.
 		NoStaker,
 	}
 
-	// Work in progress, to be included in the future
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_n: frame_system::pallet_prelude::BlockNumberFor<T>) -> Weight {
@@ -149,6 +142,15 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		#[pallet::call_index(0)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::stake())]
+
+		/// Lets the user stake.
+		///
+		/// The origin must be Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `value`: The amount of token that the user wants to stake
+		///
+		/// Emits `Locked` event when succesfful
 		pub fn stake(
 			origin: OriginFor<T>,
 			#[pallet::compact] value: BalanceOf<T>,
@@ -197,6 +199,14 @@ pub mod pallet {
 			Ok(().into())
 		}
 
+		/// Lets the user unstake.
+		///
+		/// The origin must be a staker, signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `value`: The amount of token that the user wants to unstake
+		///
+		/// Emits `Unlocked` event when succesfful
 		#[pallet::call_index(1)]
 		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
 		pub fn unstake(
@@ -229,6 +239,7 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
+		/// Gets the balance that would be available for staking.
 		fn available_staking_balance(
 			staker: &T::AccountId,
 			ledger: &LedgerAccount<BalanceOf<T>>,
@@ -238,6 +249,7 @@ pub mod pallet {
 			free_balance.saturating_sub(ledger.locked)
 		}
 
+		/// Updates the staking infos for the staker.
 		fn update_ledger(staker: &T::AccountId, ledger: LedgerAccount<BalanceOf<T>>) {
 			if ledger.locked.is_zero() {
 				Ledger::<T>::remove(staker);
@@ -258,6 +270,7 @@ pub mod pallet {
 			}
 		}
 
+		/// Calculates the current staking apy.
 		fn calculate_current_apy() -> u128 {
 			let ongoing_loans = pallet_community_loan_pool::Pallet::<T>::ongoing_loans();
 			let mut loan_apys = 0;
@@ -281,6 +294,7 @@ pub mod pallet {
 			average_loan_apy - 200
 		}
 
+		/// Claims the rewards for the stakers
 		pub fn claim_rewards() -> DispatchResult {
 			let active_stakers = Self::active_stakers();
 			for i in active_stakers {
@@ -324,6 +338,8 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// If the total loan amount is lower than the total stake, this function
+		/// unstakes the stake so that the total amount of the stake equals the total amount of the loan
 		fn check_relation_to_loan() -> DispatchResult {
 			let mut total_amount_loan =
 				pallet_community_loan_pool::Pallet::<T>::total_loan_amount() as u128;
@@ -350,6 +366,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Unstakes stakers
 		fn unstake_staker(staker: T::AccountId, value: BalanceOf<T>) -> DispatchResult {
 			let mut ledger = Self::ledger(&staker).unwrap();
 
