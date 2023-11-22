@@ -13,38 +13,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "acurast-common"
-version = "0.2.1"
-source = "git+https://github.com/Acurast/acurast-core.git?branch=staging/polkadot-v1.1.0#d5a05ffcaa37ec3051ed64fd8343cb9efe60e3ab"
-dependencies = [
- "frame-support",
- "parity-scale-codec",
- "scale-info",
- "serde",
- "sp-std",
-]
-
-[[package]]
-name = "acurast-p256-crypto"
-version = "0.2.1"
-source = "git+https://github.com/Acurast/acurast-core.git?branch=staging/polkadot-v1.1.0#d5a05ffcaa37ec3051ed64fd8343cb9efe60e3ab"
-dependencies = [
- "hex",
- "p256 0.12.0-pre",
- "parity-scale-codec",
- "scale-info",
- "serde",
- "sp-application-crypto",
- "sp-core",
- "sp-io",
- "sp-runtime",
- "sp-runtime-interface",
- "sp-std",
- "substrate-bip39",
- "tiny-bip39 0.8.2",
-]
-
-[[package]]
 name = "addr2line"
 version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2958,10 +2926,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8fc3cb4d91f53b50155bdcfd23f6a4c39ae1969c2ae85982b135750cccaf5fce"
 dependencies = [
  "cfg-if",
- "js-sys",
  "libc",
  "wasi 0.9.0+wasi-snapshot-preview1",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -4932,7 +4898,6 @@ dependencies = [
 name = "node-template-runtime"
 version = "4.0.0-dev"
 dependencies = [
- "acurast-p256-crypto",
  "frame-benchmarking",
  "frame-election-provider-support",
  "frame-executive",
@@ -4942,7 +4907,6 @@ dependencies = [
  "frame-system-rpc-runtime-api",
  "frame-try-runtime",
  "node-primitives",
- "pallet-acurast-fulfillment-receiver",
  "pallet-asset-tx-payment",
  "pallet-assets",
  "pallet-aura",
@@ -5176,17 +5140,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "p256"
-version = "0.12.0-pre"
-source = "git+https://github.com/Acurast/elliptic-curves#b2bfb1ed97ffd798e1f87be7ae6386fad7a47520"
-dependencies = [
- "ecdsa 0.14.8",
- "elliptic-curve 0.12.3",
- "sha2 0.10.8",
- "weierstrass",
-]
-
-[[package]]
 name = "p384"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5195,22 +5148,6 @@ dependencies = [
  "ecdsa 0.14.8",
  "elliptic-curve 0.12.3",
  "sha2 0.10.8",
-]
-
-[[package]]
-name = "pallet-acurast-fulfillment-receiver"
-version = "0.2.1"
-source = "git+https://github.com/Acurast/acurast-core.git?branch=staging/polkadot-v1.1.0#d5a05ffcaa37ec3051ed64fd8343cb9efe60e3ab"
-dependencies = [
- "acurast-common",
- "frame-benchmarking",
- "frame-support",
- "frame-system",
- "parity-scale-codec",
- "scale-info",
- "sp-core",
- "sp-io",
- "sp-std",
 ]
 
 [[package]]
@@ -6061,15 +5998,6 @@ name = "paste"
 version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "de3145af08024dea9fa9914f381a17b8fc6034dfb00f3a84013f7ff43f29ed4c"
-
-[[package]]
-name = "pbkdf2"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "216eaa586a190f0a738f2f918511eecfa90f13295abec0e457cdebcceda80cbd"
-dependencies = [
- "crypto-mac 0.8.0",
-]
 
 [[package]]
 name = "pbkdf2"
@@ -7353,7 +7281,7 @@ dependencies = [
  "sp-runtime",
  "sp-version",
  "thiserror",
- "tiny-bip39 1.0.0",
+ "tiny-bip39",
  "tokio",
 ]
 
@@ -8823,7 +8751,7 @@ dependencies = [
  "ss58-registry",
  "substrate-bip39",
  "thiserror",
- "tiny-bip39 1.0.0",
+ "tiny-bip39",
  "tracing",
  "zeroize",
 ]
@@ -9699,25 +9627,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ad70d68dba9e1f8aceda7aa6711965dfec1cac869f311a51bd08b3a2ccbce20"
 dependencies = [
  "time-core",
-]
-
-[[package]]
-name = "tiny-bip39"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ffc59cb9dfc85bb312c3a78fd6aa8a8582e310b0fa885d5bb877f6dcc601839d"
-dependencies = [
- "anyhow",
- "hmac 0.8.1",
- "once_cell",
- "pbkdf2 0.4.0",
- "rand 0.7.3",
- "rustc-hash",
- "sha2 0.9.9",
- "thiserror",
- "unicode-normalization",
- "wasm-bindgen",
- "zeroize",
 ]
 
 [[package]]
@@ -10825,7 +10734,7 @@ dependencies = [
  "hkdf",
  "hmac 0.12.1",
  "log",
- "p256 0.11.1",
+ "p256",
  "p384",
  "rand 0.8.5",
  "rand_core 0.6.4",
@@ -10956,14 +10865,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "winapi",
-]
-
-[[package]]
-name = "weierstrass"
-version = "0.0.0"
-source = "git+https://github.com/Acurast/elliptic-curves#b2bfb1ed97ffd798e1f87be7ae6386fad7a47520"
-dependencies = [
- "elliptic-curve 0.12.3",
 ]
 
 [[package]]

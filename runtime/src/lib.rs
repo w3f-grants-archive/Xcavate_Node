@@ -25,7 +25,7 @@ use frame_support::{
 };
 use sp_staking::currency_to_vote::U128CurrencyToVote;
 //use acurast_p256_crypto::MultiSignature;
-use pallet_acurast_fulfillment_receiver::Fulfillment;
+// use pallet_acurast_fulfillment_receiver::Fulfillment;
 
 use frame_support::traits::TrackedStorageKey;
 use frame_system::{
@@ -1391,7 +1391,7 @@ impl pallet_preimage::Config for Runtime {
 
 // TODO:
 
-pub struct OnAcurastFulfillment;
+/* pub struct OnAcurastFulfillment;
 impl pallet_acurast_fulfillment_receiver::traits::OnFulfillment<Runtime> for OnAcurastFulfillment {
 	fn on_fulfillment(
 		_from: <Runtime as frame_system::Config>::AccountId,
@@ -1399,13 +1399,13 @@ impl pallet_acurast_fulfillment_receiver::traits::OnFulfillment<Runtime> for OnA
 	) -> DispatchResultWithInfo<PostDispatchInfo> {
 		Ok(PostDispatchInfo { actual_weight: None, pays_fee: Pays::No })
 	}
-}
+} */
 
-impl pallet_acurast_fulfillment_receiver::Config for Runtime {
+/* impl pallet_acurast_fulfillment_receiver::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type OnFulfillment = OnAcurastFulfillment;
 	type WeightInfo = ();
-}
+} */
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
@@ -1467,7 +1467,7 @@ construct_runtime!(
 		// AssetConversion: pallet_asset_conversion,
 
 		// Acurast
-		AcurastReceiver: pallet_acurast_fulfillment_receiver::{Pallet, Call, Storage, Event<T>} = 40,
+		//AcurastReceiver: pallet_acurast_fulfillment_receiver::{Pallet, Call, Storage, Event<T>} = 40,
 
 	}
 );
