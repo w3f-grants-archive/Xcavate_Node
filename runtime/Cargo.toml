@@ -189,7 +189,6 @@ runtime-benchmarks = [
 	"frame-system/runtime-benchmarks",
 	"pallet-balances/runtime-benchmarks",
 	"pallet-grandpa/runtime-benchmarks",
-	"pallet-community-loan-pool/runtime-benchmarks",
 	"pallet-timestamp/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
 
@@ -230,6 +229,10 @@ try-runtime = [
 	"pallet-timestamp/try-runtime",
 	"pallet-transaction-payment/try-runtime",
 
+	"pallet-community-loan-pool/try-runtime",
+	"pallet-xcavate-staking/try-runtime",
+	"pallet-nft-marketplace/try-runtime",
+	"pallet-community-projects/try-runtime",
 	"pallet-nfts/try-runtime",
 	"pallet-insecure-randomness-collective-flip/try-runtime",
 	"pallet-assets/try-runtime",
