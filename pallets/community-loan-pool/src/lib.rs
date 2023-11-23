@@ -222,7 +222,10 @@ pub mod pallet {
 		type WeightInfo: WeightInfo;
 
 		#[cfg(feature = "runtime-benchmarks")]
-		type Helper: crate::BenchmarkHelper<<Self as pallet::Config>::CollectionId, <Self as pallet::Config>::ItemId>;
+		type Helper: crate::BenchmarkHelper<
+			<Self as pallet::Config>::CollectionId,
+			<Self as pallet::Config>::ItemId,
+		>;
 
 		/// The amount of time given to vote for a proposal.
 		type VotingTime: Get<BlockNumberFor<Self>>;
@@ -336,7 +339,12 @@ pub mod pallet {
 		_,
 		Twox64Concat,
 		LoanIndex,
-		LoanInfo<BalanceOf<T>, <T as pallet::Config>::CollectionId, <T as pallet::Config>::ItemId, T>,
+		LoanInfo<
+			BalanceOf<T>,
+			<T as pallet::Config>::CollectionId,
+			<T as pallet::Config>::ItemId,
+			T,
+		>,
 		OptionQuery,
 	>;
 
@@ -510,8 +518,7 @@ pub mod pallet {
 	}
 
 	#[pallet::hooks]
-	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T>
-	{
+	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(n: frame_system::pallet_prelude::BlockNumberFor<T>) -> Weight {
 			let mut weight = T::DbWeight::get().reads_writes(1, 1);
 
@@ -1031,8 +1038,7 @@ pub mod pallet {
 		}
 
 		/// Approves the proposal and creates the loan.
-		fn approve_loan_proposal(proposal_index: ProposalIndex) -> DispatchResult
-		{
+		fn approve_loan_proposal(proposal_index: ProposalIndex) -> DispatchResult {
 			let proposal = <Proposals<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
 			//let total_loan_amount = Self::u64_to_balance_option(Self::total_loan_amount()).unwrap();
 			//let decimal = 1000000000000_u64.saturated_into();
@@ -1051,7 +1057,9 @@ pub mod pallet {
 			let available_amount = Self::u64_to_balance_option(amount)?;
 			let loan_apy = proposal.apr_rate;
 			if pallet_nfts::NextCollectionId::<T>::get().is_none() {
-				pallet_nfts::NextCollectionId::<T>::set(<T as pallet_nfts::Config>::CollectionId::initial_value());
+				pallet_nfts::NextCollectionId::<T>::set(
+					<T as pallet_nfts::Config>::CollectionId::initial_value(),
+				);
 			};
 			let collection_id =
 				pallet_nfts::NextCollectionId::<T>::get().ok_or(Error::<T>::UnknownCollection)?;
@@ -1236,8 +1244,11 @@ pub mod pallet {
 			input.try_into().map_err(|_| Error::<T>::ConversionError)
 		}
 
-		fn default_collection_config(
-		) -> CollectionConfig<BalanceOf1<T>, BlockNumberFor<T>, <T as pallet_nfts::Config>::CollectionId> {
+		fn default_collection_config() -> CollectionConfig<
+			BalanceOf1<T>,
+			BlockNumberFor<T>,
+			<T as pallet_nfts::Config>::CollectionId,
+		> {
 			Self::collection_config_from_disabled_settings(
 				CollectionSetting::DepositRequired.into(),
 			)
@@ -1245,7 +1256,11 @@ pub mod pallet {
 
 		fn collection_config_from_disabled_settings(
 			settings: BitFlags<CollectionSetting>,
-		) -> CollectionConfig<BalanceOf1<T>, BlockNumberFor<T>, <T as pallet_nfts::Config>::CollectionId> {
+		) -> CollectionConfig<
+			BalanceOf1<T>,
+			BlockNumberFor<T>,
+			<T as pallet_nfts::Config>::CollectionId,
+		> {
 			CollectionConfig {
 				settings: CollectionSettings::from_disabled(settings),
 				max_supply: None,

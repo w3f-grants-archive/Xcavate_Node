@@ -47,8 +47,6 @@ type BalanceOf1<T> = <<T as pallet_nfts::Config>::Currency as Currency<
 pub type BoundedNftDonationTypes<T> =
 	BoundedVec<NftDonationTypes<BalanceOf<T>>, <T as Config>::MaxNftTypes>;
 
-type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
-
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
@@ -426,7 +424,6 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-
 		/// Creates a new project and list the nfts for the project on the marketplace.
 		///
 		/// The origin must be Signed and the sender must have sufficient funds free.
@@ -592,12 +589,17 @@ pub mod pallet {
 			} else {
 				OngoingProjects::<T>::insert(collection_id, project);
 				let mut listed_nfts = Self::listed_nfts();
-				let index =
-					listed_nfts.iter().position(|x| *x == (collection_id, item_id)).unwrap();
+				let index = listed_nfts
+					.iter()
+					.position(|x| *x == (collection_id, item_id))
+					.ok_or(Error::<T>::InvalidIndex)?;
 				listed_nfts.remove(index);
 				ListedNfts::<T>::put(listed_nfts);
 				let mut listed_items = Self::listed_nfts_of_collection(collection_id);
-				let index = listed_items.iter().position(|x| *x == item_id).unwrap();
+				let index = listed_items
+					.iter()
+					.position(|x| *x == item_id)
+					.ok_or(Error::<T>::InvalidIndex)?;
 				listed_items.remove(index);
 				ListedNftsOfCollection::<T>::insert(collection_id, listed_items);
 			};
@@ -610,9 +612,8 @@ pub mod pallet {
 			}
 			let mut current_voting_power =
 				Self::voting_power((collection_id, signer.clone())).unwrap_or_default();
-			current_voting_power += TryInto::<u64>::try_into(nft.price)
-				.map_err(|_| Error::<T>::ConversionError)
-				.unwrap();
+				current_voting_power += TryInto::<u64>::try_into(nft.price)
+				.map_err(|_| Error::<T>::ConversionError)?;
 			VotingPower::<T>::insert((collection_id, signer.clone()), current_voting_power);
 			Self::deposit_event(Event::<T>::NftBought {
 				collection_index: collection_id,
@@ -678,11 +679,15 @@ pub mod pallet {
 			for item in remaining_nfts {
 				pallet_nfts::Pallet::<T>::do_burn(collection_id.into(), item.into(), |_| Ok(()));
 				let mut listed_nfts = Self::listed_nfts();
-				let index = listed_nfts.iter().position(|x| *x == (collection_id, item)).unwrap();
+				let index = listed_nfts
+					.iter()
+					.position(|x| *x == (collection_id, item))
+					.ok_or(Error::<T>::InvalidIndex)?;
 				listed_nfts.remove(index);
 				ListedNfts::<T>::put(listed_nfts);
 			}
-			let mut project = Self::ongoing_projects(collection_id).unwrap();
+			let mut project =
+				Self::ongoing_projects(collection_id).ok_or(Error::<T>::InvalidIndex)?;
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
 			project.launching_timestamp = current_block_number;
 			// The milestone period is so short for testing purpose. Later on it will be about three weeks if the duration is lower than 12.
@@ -690,8 +695,9 @@ pub mod pallet {
 			let milestone_period =
 				if project.duration > 12 { project.duration * 10 / 12 } else { 10 };
 			OngoingProjects::<T>::insert(collection_id, project);
-			let expiry_block =
-				current_block_number.saturating_add(milestone_period.try_into().ok().unwrap());
+			let expiry_block = current_block_number.saturating_add(
+				milestone_period.try_into().map_err(|_| Error::<T>::ConversionError)?
+			);
 			MilestonePeriodExpiring::<T>::try_mutate(expiry_block, |keys| {
 				keys.try_push(collection_id).map_err(|_| Error::<T>::TooManyProjects)?;
 				Ok::<(), DispatchError>(())
@@ -708,7 +714,7 @@ pub mod pallet {
 			OngoingVotes::<T>::insert(collection_id, vote_stats);
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
 			// The voting period is so short for testing purpose. Later on it will be about 1 week.
-			let expiry_block = current_block_number.saturating_add(10_u64.try_into().ok().unwrap());
+			let expiry_block = current_block_number.saturating_add(10_u64.try_into().map_err(|_| Error::<T>::ConversionError)?);
 			VotingPeriodExpiring::<T>::try_mutate(expiry_block, |keys| {
 				keys.try_push(collection_id).map_err(|_| Error::<T>::TooManyProjects)?;
 				Ok::<(), DispatchError>(())
@@ -724,7 +730,7 @@ pub mod pallet {
 			collection_id: <T as pallet::Config>::CollectionId,
 		) -> DispatchResult {
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
-			let expiry_block = current_block_number.saturating_add(10_u64.try_into().ok().unwrap());
+			let expiry_block = current_block_number.saturating_add(10_u64.try_into().map_err(|_| Error::<T>::ConversionError)?);
 			MilestonePeriodExpiring::<T>::try_mutate(expiry_block, |keys| {
 				keys.try_push(collection_id).map_err(|_| Error::<T>::TooManyProjects)?;
 				Ok::<(), DispatchError>(())
@@ -733,7 +739,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Distributes funds after a successful voting for the project. 
+		/// Distributes funds after a successful voting for the project.
 		fn distribute_funds(collection_id: <T as pallet::Config>::CollectionId) -> DispatchResult {
 			let mut project =
 				OngoingProjects::<T>::take(collection_id).ok_or(Error::<T>::InvalidIndex)?;
@@ -761,7 +767,8 @@ pub mod pallet {
 
 		/// Evaluates if the project has 3 or more strikes and calls the delete delete_project_refund if its the case.
 		fn ckeck_strikes(collection_id: <T as pallet::Config>::CollectionId) -> DispatchResult {
-			let mut project = Self::ongoing_projects(collection_id).unwrap();
+			let mut project =
+				Self::ongoing_projects(collection_id).ok_or(Error::<T>::InvalidIndex)?;
 			project.strikes += 1;
 			OngoingProjects::<T>::insert(collection_id, project.clone());
 			if project.strikes >= 3 {

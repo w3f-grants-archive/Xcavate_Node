@@ -545,8 +545,8 @@ impl pallet_community_projects::Config for Runtime {
 	type MaxNftTypes = MaxNftType;
 	type MaxListedNfts = MaxListedNftProject;
 	type MaxNftInCollection = MaxNftsInCollectionProject;
- 	#[cfg(feature = "runtime-benchmarks")]
-	type Helper = pallet_community_projects::NftHelper; 
+	#[cfg(feature = "runtime-benchmarks")]
+	type Helper = pallet_community_projects::NftHelper;
 	type TimeProvider = Timestamp;
 	type MaxOngoingProjects = MaxOngoingProject;
 	type MaxNftHolder = MaxNftHolders;

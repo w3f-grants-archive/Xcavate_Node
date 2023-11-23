@@ -27,8 +27,6 @@ use pallet_nfts::{
 	CollectionConfig, CollectionSetting, CollectionSettings, ItemConfig, ItemSettings, MintSettings,
 };
 
-use codec::EncodeLike;
-
 type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
 
 type BalanceOf<T> =
@@ -106,7 +104,10 @@ pub mod pallet {
 		type PalletId: Get<PalletId>;
 
 		#[cfg(feature = "runtime-benchmarks")]
-		type Helper: crate::BenchmarkHelper<<Self as pallet_nfts::Config>::CollectionId, <Self as pallet_nfts::Config>::ItemId>;
+		type Helper: crate::BenchmarkHelper<
+			<Self as pallet_nfts::Config>::CollectionId,
+			<Self as pallet_nfts::Config>::ItemId,
+		>;
 
 		/// The maximum amount of nfts that can be listed at the same time.
 		#[pallet::constant]
@@ -138,8 +139,14 @@ pub mod pallet {
 	/// Vector with all currently ongoing listings.
 	#[pallet::storage]
 	#[pallet::getter(fn listed_nfts)]
-	pub(super) type ListedNfts<T: Config> =
-		StorageValue<_, BoundedVec<(<T as pallet::Config>::CollectionId, <T as pallet::Config>::ItemId), T::MaxListedNfts>, ValueQuery>;
+	pub(super) type ListedNfts<T: Config> = StorageValue<
+		_,
+		BoundedVec<
+			(<T as pallet::Config>::CollectionId, <T as pallet::Config>::ItemId),
+			T::MaxListedNfts,
+		>,
+		ValueQuery,
+	>;
 
 	/// Mapping from the nft to the nft details.
 	#[pallet::storage]
@@ -148,7 +155,12 @@ pub mod pallet {
 		_,
 		Twox64Concat,
 		(<T as pallet::Config>::CollectionId, <T as pallet::Config>::ItemId),
-		NftDetails<BalanceOf<T>, <T as pallet::Config>::CollectionId, <T as pallet::Config>::ItemId, T>,
+		NftDetails<
+			BalanceOf<T>,
+			<T as pallet::Config>::CollectionId,
+			<T as pallet::Config>::ItemId,
+			T,
+		>,
 		OptionQuery,
 	>;
 
@@ -181,7 +193,10 @@ pub mod pallet {
 		_,
 		Twox64Concat,
 		AccountIdOf<T>,
-		BoundedVec<(<T as pallet::Config>::CollectionId, <T as pallet::Config>::ItemId), T::MaxListedNfts>,
+		BoundedVec<
+			(<T as pallet::Config>::CollectionId, <T as pallet::Config>::ItemId),
+			T::MaxListedNfts,
+		>,
 		ValueQuery,
 	>;
 
@@ -192,7 +207,10 @@ pub mod pallet {
 		_,
 		Twox64Concat,
 		AccountIdOf<T>,
-		BoundedVec<(<T as pallet::Config>::CollectionId, <T as pallet::Config>::ItemId), T::MaxListedNfts>,
+		BoundedVec<
+			(<T as pallet::Config>::CollectionId, <T as pallet::Config>::ItemId),
+			T::MaxListedNfts,
+		>,
 		ValueQuery,
 	>;
 
@@ -239,11 +257,12 @@ pub mod pallet {
 		MultiplyError,
 		/// There is an issue by calling the next collection id.
 		UnknownCollection,
+		/// The nft has not been found.
+		ItemNotFound,
 	}
 
 	#[pallet::call]
-	impl<T: Config> Pallet<T>
-	{
+	impl<T: Config> Pallet<T> {
 		/// List a real estate object. A new collection is created and 100 nfts get minted.
 		/// This function calls the nfts-pallet to creates a collection, mint nfts and set the Metadata.
 		///
@@ -263,14 +282,15 @@ pub mod pallet {
 		) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
 			if pallet_nfts::NextCollectionId::<T>::get().is_none() {
-				pallet_nfts::NextCollectionId::<T>::set(<T as pallet_nfts::Config>::CollectionId::initial_value(),);
+				pallet_nfts::NextCollectionId::<T>::set(
+					<T as pallet_nfts::Config>::CollectionId::initial_value(),
+				);
 			};
 			let collection_id =
 				pallet_nfts::NextCollectionId::<T>::get().ok_or(Error::<T>::UnknownCollection)?;
 			let next_collection_id = collection_id.increment();
 			pallet_nfts::NextCollectionId::<T>::set(next_collection_id);
 			let collection_id: CollectionId<T> = collection_id.into();
-
 
 			pallet_nfts::Pallet::<T>::do_create_collection(
 				collection_id.into(),
@@ -327,7 +347,13 @@ pub mod pallet {
 					Ok::<(), DispatchError>(())
 				})?;
 			}
-			pallet_nfts::Pallet::<T>::set_team(origin.clone(), collection_id.into(), None, None, None)?;
+			pallet_nfts::Pallet::<T>::set_team(
+				origin.clone(),
+				collection_id.into(),
+				None,
+				None,
+				None,
+			)?;
 			Self::deposit_event(Event::<T>::ObjectListed {
 				collection_index: collection_id,
 				price,
@@ -355,7 +381,7 @@ pub mod pallet {
 			let origin = ensure_signed(origin)?;
 			ensure!(Self::collection_exists(collection), Error::<T>::CollectionNotFound);
 			ensure!(
-				Self::listed_nfts_of_collection(collection).len() >= amount.try_into().unwrap(),
+				Self::listed_nfts_of_collection(collection).len() >= amount.try_into().map_err(|_| Error::<T>::ConversionError)?,
 				Error::<T>::NotEnoughNftsAvailable
 			);
 			for _x in 0..amount as usize {
@@ -374,17 +400,17 @@ pub mod pallet {
 				})?;
 				let price = nft
 					.price
-					.checked_mul(&Self::u64_to_balance_option(1000000000000)?)
+					.checked_mul(&Self::u64_to_balance_option(1/* 000000000000 */)?)
 					.ok_or(Error::<T>::MultiplyError)?;
 				Self::transfer_funds(&origin, &Self::account_id(), price)?;
 				let mut listed_nfts = Self::listed_nfts();
 				let index = listed_nfts
 					.iter()
 					.position(|x| *x == (next_nft.collection_id, next_nft.item_id))
-					.unwrap();
+					.ok_or_else(|| Error::<T>::ItemNotFound)?;
 				listed_nfts.remove(index);
 				ListedNfts::<T>::put(listed_nfts);
-				let index = listed_items.iter().position(|x| *x == next_nft.item_id).unwrap();
+				let index = listed_items.iter().position(|x| *x == next_nft.item_id).ok_or_else(|| Error::<T>::ItemNotFound)?;
 				listed_items.remove(index);
 				ListedNftsOfCollection::<T>::insert(collection, listed_items);
 				if Self::sold_nfts_collection(collection).len() == 100 {
@@ -400,7 +426,7 @@ pub mod pallet {
 					let index = keys
 						.iter()
 						.position(|x| *x == (next_nft.collection_id, next_nft.item_id))
-						.unwrap();
+						.ok_or_else(|| Error::<T>::ItemNotFound)?;
 					keys.remove(index);
 					Ok::<(), DispatchError>(())
 				})?;
@@ -431,7 +457,7 @@ pub mod pallet {
 				.price
 				.checked_mul(&Self::u64_to_balance_option(100)?)
 				.ok_or(Error::<T>::MultiplyError)?
-				.checked_mul(&Self::u64_to_balance_option(1000000000000)?)
+				.checked_mul(&Self::u64_to_balance_option(1/* 000000000000 */)?)
 				.ok_or(Error::<T>::MultiplyError)?;
 			Self::transfer_funds(&Self::account_id(), &nft_details.real_estate_developer, price)?;
 			for x in list {
@@ -455,8 +481,11 @@ pub mod pallet {
 		}
 
 		/// Set the default collection configuration for creating a collection.
-		fn default_collection_config(
-		) -> CollectionConfig<BalanceOf1<T>, BlockNumberFor<T>, <T as pallet_nfts::Config>::CollectionId> {
+		fn default_collection_config() -> CollectionConfig<
+			BalanceOf1<T>,
+			BlockNumberFor<T>,
+			<T as pallet_nfts::Config>::CollectionId,
+		> {
 			Self::collection_config_from_disabled_settings(
 				CollectionSetting::DepositRequired.into(),
 			)
@@ -464,7 +493,11 @@ pub mod pallet {
 
 		fn collection_config_from_disabled_settings(
 			settings: BitFlags<CollectionSetting>,
-		) -> CollectionConfig<BalanceOf1<T>, BlockNumberFor<T>, <T as pallet_nfts::Config>::CollectionId> {
+		) -> CollectionConfig<
+			BalanceOf1<T>,
+			BlockNumberFor<T>,
+			<T as pallet_nfts::Config>::CollectionId,
+		> {
 			CollectionConfig {
 				settings: CollectionSettings::from_disabled(settings),
 				max_supply: None,
