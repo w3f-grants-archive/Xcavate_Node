@@ -478,6 +478,8 @@ pub mod pallet {
 		ArithmeticUnderflow,
 		/// Error by dividing a number.
 		DivisionError,
+		/// This loan does not exist
+		NoLoanFound,
 	}
 
 	#[pallet::event]
@@ -886,7 +888,7 @@ pub mod pallet {
 				<OngoingVotes<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
 			let voted = <UserVotes<T>>::get((proposal_index, origin.clone()));
 			ensure!(voted.is_none(), Error::<T>::AlreadyVoted);
-			let proposal = Self::proposals(proposal_index).unwrap();
+			let proposal = Self::proposals(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(proposal.milestones.len() > 0, Error::<T>::NoMilestones);
 			if vote == Vote::Yes {
 				current_vote.yes_votes += 1;
@@ -1050,7 +1052,7 @@ pub mod pallet {
 			let value = proposal.amount;
 			let mut milestones = proposal.milestones;
 			let timestamp = T::TimeProvider::now().as_secs();
-			let amount = Self::balance_to_u64(value).unwrap()
+			let amount = Self::balance_to_u64(value).unwrap_or_default()
 				* milestones[0].percentage_to_unlock.deconstruct() as u64
 				/ 100;
 			milestones.remove(0);
@@ -1162,8 +1164,7 @@ pub mod pallet {
 			loan.milestones = loan_milestones;
 			loan.available_amount = new_available_amount;
 			let proposal_info = <MilestoneInfo<T>>::take(proposal_index)
-				.ok_or(Error::<T>::InvalidIndex)
-				.unwrap();
+				.ok_or(Error::<T>::InvalidIndex)?;
 			let _err_amount = <T as pallet::Config>::Currency::unreserve(
 				&proposal_info.proposer,
 				proposal_info.bond,
@@ -1176,8 +1177,7 @@ pub mod pallet {
 		/// Rejects a milestone proposal.
 		fn reject_milestone(proposal_index: &ProposalIndex) -> DispatchResult {
 			let proposal_info = <MilestoneInfo<T>>::take(proposal_index)
-				.ok_or(Error::<T>::InvalidIndex)
-				.unwrap();
+				.ok_or(Error::<T>::InvalidIndex)?;
 			let imbalance = <T as pallet::Config>::Currency::slash_reserved(
 				&proposal_info.proposer,
 				proposal_info.bond,
@@ -1196,7 +1196,7 @@ pub mod pallet {
 			let item_id = loan.item_id;
 			pallet_nfts::Pallet::<T>::do_burn(collection_id.into(), item_id.into(), |_| Ok(()))?;
 			let mut loans = Self::ongoing_loans();
-			let index = loans.iter().position(|x| *x == loan_id).unwrap();
+			let index = loans.iter().position(|x| *x == loan_id).ok_or_else(|| Error::<T>::NoLoanFound)?;
 			loans.remove(index);
 			let reserved_loan = Self::reserved_loan_amount()
 				.checked_sub(Self::balance_to_u64(loan.current_loan_balance)?)
