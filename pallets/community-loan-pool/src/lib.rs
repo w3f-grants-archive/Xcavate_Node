@@ -303,7 +303,7 @@ pub mod pallet {
 	#[pallet::getter(fn proposals)]
 	pub(super) type Proposals<T> = StorageMap<
 		_,
-		Twox64Concat,
+		Blake2_128Concat,
 		ProposalIndex,
 		Proposal<BalanceOf<T>, BlockNumberFor<T>, T>,
 		OptionQuery,
@@ -313,14 +313,14 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn milestone_proposals)]
 	pub(super) type MilestoneProposals<T> =
-		StorageMap<_, Twox64Concat, ProposalIndex, LoanIndex, OptionQuery>;
+		StorageMap<_, Blake2_128Concat, ProposalIndex, LoanIndex, OptionQuery>;
 
 	/// Milestone proposal that has been made.
 	#[pallet::storage]
 	#[pallet::getter(fn milestone_info)]
 	pub(super) type MilestoneInfo<T> = StorageMap<
 		_,
-		Twox64Concat,
+		Blake2_128Concat,
 		ProposalIndex,
 		MilestoneProposalInfo<BalanceOf<T>, T>,
 		OptionQuery,
@@ -330,14 +330,14 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn deletion_proposals)]
 	pub(super) type DeletionProposals<T> =
-		StorageMap<_, Twox64Concat, ProposalIndex, LoanIndex, OptionQuery>;
+		StorageMap<_, Blake2_128Concat, ProposalIndex, LoanIndex, OptionQuery>;
 
 	/// Mapping of ongoing loans.
 	#[pallet::storage]
 	#[pallet::getter(fn loans)]
 	pub(super) type Loans<T: Config> = StorageMap<
 		_,
-		Twox64Concat,
+		Blake2_128Concat,
 		LoanIndex,
 		LoanInfo<
 			BalanceOf<T>,
@@ -352,37 +352,37 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn ongoing_votes)]
 	pub(super) type OngoingVotes<T: Config> =
-		StorageMap<_, Twox64Concat, ProposalIndex, VoteStats, OptionQuery>;
+		StorageMap<_, Blake2_128Concat, ProposalIndex, VoteStats, OptionQuery>;
 
 	/// Mapping of ongoing milstone votes.
 	#[pallet::storage]
 	#[pallet::getter(fn ongoing_milestone_votes)]
 	pub(super) type OngoingMilestoneVotes<T: Config> =
-		StorageMap<_, Twox64Concat, ProposalIndex, VoteStats, OptionQuery>;
+		StorageMap<_, Blake2_128Concat, ProposalIndex, VoteStats, OptionQuery>;
 
 	/// Mapping of ongoing deletion votes.
 	#[pallet::storage]
 	#[pallet::getter(fn ongoing_deletion_votes)]
 	pub(super) type OngoingDeletionVotes<T: Config> =
-		StorageMap<_, Twox64Concat, ProposalIndex, VoteStats, OptionQuery>;
+		StorageMap<_, Blake2_128Concat, ProposalIndex, VoteStats, OptionQuery>;
 
 	/// Mapping of user who voted for a proposal.
 	#[pallet::storage]
 	#[pallet::getter(fn user_milestone_votes)]
 	pub(super) type UserMilestoneVotes<T: Config> =
-		StorageMap<_, Twox64Concat, (ProposalIndex, AccountIdOf<T>), Vote, OptionQuery>;
+		StorageMap<_, Blake2_128Concat, (ProposalIndex, AccountIdOf<T>), Vote, OptionQuery>;
 
 	/// Mapping of user who voted for a milestone proposal.
 	#[pallet::storage]
 	#[pallet::getter(fn user_votes)]
 	pub(super) type UserVotes<T: Config> =
-		StorageMap<_, Twox64Concat, (ProposalIndex, AccountIdOf<T>), Vote, OptionQuery>;
+		StorageMap<_, Blake2_128Concat, (ProposalIndex, AccountIdOf<T>), Vote, OptionQuery>;
 
 	/// Mapping of user who voted for a deletion proposal.
 	#[pallet::storage]
 	#[pallet::getter(fn user_deletion_votes)]
 	pub(super) type UserDeletionVotes<T: Config> =
-		StorageMap<_, Twox64Concat, (ProposalIndex, AccountIdOf<T>), Vote, OptionQuery>;
+		StorageMap<_, Blake2_128Concat, (ProposalIndex, AccountIdOf<T>), Vote, OptionQuery>;
 
 	/// Stores the project keys and round types ending on a given block.
 	#[pallet::storage]
@@ -703,7 +703,7 @@ pub mod pallet {
 		///
 		/// Emits `DeletionProposed` event when succesfful
 		#[pallet::call_index(2)]
-		#[pallet::weight(<T as pallet::Config>::WeightInfo::propose_milestone())]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::propose_deletion())]
 		pub fn propose_deletion(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
 			let origin = ensure_signed(origin.clone())?;
 			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
@@ -758,11 +758,10 @@ pub mod pallet {
 				&loan_pallet,
 				&signer,
 				// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
-				(sending_amount as u128 * 1000000000000).try_into().ok().unwrap_or_default(),
+				(sending_amount as u128 * 1000000000000).try_into().map_err(|_| Error::<T>::ConversionError)?,
 				//amount,
 				KeepAlive,
-			)
-			.unwrap_or_default();
+			)?;
 			loan.borrowed_amount = loan.borrowed_amount.saturating_add(amount);
 			loan.available_amount = loan.available_amount.saturating_sub(amount);
 			Loans::<T>::insert(loan_id, loan);
@@ -800,11 +799,10 @@ pub mod pallet {
 				&signer,
 				&loan_pallet,
 				// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
-				(sending_amount as u128 * 1000000000000).try_into().ok().unwrap_or_default(),
+				(sending_amount as u128 * 1000000000000).try_into().map_err(|_| Error::<T>::ConversionError)?,
 				//amount,
 				KeepAlive,
-			)
-			.unwrap_or_default();
+			)?;
 			loan.borrowed_amount = loan.borrowed_amount.saturating_sub(amount);
 			loan.current_loan_balance = loan.current_loan_balance.saturating_sub(amount);
 			Loans::<T>::insert(loan_id, loan);
@@ -1052,11 +1050,11 @@ pub mod pallet {
 			let value = proposal.amount;
 			let mut milestones = proposal.milestones;
 			let timestamp = T::TimeProvider::now().as_secs();
-			let amount = Self::balance_to_u64(value).unwrap_or_default()
-				* milestones[0].percentage_to_unlock.deconstruct() as u64
+			let amount = Self::balance_to_u128(value).unwrap_or_default()
+				* milestones[0].percentage_to_unlock.deconstruct() as u128
 				/ 100;
 			milestones.remove(0);
-			let available_amount = Self::u64_to_balance_option(amount)?;
+			let available_amount = Self::u128_to_balance_option(amount)?;
 			let loan_apy = proposal.apr_rate;
 			if pallet_nfts::NextCollectionId::<T>::get().is_none() {
 				pallet_nfts::NextCollectionId::<T>::set(
@@ -1240,7 +1238,15 @@ pub mod pallet {
 			TryInto::<u64>::try_into(input).map_err(|_| Error::<T>::ConversionError)
 		}
 
+		pub fn balance_to_u128(input: BalanceOf<T>) -> Result<u128, Error<T>> {
+			TryInto::<u128>::try_into(input).map_err(|_| Error::<T>::ConversionError)
+		}
+
 		pub fn u64_to_balance_option(input: u64) -> Result<BalanceOf<T>, Error<T>> {
+			input.try_into().map_err(|_| Error::<T>::ConversionError)
+		}
+
+		pub fn u128_to_balance_option(input: u128) -> Result<BalanceOf<T>, Error<T>> {
 			input.try_into().map_err(|_| Error::<T>::ConversionError)
 		}
 

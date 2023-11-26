@@ -80,7 +80,7 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn ledger)]
 	pub type Ledger<T: Config> =
-		StorageMap<_, Twox64Concat, T::AccountId, LedgerAccount<BalanceOf<T>>, OptionQuery>;
+		StorageMap<_, Blake2_128Concat, T::AccountId, LedgerAccount<BalanceOf<T>>, OptionQuery>;
 
 	/// All current stakers.
 	#[pallet::storage]

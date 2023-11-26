@@ -223,7 +223,7 @@ pub mod pallet {
 	#[pallet::getter(fn ongoing_nft_details)]
 	pub(super) type OngoingNftDetails<T: Config> = StorageMap<
 		_,
-		Twox64Concat,
+		Blake2_128Concat,
 		(<T as pallet::Config>::CollectionId, <T as pallet::Config>::ItemId),
 		NftDetails<
 			BalanceOf<T>,
@@ -239,7 +239,7 @@ pub mod pallet {
 	#[pallet::getter(fn ongoing_projects)]
 	pub(super) type OngoingProjects<T: Config> = StorageMap<
 		_,
-		Twox64Concat,
+		Blake2_128Concat,
 		<T as pallet::Config>::CollectionId,
 		ProjectDetails<BalanceOf<T>, T>,
 		OptionQuery,
@@ -250,7 +250,7 @@ pub mod pallet {
 	#[pallet::getter(fn listed_nfts_of_collection)]
 	pub(super) type ListedNftsOfCollection<T: Config> = StorageMap<
 		_,
-		Twox64Concat,
+		Blake2_128Concat,
 		<T as pallet::Config>::CollectionId,
 		BoundedVec<<T as pallet::Config>::ItemId, T::MaxNftInCollection>,
 		ValueQuery,
@@ -280,14 +280,14 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn ongoing_votes)]
 	pub(super) type OngoingVotes<T: Config> =
-		StorageMap<_, Twox64Concat, <T as pallet::Config>::CollectionId, VoteStats, OptionQuery>;
+		StorageMap<_, Blake2_128Concat, <T as pallet::Config>::CollectionId, VoteStats, OptionQuery>;
 
 	/// Mapping of collection to the users.
 	#[pallet::storage]
 	#[pallet::getter(fn voted_user)]
 	pub(super) type VotedUser<T: Config> = StorageMap<
 		_,
-		Twox64Concat,
+		Blake2_128Concat,
 		<T as pallet::Config>::CollectionId,
 		BoundedVec<AccountIdOf<T>, T::MaxNftHolder>,
 		ValueQuery,
@@ -298,7 +298,7 @@ pub mod pallet {
 	#[pallet::getter(fn nft_holder)]
 	pub(super) type NftHolder<T: Config> = StorageMap<
 		_,
-		Twox64Concat,
+		Blake2_128Concat,
 		<T as pallet::Config>::CollectionId,
 		BoundedVec<AccountIdOf<T>, T::MaxNftHolder>,
 		ValueQuery,
@@ -309,7 +309,7 @@ pub mod pallet {
 	#[pallet::getter(fn voting_power)]
 	pub(super) type VotingPower<T: Config> = StorageMap<
 		_,
-		Twox64Concat,
+		Blake2_128Concat,
 		(<T as pallet::Config>::CollectionId, AccountIdOf<T>),
 		u64,
 		OptionQuery,
@@ -382,6 +382,8 @@ pub mod pallet {
 		NoFundsRemaining,
 		/// Metadata is not the same amount as nft types.
 		WrongAmountOfMetadata,
+		/// The Duration must be at least one.
+		DurationMustBeHigherThanZero,
 	}
 
 	#[pallet::hooks]
@@ -456,6 +458,7 @@ pub mod pallet {
 					<T as pallet_nfts::Config>::CollectionId::initial_value(),
 				);
 			};
+			ensure!(duration > 0, Error::<T>::DurationMustBeHigherThanZero);
 			let collection_id =
 				pallet_nfts::NextCollectionId::<T>::get().ok_or(Error::<T>::UnknownCollection)?;
 			let next_collection_id = collection_id.increment();
@@ -796,8 +799,8 @@ pub mod pallet {
 					origin,
 					asset_id.into().into(),
 					user_lookup,
-					Self::u64_to_balance_option(remaining_funds).unwrap_or_default()
-						/* * Self::u64_to_balance_option(1000000000000).unwrap_or_default() */,
+					Self::u64_to_balance_option(remaining_funds)?
+						/* * Self::u64_to_balance_option(1000000000000)? */,
 				)
 				.map_err(|_| Error::<T>::NotEnoughFunds)?;
 			}

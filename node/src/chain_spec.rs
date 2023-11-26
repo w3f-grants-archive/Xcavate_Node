@@ -80,7 +80,7 @@ pub fn get_endowed_accounts_with_balance() -> Vec<(AccountId, u128)> {
 		accounts.iter().cloned().map(|k| (k, ENDOWMENT)).collect();
 	let json_data = &include_bytes!("../../seed/balances.json")[..];
 	let additional_accounts_with_balance: Vec<(AccountId, u128)> =
-		serde_json::from_slice(json_data).unwrap();
+		serde_json::from_slice(json_data).unwrap_or_default();
 
 	let mut accounts = additional_accounts_with_balance.clone();
 

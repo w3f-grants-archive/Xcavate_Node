@@ -153,7 +153,7 @@ pub mod pallet {
 	#[pallet::getter(fn ongoing_nft_details)]
 	pub(super) type OngoingNftDetails<T: Config> = StorageMap<
 		_,
-		Twox64Concat,
+		Blake2_128Concat,
 		(<T as pallet::Config>::CollectionId, <T as pallet::Config>::ItemId),
 		NftDetails<
 			BalanceOf<T>,
@@ -169,7 +169,7 @@ pub mod pallet {
 	#[pallet::getter(fn listed_nfts_of_collection)]
 	pub(super) type ListedNftsOfCollection<T: Config> = StorageMap<
 		_,
-		Twox64Concat,
+		Blake2_128Concat,
 		<T as pallet::Config>::CollectionId,
 		BoundedVec<<T as pallet::Config>::ItemId, T::MaxNftInCollection>,
 		ValueQuery,
@@ -180,7 +180,7 @@ pub mod pallet {
 	#[pallet::getter(fn sold_nfts_collection)]
 	pub(super) type SoldNftsCollection<T: Config> = StorageMap<
 		_,
-		Twox64Concat,
+		Blake2_128Concat,
 		<T as pallet::Config>::CollectionId,
 		BoundedVec<<T as pallet::Config>::ItemId, T::MaxNftInCollection>,
 		ValueQuery,
@@ -191,7 +191,7 @@ pub mod pallet {
 	#[pallet::getter(fn seller_listings)]
 	pub(super) type SellerListings<T: Config> = StorageMap<
 		_,
-		Twox64Concat,
+		Blake2_128Concat,
 		AccountIdOf<T>,
 		BoundedVec<
 			(<T as pallet::Config>::CollectionId, <T as pallet::Config>::ItemId),
@@ -205,7 +205,7 @@ pub mod pallet {
 	#[pallet::getter(fn seller_sold_nfts)]
 	pub(super) type SellerSoldNfts<T: Config> = StorageMap<
 		_,
-		Twox64Concat,
+		Blake2_128Concat,
 		AccountIdOf<T>,
 		BoundedVec<
 			(<T as pallet::Config>::CollectionId, <T as pallet::Config>::ItemId),
