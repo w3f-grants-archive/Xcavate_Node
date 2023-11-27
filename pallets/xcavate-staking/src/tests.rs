@@ -3,6 +3,9 @@ use frame_support::{
 	assert_noop, assert_ok,
 	traits::{OnFinalize, OnInitialize},
 };
+use frame_support::sp_runtime::Percent;
+
+use pallet_community_loan_pool::{BoundedProposedMilestones, Config, ProposedMilestone};
 
 fn run_to_block(n: u64) {
 	while System::block_number() < n {
@@ -15,6 +18,18 @@ fn run_to_block(n: u64) {
 		System::on_initialize(System::block_number());
 		CommunityLoanPool::on_initialize(System::block_number());
 	}
+}
+
+fn get_milestones(mut n: u32) -> BoundedProposedMilestones<Test> {
+	let max = <Test as Config>::MaxMilestonesPerProject::get();
+	if n > max {
+		n = max
+	}
+	(0..n)
+		.map(|_| ProposedMilestone { percentage_to_unlock: Percent::from_percent((100 / n) as u8) })
+		.collect::<Vec<ProposedMilestone>>()
+		.try_into()
+		.expect("bound is ensured; qed")
 }
 
 #[test]
@@ -76,5 +91,32 @@ fn unstake_doesnt_work_for_nonstaker() {
 			XcavateStaking::unstake(RuntimeOrigin::signed([1; 32].into()), 100),
 			Error::<Test>::NoStaker
 		);
+	})
+}
+
+#[test]
+fn claiming_of_rewards_works() {
+	new_test_ext().execute_with(|| {
+		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([0; 32].into()), 10000000));
+		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(CommunityLoanPool::propose(
+			RuntimeOrigin::signed([1; 32].into()),
+			10000000,
+			sp_runtime::MultiAddress::Id([1; 32].into()),
+			13,
+			20
+		));
+		assert_ok!(CommunityLoanPool::set_milestones(
+			RuntimeOrigin::signed([0; 32].into()),
+			1,
+			get_milestones(10),
+		));
+		run_to_block(21);
+		assert_eq!(CommunityLoanPool::ongoing_loans().len(), 1);
+		run_to_block(100);
+		assert_eq!(Balances::free_balance(&([0; 32].into())), 20_000_000);
+		//assert_eq!(ledger([0; 32].into()).unwrap().locked, 10000000);
+		//System::assert_last_event(Event::RewardsClaimed { amount: 42, apy: 1 }.into());
+
 	})
 }

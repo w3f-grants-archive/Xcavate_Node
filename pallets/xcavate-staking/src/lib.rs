@@ -27,6 +27,8 @@ use frame_support::sp_runtime::Saturating;
 
 use sp_std::prelude::*;
 
+use frame_support::sp_runtime::SaturatedConversion;
+
 pub type BalanceOf<T> =
 	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
@@ -65,6 +67,8 @@ pub mod pallet {
 		type MaxStakers: Get<u32>;
 		/// Lose coupling of pallet timestamp.
 		type TimeProvider: UnixTime;
+		/// Frequence in which the staking rewards are distributed
+		type RewardsDistributingTime: Get<BlockNumberFor<Self>>;
 	}
 
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
@@ -131,16 +135,18 @@ pub mod pallet {
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-		fn on_initialize(_n: frame_system::pallet_prelude::BlockNumberFor<T>) -> Weight {
-			T::DbWeight::get().writes(1)
-		}
+		fn on_initialize(n: frame_system::pallet_prelude::BlockNumberFor<T>) -> Weight {
+			let mut weight = T::DbWeight::get().reads_writes(1, 1);
+			let block = n.saturated_into::<u64>();
+			let time_frame = T::RewardsDistributingTime::get().saturated_into::<u64>();
+			if block % time_frame == 0 { 
+				Self::claim_rewards().unwrap_or_default();
+				weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
+				Self::check_relation_to_loan().unwrap_or_default();
+				weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
+				} 
 
-		fn on_finalize(_n: frame_system::pallet_prelude::BlockNumberFor<T>) {
-			//let block = n.saturated_into::<u64>();
-			/* if block % 10 == 0 { */
-			Self::claim_rewards().unwrap_or_default();
-			Self::check_relation_to_loan().unwrap_or_default();
-			/* } */
+			weight
 		}
 	}
 
@@ -311,8 +317,7 @@ pub mod pallet {
 				let current_timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
 				let locked_amount = Self::balance_to_u128(ledger.locked).unwrap_or_default();
 				let rewards = locked_amount * apy * (current_timestamp - ledger.timestamp) as u128
-					/ 365 / 60 / 60 / 24 / 100
-					/ 100;
+					/ 365 / 60 / 60 / 24 / 100;
 				let new_locked_amount = locked_amount + rewards;
 				ledger.locked = Self::u128_to_balance_option(new_locked_amount).unwrap_or_default();
 				ledger.timestamp = current_timestamp;

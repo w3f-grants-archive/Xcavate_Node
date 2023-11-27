@@ -578,16 +578,14 @@ pub mod pallet {
 					OngoingDeletionVotes::<T>::remove(item);
 				}
 			});
-
-			weight
-		}
-
-		/// Charging loan apy every block for testing purpose
-		fn on_finalize(_n: frame_system::pallet_prelude::BlockNumberFor<T>) {
+			/// Charging loan apy every block for testing purpose
 			//let block = n.saturated_into::<u64>();
 			//if block % 10 == 0 {
 			Self::charge_apy().unwrap_or_default();
-			//}
+			weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
+				//}
+
+			weight
 		}
 	}
 
@@ -1130,7 +1128,7 @@ pub mod pallet {
 				let time_difference = current_timestamp - loan.last_timestamp;
 				let loan_amount = Self::balance_to_u64(loan.current_loan_balance)?;
 				let interests =
-					loan_amount * time_difference * loan.loan_apy / 365 / 60 / 60 / 24 / 100 / 100;
+					loan_amount * time_difference * loan.loan_apy / 365 / 60 / 60 / 24 / 100;
 				let interest_balance = Self::u64_to_balance_option(interests)?;
 				loan.borrowed_amount += interest_balance;
 				loan.current_loan_balance += interest_balance;

@@ -495,6 +495,7 @@ impl pallet_community_loan_pool::Config for Runtime {
 parameter_types! {
 	pub const MinimumRemainingAmount: Balance = DOLLARS;
 	pub const MaxStaker: u32 = 10000;
+	pub const RewardsDistributing: BlockNumber = 1;
 }
 
 /// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
@@ -505,6 +506,7 @@ impl pallet_xcavate_staking::Config for Runtime {
 	type MinimumRemainingAmount = MinimumRemainingAmount;
 	type MaxStakers = MaxStaker;
 	type TimeProvider = Timestamp;
+	type RewardsDistributingTime = RewardsDistributing;
 }
 
 parameter_types! {
