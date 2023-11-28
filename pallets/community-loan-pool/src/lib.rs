@@ -498,7 +498,7 @@ pub mod pallet {
 		/// Loan has been deleted.
 		Deleted { loan_index: LoanIndex },
 		/// Apy has been charged.
-		ApyCharged { loan_index: LoanIndex },
+		ApyCharged { loan_index: LoanIndex, interest_balance: BalanceOf<T> },
 		/// Loan has been updated.
 		LoanUpdated { loan_index: LoanIndex },
 		/// User withdrew money.
@@ -1136,7 +1136,7 @@ pub mod pallet {
 				Loans::<T>::insert(loan_index, loan.clone());
 				let new_value = Self::total_loan_amount() + interests;
 				TotalLoanAmount::<T>::put(new_value);
-				Self::deposit_event(Event::<T>::ApyCharged { loan_index });
+				Self::deposit_event(Event::<T>::ApyCharged { loan_index, interest_balance });
 			}
 			Ok(())
 		}

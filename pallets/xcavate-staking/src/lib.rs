@@ -299,11 +299,11 @@ pub mod pallet {
 				let loan = pallet_community_loan_pool::Pallet::<T>::loans(loan_index)
     .ok_or(Error::<T>::NoLoanFound)?;
 				loan_apys += loan.loan_apy as u128
-					*TryInto::<u128>::try_into(loan.borrowed_amount + loan.available_amount).map_err(|_| Error::<T>::ConversionError).unwrap_or_default()
-					 * 10000 / total_amount_loan;
+					* TryInto::<u128>::try_into(loan.current_loan_balance).map_err(|_| Error::<T>::ConversionError).unwrap_or_default()
+					  * 10000 / total_amount_loan;
 			}
-			let average_loan_apy = loan_apys / 10000;
-			Ok(average_loan_apy - 200)
+			let average_loan_apy = loan_apys / 10000 ;
+			Ok(average_loan_apy.saturating_sub(200))
 		}
 
 		/// Claims the rewards for the stakers

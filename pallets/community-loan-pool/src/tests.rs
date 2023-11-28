@@ -351,3 +351,31 @@ fn deletion_works() {
 		assert_eq!(CommunityLoanPool::loans(1), None);
 	})
 }
+
+#[test]
+fn charge_apy_works() {
+	new_test_ext().execute_with(|| {
+		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(CommunityLoanPool::propose(
+			RuntimeOrigin::signed([0; 32].into()),
+			100000000,
+			sp_runtime::MultiAddress::Id([0; 32].into()),
+			1,
+			1
+		));
+		assert_ok!(CommunityLoanPool::set_milestones(
+			RuntimeOrigin::signed([0; 32].into()),
+			1,
+			get_milestones(10),
+		));
+		Timestamp::set_timestamp(0);
+		run_to_block(11);
+		Timestamp::set_timestamp(10000);
+		System::reset_events();
+		System::set_block_number(System::block_number() + 1);
+		System::on_initialize(System::block_number());
+		CommunityLoanPool::on_initialize(System::block_number());
+		assert_eq!(CommunityLoanPool::loans(1).unwrap().borrowed_amount, 396);
+		System::assert_last_event(Event::ApyCharged { loan_index: 1 , interest_balance: 0}.into());
+	})
+}

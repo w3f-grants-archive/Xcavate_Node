@@ -101,7 +101,7 @@ fn claiming_of_rewards_works() {
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
-			10000000,
+			10003000,
 			sp_runtime::MultiAddress::Id([1; 32].into()),
 			13,
 			20
@@ -111,12 +111,18 @@ fn claiming_of_rewards_works() {
 			1,
 			get_milestones(10),
 		));
+		Timestamp::set_timestamp(0);
 		run_to_block(21);
 		assert_eq!(CommunityLoanPool::ongoing_loans().len(), 1);
-		run_to_block(100);
-		assert_eq!(Balances::free_balance(&([0; 32].into())), 20_000_000);
-		//assert_eq!(ledger([0; 32].into()).unwrap().locked, 10000000);
-		//System::assert_last_event(Event::RewardsClaimed { amount: 42, apy: 1 }.into());
-
+		assert_eq!(CommunityLoanPool::loans(1).unwrap().available_amount, 1000300);
+		assert_eq!(CommunityLoanPool::total_loan_amount(), 10003000);
+		assert_eq!(XcavateStaking::ledger::<AccountId>([0; 32].into()).unwrap().locked, 10000000);
+		Timestamp::set_timestamp(10000);
+		System::reset_events();
+		System::set_block_number(System::block_number() + 1);
+		System::on_initialize(System::block_number());
+		XcavateStaking::on_initialize(System::block_number());
+		assert_eq!(XcavateStaking::ledger::<AccountId>([0; 32].into()).unwrap().locked, 10000026);
+		System::assert_last_event(Event::RewardsClaimed { amount: 26, apy: 823 }.into());
 	})
 }
