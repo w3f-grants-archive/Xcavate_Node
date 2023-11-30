@@ -80,17 +80,39 @@ pub mod pallet {
 		pub timestamp: u64,
 	}
 
+	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
+	pub struct QueueLedgerAccount<Balance> {
+		/// Balance locked
+		pub locked: Balance,
+		/// Timestamp locked
+		pub timestamp: u64,
+	}
+
 	/// Mapping of the account to the staking info.
 	#[pallet::storage]
 	#[pallet::getter(fn ledger)]
 	pub type Ledger<T: Config> =
 		StorageMap<_, Blake2_128Concat, T::AccountId, LedgerAccount<BalanceOf<T>>, OptionQuery>;
 
+	/// Mapping of the account to the queue info.
+	#[pallet::storage]
+	#[pallet::getter(fn queue_ledger)]
+	pub type QueueLedger<T: Config> =
+		StorageMap<_, Blake2_128Concat, T::AccountId, QueueLedgerAccount<BalanceOf<T>>, OptionQuery>;
+
 	/// All current stakers.
 	#[pallet::storage]
 	#[pallet::getter(fn active_stakers)]
 	pub type ActiveStakers<T: Config> =
 		StorageValue<_, BoundedVec<T::AccountId, T::MaxStakers>, ValueQuery>;
+
+	/// All current users waiting in the queue.
+	#[pallet::storage]
+	#[pallet::getter(fn queue_stakers)]
+	pub type QueueStakers<T: Config> =
+		StorageValue<_, BoundedVec<T::AccountId, T::MaxStakers>, ValueQuery>;
+
 
 	/// The total staked amount.
 	#[pallet::storage]
@@ -171,42 +193,115 @@ pub mod pallet {
 
 			ensure!(!value.is_zero(), Error::<T>::StakingWithNoValue);
 
-			if Self::ledger(&staker).is_none() {
-				let available_balance = <T as pallet::Config>::Currency::free_balance(&staker)
+			let total_amount_loan =
+			pallet_community_loan_pool::Pallet::<T>::total_loan_amount() as u128;
+			let total_stake = Self::balance_to_u128(Self::total_stake()).unwrap_or_default();
+			if total_stake >= total_amount_loan {
+				if Self::queue_ledger(&staker).is_none() {
+					let available_balance = <T as pallet::Config>::Currency::free_balance(&staker)
+						.saturating_sub(T::MinimumRemainingAmount::get());
+					let value_to_queue = value.min(available_balance);
+					let timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
+					let queue_ledger = QueueLedgerAccount { locked: value_to_queue, timestamp };
+					Self::update_queue_ledger(&staker, queue_ledger);
+					QueueStakers::<T>::try_append(staker.clone())
+						.map_err(|_| Error::<T>::TooManyStakers)?;
+				} else {
+					let mut queue_ledger = Self::queue_ledger(&staker).ok_or(Error::<T>::LedgerNotFound)?;
+					let available_balance = <T as pallet::Config>::Currency::free_balance(&staker)
 					.saturating_sub(T::MinimumRemainingAmount::get());
-
-				let value_to_stake = value.min(available_balance);
-
-				let timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
-
-				let ledger = LedgerAccount { locked: value_to_stake, timestamp };
-
-				Self::update_ledger(&staker, ledger);
-
-				ActiveStakers::<T>::try_append(staker.clone())
-					.map_err(|_| Error::<T>::TooManyStakers)?;
-
-				let total_stake = Self::total_stake();
-				TotalStake::<T>::put(total_stake + value_to_stake);
+					let value_to_queue = value.min(available_balance);
+					let timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
+					queue_ledger.locked += value_to_queue;
+					queue_ledger.timestamp = timestamp;
+					Self::update_queue_ledger(&staker, queue_ledger);
+				}			
+			} else if total_stake + Self::balance_to_u128(value).unwrap_or_default() >= total_amount_loan {
+				let available_balance = <T as pallet::Config>::Currency::free_balance(&staker)
+				.saturating_sub(T::MinimumRemainingAmount::get());
+				let value_available = value.min(available_balance);
+				let staking_value = total_amount_loan - total_stake;
+				let queue_value = Self::balance_to_u128(value_available).unwrap_or_default() - staking_value;
+				if Self::queue_ledger(&staker).is_none() {
+					let timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
+					let queue_ledger = QueueLedgerAccount { locked: Self::u128_to_balance_option(queue_value).unwrap_or_default(), timestamp };
+					Self::update_queue_ledger(&staker, queue_ledger);
+					QueueStakers::<T>::try_append(staker.clone())
+						.map_err(|_| Error::<T>::TooManyStakers)?;
+				} else {
+					let mut queue_ledger = Self::queue_ledger(&staker).ok_or(Error::<T>::LedgerNotFound)?;
+					let available_balance = <T as pallet::Config>::Currency::free_balance(&staker)
+					.saturating_sub(T::MinimumRemainingAmount::get());
+					let value_to_queue = value.min(available_balance);
+					let timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
+					queue_ledger.locked += value_to_queue;
+					queue_ledger.timestamp = timestamp;
+					Self::update_queue_ledger(&staker, queue_ledger);
+				}
+				if Self::ledger(&staker).is_none() {
+					let timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
+	
+					let ledger = LedgerAccount { locked: Self::u128_to_balance_option(staking_value).unwrap_or_default(), timestamp };
+	
+					Self::update_ledger(&staker, ledger);
+	
+					ActiveStakers::<T>::try_append(staker.clone())
+						.map_err(|_| Error::<T>::TooManyStakers)?;
+	
+					let total_stake = Self::total_stake();
+					TotalStake::<T>::put(total_stake + Self::u128_to_balance_option(staking_value).unwrap_or_default());
+				} else {
+					let mut ledger = Self::ledger(&staker).ok_or(Error::<T>::LedgerNotFound)?;
+	
+					let timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
+	
+					//ensure!(value_to_stake > 0, Error::<T>::StakingWithNoValue);
+	
+					ledger.locked += Self::u128_to_balance_option(staking_value).unwrap_or_default();
+					ledger.timestamp = timestamp;
+	
+					Self::update_ledger(&staker, ledger);
+	
+					let total_stake = Self::total_stake();
+					TotalStake::<T>::put(total_stake + Self::u128_to_balance_option(staking_value).unwrap_or_default());
+				}
 			} else {
-				let mut ledger = Self::ledger(&staker).ok_or(Error::<T>::LedgerNotFound)?;
-
-				let available_balance = Self::available_staking_balance(&staker, &ledger);
-				let value_to_stake = value.min(available_balance);
-
-				let timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
-
-				//ensure!(value_to_stake > 0, Error::<T>::StakingWithNoValue);
-
-				ledger.locked += value;
-				ledger.timestamp = timestamp;
-
-				Self::update_ledger(&staker, ledger);
-
-				let total_stake = Self::total_stake();
-				TotalStake::<T>::put(total_stake + value_to_stake);
+				if Self::ledger(&staker).is_none() {
+					let available_balance = <T as pallet::Config>::Currency::free_balance(&staker)
+						.saturating_sub(T::MinimumRemainingAmount::get());
+	
+					let value_to_stake = value.min(available_balance);
+	
+					let timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
+	
+					let ledger = LedgerAccount { locked: value_to_stake, timestamp };
+	
+					Self::update_ledger(&staker, ledger);
+	
+					ActiveStakers::<T>::try_append(staker.clone())
+						.map_err(|_| Error::<T>::TooManyStakers)?;
+	
+					let total_stake = Self::total_stake();
+					TotalStake::<T>::put(total_stake + value_to_stake);
+				} else {
+					let mut ledger = Self::ledger(&staker).ok_or(Error::<T>::LedgerNotFound)?;
+	
+					let available_balance = Self::available_staking_balance(&staker, &ledger);
+					let value_to_stake = value.min(available_balance);
+	
+					let timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
+	
+					//ensure!(value_to_stake > 0, Error::<T>::StakingWithNoValue);
+	
+					ledger.locked += value;
+					ledger.timestamp = timestamp;
+	
+					Self::update_ledger(&staker, ledger);
+	
+					let total_stake = Self::total_stake();
+					TotalStake::<T>::put(total_stake + value_to_stake);
+				}
 			}
-
 			Self::deposit_event(Event::Locked { staker, amount: value });
 			Ok(().into())
 		}
@@ -278,6 +373,27 @@ pub mod pallet {
 					Ledger::<T>::insert(staker, ledger);
 				} else {
 					Ledger::<T>::insert(staker, ledger);
+				}
+			}
+		}
+
+		/// Updates the queue info for the staker.
+		fn update_queue_ledger(staker: &T::AccountId, ledger: QueueLedgerAccount<BalanceOf<T>>) {
+			if ledger.locked.is_zero() {
+				QueueLedger::<T>::remove(staker);
+				<T as pallet::Config>::Currency::remove_lock(EXAMPLE_ID, staker);
+			} else {
+				let locking_amount = Self::balance_to_u128(ledger.locked).unwrap_or_default() * 1000000000000;
+				if Self::u128_to_balance_option(locking_amount).is_ok() {
+					<T as pallet::Config>::Currency::set_lock(
+						EXAMPLE_ID,
+						staker,
+						Self::u128_to_balance_option(locking_amount).unwrap_or_default(),
+						WithdrawReasons::all(),
+					);
+					QueueLedger::<T>::insert(staker, ledger);
+				} else {
+					QueueLedger::<T>::insert(staker, ledger);
 				}
 			}
 		}
@@ -357,16 +473,16 @@ pub mod pallet {
 			let mut total_stake = Self::balance_to_u128(Self::total_stake()).unwrap_or_default();
 			while total_stake > total_amount_loan {
 				let stakers = Self::active_stakers();
-				let last_staker = &Self::active_stakers()[stakers.len() - 1];
-				let ledger = Self::ledger(last_staker).ok_or(Error::<T>::LedgerNotFound)?;
+				let first_staker = &Self::active_stakers()[0];
+				let ledger = Self::ledger(first_staker).ok_or(Error::<T>::LedgerNotFound)?;
 				if Self::balance_to_u128(ledger.locked).unwrap_or_default()
 					< total_stake.saturating_sub(total_amount_loan)
 				{
-					Self::unstake_staker(last_staker.clone(), ledger.locked);
+					Self::unstake_staker(first_staker.clone(), ledger.locked);
 				} else {
 					let value = total_stake.saturating_sub(total_amount_loan);
 					Self::unstake_staker(
-						last_staker.clone(),
+						first_staker.clone(),
 						Self::u128_to_balance_option(value).unwrap_or_default(),
 					);
 				};
