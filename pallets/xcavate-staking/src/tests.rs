@@ -61,6 +61,119 @@ fn stake_works() {
 }
 
 #[test]
+fn queue_works() {
+	new_test_ext().execute_with(|| {
+		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([0; 32].into()), 100));
+		assert_eq!(XcavateStaking::queue_ledger(1).unwrap().locked, 100);
+		assert_eq!(XcavateStaking::ledger(1), None);
+	})
+}
+
+#[test]
+fn staking_and_queuing_works() {
+	new_test_ext().execute_with(|| {
+		Timestamp::set_timestamp(1);
+		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(CommunityLoanPool::propose(
+			RuntimeOrigin::signed([1; 32].into()),
+			100,
+			sp_runtime::MultiAddress::Id([1; 32].into()),
+			13,
+			20
+		));
+		assert_ok!(CommunityLoanPool::set_milestones(
+			RuntimeOrigin::signed([0; 32].into()),
+			1,
+			get_milestones(10),
+		));
+		run_to_block(21);
+		assert_eq!(CommunityLoanPool::ongoing_loans().len(), 1);
+		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([0; 32].into()), 200));
+		assert_eq!(XcavateStaking::queue_ledger(1).unwrap().locked, 100);
+		assert_eq!(XcavateStaking::ledger(1).unwrap().locked, 100);
+	})
+}
+
+#[test]
+fn unstake_if_loan_payed_back() {
+	new_test_ext().execute_with(|| {
+		Timestamp::set_timestamp(1);
+		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(CommunityLoanPool::propose(
+			RuntimeOrigin::signed([1; 32].into()),
+			100,
+			sp_runtime::MultiAddress::Id([1; 32].into()),
+			13,
+			20
+		));
+		assert_ok!(CommunityLoanPool::set_milestones(
+			RuntimeOrigin::signed([0; 32].into()),
+			1,
+			get_milestones(10),
+		));
+		run_to_block(21);
+		assert_eq!(CommunityLoanPool::ongoing_loans().len(), 1);
+		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([0; 32].into()), 200));
+		assert_eq!(XcavateStaking::queue_ledger(1).unwrap().locked, 100);
+		assert_eq!(XcavateStaking::ledger(1).unwrap().locked, 100);
+		assert_ok!(CommunityLoanPool::withdraw(RuntimeOrigin::signed([1; 32].into()), 1, 10));
+		assert_ok!(CommunityLoanPool::repay(RuntimeOrigin::signed([1; 32].into()), 1, 10));
+		System::reset_events();
+		System::set_block_number(System::block_number() + 1);
+		System::on_initialize(System::block_number());
+		XcavateStaking::on_initialize(System::block_number());
+		assert_eq!(XcavateStaking::queue_ledger(2).unwrap().locked, 10);
+		assert_eq!(XcavateStaking::ledger(1).unwrap().locked, 90);
+		assert_eq!(XcavateStaking::queue_staking().len(), 2);
+	})
+}
+
+#[test]
+fn stakes_if_loan_increases() {
+	new_test_ext().execute_with(|| {
+		Timestamp::set_timestamp(1);
+		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(CommunityLoanPool::propose(
+			RuntimeOrigin::signed([1; 32].into()),
+			100,
+			sp_runtime::MultiAddress::Id([1; 32].into()),
+			13,
+			20
+		));
+		assert_ok!(CommunityLoanPool::set_milestones(
+			RuntimeOrigin::signed([0; 32].into()),
+			1,
+			get_milestones(10),
+		));
+		run_to_block(21);
+		assert_eq!(CommunityLoanPool::ongoing_loans().len(), 1);
+		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([0; 32].into()), 200));
+		assert_eq!(XcavateStaking::queue_ledger(1).unwrap().locked, 100);
+		assert_eq!(XcavateStaking::ledger(1).unwrap().locked, 100);
+		assert_ok!(CommunityLoanPool::propose(
+			RuntimeOrigin::signed([1; 32].into()),
+			50,
+			sp_runtime::MultiAddress::Id([3; 32].into()),
+			13,
+			20
+		));
+		assert_ok!(CommunityLoanPool::set_milestones(
+			RuntimeOrigin::signed([0; 32].into()),
+			2,
+			get_milestones(10),
+		));
+		run_to_block(41);
+		System::reset_events();
+		System::set_block_number(System::block_number() + 1);
+		System::on_initialize(System::block_number());
+		XcavateStaking::on_initialize(System::block_number());
+		assert_eq!(XcavateStaking::queue_ledger(1).unwrap().locked, 50);
+		assert_eq!(XcavateStaking::ledger(2).unwrap().locked, 50);
+		assert_eq!(XcavateStaking::active_stakings().len(), 2);
+	})
+}
+
+#[test]
 fn stake_with_several_people_works() {
 	new_test_ext().execute_with(|| {
 		Timestamp::set_timestamp(1);
@@ -203,5 +316,6 @@ fn testing_issue() {
 		System::on_initialize(System::block_number());
 		XcavateStaking::on_initialize(System::block_number());
 		assert_eq!(XcavateStaking::ledger(1).unwrap().locked, 5003000);
+		assert_eq!(XcavateStaking::queue_ledger(1).unwrap().locked, 4997000);
 	})
 }

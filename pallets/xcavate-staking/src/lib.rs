@@ -224,17 +224,10 @@ pub mod pallet {
 				pallet_community_loan_pool::Pallet::<T>::total_loan_amount() as u128;
 			let total_stake = Self::balance_to_u128(Self::total_stake()).unwrap_or_default();
 			if total_stake >= total_amount_loan {
-				let queue_index = Self::queue_count() + 1;
-				ensure!(Self::queue_ledger(&queue_index).is_none(), Error::<T>::IndexInUse);
-					let available_balance = <T as pallet::Config>::Currency::free_balance(&staker)
-						.saturating_sub(T::MinimumRemainingAmount::get());
-					let value_to_queue = value.min(available_balance);
-					let timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
-					let queue_ledger = QueueLedgerAccount { staker: staker.clone(), locked: value_to_queue, timestamp };
-					Self::update_queue_ledger(queue_index, queue_ledger);
-					QueueCount::<T>::put(queue_index);
-					QueueStaking::<T>::try_append(queue_index)
-						.map_err(|_| Error::<T>::TooManyStakers)?;
+				let available_balance = <T as pallet::Config>::Currency::free_balance(&staker)
+					.saturating_sub(T::MinimumRemainingAmount::get());
+				let value_to_queue = value.min(available_balance);
+				Self::queue_helper(staker.clone(), value_to_queue)?;
 			} else if total_stake + Self::balance_to_u128(value).unwrap_or_default()
 				>= total_amount_loan
 			{
@@ -244,39 +237,8 @@ pub mod pallet {
 				let staking_value = total_amount_loan - total_stake;
 				let queue_value =
 					Self::balance_to_u128(value_available).unwrap_or_default() - staking_value;
-					let queue_index = Self::queue_count() + 1;
-					ensure!(Self::queue_ledger(&queue_index).is_none(), Error::<T>::IndexInUse);
-					let timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
-					let queue_ledger = QueueLedgerAccount {
-						staker: staker.clone(),
-						locked: Self::u128_to_balance_option(queue_value).unwrap_or_default(),
-						timestamp,
-					};
-					Self::update_queue_ledger(queue_index, queue_ledger);
-					QueueCount::<T>::put(queue_index);
-					QueueStaking::<T>::try_append(queue_index)
-						.map_err(|_| Error::<T>::TooManyStakers)?;
-					let staking_index = Self::staking_count() + 1;
-					ensure!(Self::ledger(staking_index).is_none(), Error::<T>::IndexInUse);
-					let timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
-
-					let ledger = LedgerAccount {
-						staker: staker.clone(),
-						locked: Self::u128_to_balance_option(staking_value).unwrap_or_default(),
-						timestamp,
-					};
-
-					Self::update_ledger(staking_index, ledger);
-
-					ActiveStakings::<T>::try_append(staking_index)
-						.map_err(|_| Error::<T>::TooManyStakers)?;
-
-					let total_stake = Self::total_stake();
-					StakingCount::<T>::put(staking_index);
-					TotalStake::<T>::put(
-						total_stake
-							+ Self::u128_to_balance_option(staking_value).unwrap_or_default(),
-					);
+				Self::queue_helper(staker.clone(), Self::u128_to_balance_option(queue_value).unwrap_or_default())?;
+				Self::stake_helper(staker.clone(), Self::u128_to_balance_option(staking_value).unwrap_or_default())?;
 			} else {
 				let available_balance = <T as pallet::Config>::Currency::free_balance(&staker)
 						.saturating_sub(T::MinimumRemainingAmount::get());
@@ -361,6 +323,18 @@ pub mod pallet {
 			StakingCount::<T>::put(staking_index);
 			TotalStake::<T>::put(total_stake + value);
 			Ok(())			
+		}
+
+		fn queue_helper(staker: T::AccountId, value: BalanceOf<T>) -> DispatchResult {
+			let queue_index = Self::queue_count() + 1;
+			ensure!(Self::queue_ledger(&queue_index).is_none(), Error::<T>::IndexInUse);
+			let timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
+			let queue_ledger = QueueLedgerAccount { staker: staker.clone(), locked: value, timestamp };
+			Self::update_queue_ledger(queue_index, queue_ledger);
+			QueueCount::<T>::put(queue_index);
+			QueueStaking::<T>::try_append(queue_index)
+				.map_err(|_| Error::<T>::TooManyStakers)?;	
+			Ok(())		
 		}
 
 		/// Updates the staking infos for the staker.
@@ -541,7 +515,7 @@ pub mod pallet {
 			}
 
 			Self::update_ledger(staking_index, ledger.clone());
-
+			Self::queue_helper(ledger.staker.clone(), value)?;
 			let total_stake = Self::total_stake();
 			TotalStake::<T>::put(total_stake.saturating_sub(value));
 
