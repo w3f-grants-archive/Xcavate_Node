@@ -384,6 +384,8 @@ fn charge_apy_works() {
 		System::on_initialize(System::block_number());
 		CommunityLoanPool::on_initialize(System::block_number());
 		assert_eq!(CommunityLoanPool::loans(1).unwrap().borrowed_amount, 396);
-		System::assert_last_event(Event::ApyCharged { loan_index: 1 , interest_balance: 396}.into());
+		System::assert_last_event(
+			Event::ApyCharged { loan_index: 1, interest_balance: 396 }.into(),
+		);
 	})
 }

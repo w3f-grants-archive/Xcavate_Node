@@ -1,9 +1,9 @@
 use crate::{mock::*, Error, Event};
+use frame_support::sp_runtime::Percent;
 use frame_support::{
 	assert_noop, assert_ok,
 	traits::{OnFinalize, OnInitialize},
 };
-use frame_support::sp_runtime::Percent;
 
 use pallet_community_loan_pool::{BoundedProposedMilestones, Config, ProposedMilestone};
 
@@ -55,7 +55,7 @@ fn stake_works() {
 		System::assert_last_event(Event::Locked { staker: [0; 32].into(), amount: 100 }.into());
 		let total_stake = XcavateStaking::total_stake();
 		assert_eq!(total_stake, 100);
-		let stakers = XcavateStaking::active_stakers();
+		let stakers = XcavateStaking::active_stakings();
 		assert_eq!(stakers.len(), 1);
 	});
 }
@@ -84,7 +84,7 @@ fn stake_with_several_people_works() {
 		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([2; 32].into()), 500));
 		let total_stake = XcavateStaking::total_stake();
 		assert_eq!(total_stake, 1000);
-		let stakers = XcavateStaking::active_stakers();
+		let stakers = XcavateStaking::active_stakings();
 		assert_eq!(stakers.len(), 3);
 	})
 }
@@ -120,10 +120,10 @@ fn unstake_works() {
 		run_to_block(21);
 		assert_eq!(CommunityLoanPool::ongoing_loans().len(), 1);
 		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([0; 32].into()), 100));
-		assert_ok!(XcavateStaking::unstake(RuntimeOrigin::signed([0; 32].into()), 100));
+		assert_ok!(XcavateStaking::unstake(RuntimeOrigin::signed([0; 32].into()), 1, 100));
 		let total_stake = XcavateStaking::total_stake();
 		assert_eq!(total_stake, 0);
-		let stakers = XcavateStaking::active_stakers();
+		let stakers = XcavateStaking::active_stakings();
 		assert_eq!(stakers.len(), 0);
 	})
 }
@@ -134,11 +134,11 @@ fn unstake_doesnt_work_for_nonstaker() {
 		Timestamp::set_timestamp(1);
 		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([0; 32].into()), 100));
 		assert_noop!(
-			XcavateStaking::unstake(RuntimeOrigin::signed([1; 32].into()), 100),
+			XcavateStaking::unstake(RuntimeOrigin::signed([1; 32].into()), 1, 100),
 			Error::<Test>::NoStaker
 		);
 	})
-} 
+}
 
 #[test]
 fn claiming_of_rewards_works() {
@@ -162,13 +162,13 @@ fn claiming_of_rewards_works() {
 		assert_eq!(CommunityLoanPool::loans(1).unwrap().available_amount, 1000300);
 		assert_eq!(CommunityLoanPool::total_loan_amount(), 10003000);
 		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([0; 32].into()), 10000000));
-		assert_eq!(XcavateStaking::ledger::<AccountId>([0; 32].into()).unwrap().locked, 10000000);
+		assert_eq!(XcavateStaking::ledger(1).unwrap().locked, 10000000);
 		Timestamp::set_timestamp(10000);
 		System::reset_events();
 		System::set_block_number(System::block_number() + 1);
 		System::on_initialize(System::block_number());
 		XcavateStaking::on_initialize(System::block_number());
-		assert_eq!(XcavateStaking::ledger::<AccountId>([0; 32].into()).unwrap().locked, 10000026);
+		assert_eq!(XcavateStaking::ledger(1).unwrap().locked, 10000026);
 		System::assert_last_event(Event::RewardsClaimed { amount: 26, apy: 823 }.into());
 	})
 }

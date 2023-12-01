@@ -583,7 +583,7 @@ pub mod pallet {
 			//if block % 10 == 0 {
 			Self::charge_apy().unwrap_or_default();
 			weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
-				//}
+			//}
 
 			weight
 		}
@@ -756,7 +756,9 @@ pub mod pallet {
 				&loan_pallet,
 				&signer,
 				// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
-				(sending_amount as u128 /* * 1000000000000 */).try_into().map_err(|_| Error::<T>::ConversionError)?,
+				(sending_amount as u128/* * 1000000000000 */)
+					.try_into()
+					.map_err(|_| Error::<T>::ConversionError)?,
 				//amount,
 				KeepAlive,
 			)?;
@@ -797,7 +799,9 @@ pub mod pallet {
 				&signer,
 				&loan_pallet,
 				// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
-				(sending_amount as u128 /* * 1000000000000 */).try_into().map_err(|_| Error::<T>::ConversionError)?,
+				(sending_amount as u128/* * 1000000000000 */)
+					.try_into()
+					.map_err(|_| Error::<T>::ConversionError)?,
 				//amount,
 				KeepAlive,
 			)?;
@@ -1159,8 +1163,8 @@ pub mod pallet {
 				.saturating_add(Self::u64_to_balance_option(added_available_amount)?);
 			loan.milestones = loan_milestones;
 			loan.available_amount = new_available_amount;
-			let proposal_info = <MilestoneInfo<T>>::take(proposal_index)
-				.ok_or(Error::<T>::InvalidIndex)?;
+			let proposal_info =
+				<MilestoneInfo<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
 			let _err_amount = <T as pallet::Config>::Currency::unreserve(
 				&proposal_info.proposer,
 				proposal_info.bond,
@@ -1172,8 +1176,8 @@ pub mod pallet {
 
 		/// Rejects a milestone proposal.
 		fn reject_milestone(proposal_index: &ProposalIndex) -> DispatchResult {
-			let proposal_info = <MilestoneInfo<T>>::take(proposal_index)
-				.ok_or(Error::<T>::InvalidIndex)?;
+			let proposal_info =
+				<MilestoneInfo<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
 			let imbalance = <T as pallet::Config>::Currency::slash_reserved(
 				&proposal_info.proposer,
 				proposal_info.bond,
@@ -1192,7 +1196,10 @@ pub mod pallet {
 			let item_id = loan.item_id;
 			pallet_nfts::Pallet::<T>::do_burn(collection_id.into(), item_id.into(), |_| Ok(()))?;
 			let mut loans = Self::ongoing_loans();
-			let index = loans.iter().position(|x| *x == loan_id).ok_or_else(|| Error::<T>::NoLoanFound)?;
+			let index = loans
+				.iter()
+				.position(|x| *x == loan_id)
+				.ok_or_else(|| Error::<T>::NoLoanFound)?;
 			loans.remove(index);
 			let reserved_loan = Self::reserved_loan_amount()
 				.checked_sub(Self::balance_to_u64(loan.current_loan_balance)?)

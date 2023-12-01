@@ -381,7 +381,8 @@ pub mod pallet {
 			let origin = ensure_signed(origin)?;
 			ensure!(Self::collection_exists(collection), Error::<T>::CollectionNotFound);
 			ensure!(
-				Self::listed_nfts_of_collection(collection).len() >= amount.try_into().map_err(|_| Error::<T>::ConversionError)?,
+				Self::listed_nfts_of_collection(collection).len()
+					>= amount.try_into().map_err(|_| Error::<T>::ConversionError)?,
 				Error::<T>::NotEnoughNftsAvailable
 			);
 			for _x in 0..amount as usize {
@@ -400,7 +401,7 @@ pub mod pallet {
 				})?;
 				let price = nft
 					.price
-					.checked_mul(&Self::u64_to_balance_option(1/* 000000000000 */)?)
+					.checked_mul(&Self::u64_to_balance_option(1 /* 000000000000 */)?)
 					.ok_or(Error::<T>::MultiplyError)?;
 				Self::transfer_funds(&origin, &Self::account_id(), price)?;
 				let mut listed_nfts = Self::listed_nfts();
@@ -410,7 +411,10 @@ pub mod pallet {
 					.ok_or_else(|| Error::<T>::ItemNotFound)?;
 				listed_nfts.remove(index);
 				ListedNfts::<T>::put(listed_nfts);
-				let index = listed_items.iter().position(|x| *x == next_nft.item_id).ok_or_else(|| Error::<T>::ItemNotFound)?;
+				let index = listed_items
+					.iter()
+					.position(|x| *x == next_nft.item_id)
+					.ok_or_else(|| Error::<T>::ItemNotFound)?;
 				listed_items.remove(index);
 				ListedNftsOfCollection::<T>::insert(collection, listed_items);
 				if Self::sold_nfts_collection(collection).len() == 100 {
@@ -457,7 +461,7 @@ pub mod pallet {
 				.price
 				.checked_mul(&Self::u64_to_balance_option(100)?)
 				.ok_or(Error::<T>::MultiplyError)?
-				.checked_mul(&Self::u64_to_balance_option(1/* 000000000000 */)?)
+				.checked_mul(&Self::u64_to_balance_option(1 /* 000000000000 */)?)
 				.ok_or(Error::<T>::MultiplyError)?;
 			Self::transfer_funds(&Self::account_id(), &nft_details.real_estate_developer, price)?;
 			for x in list {

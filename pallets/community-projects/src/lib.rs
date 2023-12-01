@@ -279,8 +279,13 @@ pub mod pallet {
 	/// Mapping of ongoing votes.
 	#[pallet::storage]
 	#[pallet::getter(fn ongoing_votes)]
-	pub(super) type OngoingVotes<T: Config> =
-		StorageMap<_, Blake2_128Concat, <T as pallet::Config>::CollectionId, VoteStats, OptionQuery>;
+	pub(super) type OngoingVotes<T: Config> = StorageMap<
+		_,
+		Blake2_128Concat,
+		<T as pallet::Config>::CollectionId,
+		VoteStats,
+		OptionQuery,
+	>;
 
 	/// Mapping of collection to the users.
 	#[pallet::storage]
@@ -615,8 +620,8 @@ pub mod pallet {
 			}
 			let mut current_voting_power =
 				Self::voting_power((collection_id, signer.clone())).unwrap_or_default();
-				current_voting_power += TryInto::<u64>::try_into(nft.price)
-				.map_err(|_| Error::<T>::ConversionError)?;
+			current_voting_power +=
+				TryInto::<u64>::try_into(nft.price).map_err(|_| Error::<T>::ConversionError)?;
 			VotingPower::<T>::insert((collection_id, signer.clone()), current_voting_power);
 			Self::deposit_event(Event::<T>::NftBought {
 				collection_index: collection_id,
@@ -699,7 +704,7 @@ pub mod pallet {
 				if project.duration > 12 { project.duration * 10 / 12 } else { 10 };
 			OngoingProjects::<T>::insert(collection_id, project);
 			let expiry_block = current_block_number.saturating_add(
-				milestone_period.try_into().map_err(|_| Error::<T>::ConversionError)?
+				milestone_period.try_into().map_err(|_| Error::<T>::ConversionError)?,
 			);
 			MilestonePeriodExpiring::<T>::try_mutate(expiry_block, |keys| {
 				keys.try_push(collection_id).map_err(|_| Error::<T>::TooManyProjects)?;
@@ -717,7 +722,8 @@ pub mod pallet {
 			OngoingVotes::<T>::insert(collection_id, vote_stats);
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
 			// The voting period is so short for testing purpose. Later on it will be about 1 week.
-			let expiry_block = current_block_number.saturating_add(10_u64.try_into().map_err(|_| Error::<T>::ConversionError)?);
+			let expiry_block = current_block_number
+				.saturating_add(10_u64.try_into().map_err(|_| Error::<T>::ConversionError)?);
 			VotingPeriodExpiring::<T>::try_mutate(expiry_block, |keys| {
 				keys.try_push(collection_id).map_err(|_| Error::<T>::TooManyProjects)?;
 				Ok::<(), DispatchError>(())
@@ -733,7 +739,8 @@ pub mod pallet {
 			collection_id: <T as pallet::Config>::CollectionId,
 		) -> DispatchResult {
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
-			let expiry_block = current_block_number.saturating_add(10_u64.try_into().map_err(|_| Error::<T>::ConversionError)?);
+			let expiry_block = current_block_number
+				.saturating_add(10_u64.try_into().map_err(|_| Error::<T>::ConversionError)?);
 			MilestonePeriodExpiring::<T>::try_mutate(expiry_block, |keys| {
 				keys.try_push(collection_id).map_err(|_| Error::<T>::TooManyProjects)?;
 				Ok::<(), DispatchError>(())
@@ -799,8 +806,7 @@ pub mod pallet {
 					origin,
 					asset_id.into().into(),
 					user_lookup,
-					Self::u64_to_balance_option(remaining_funds)?
-						/* * Self::u64_to_balance_option(1000000000000)? */,
+					Self::u64_to_balance_option(remaining_funds)?, /* * Self::u64_to_balance_option(1000000000000)? */
 				)
 				.map_err(|_| Error::<T>::NotEnoughFunds)?;
 			}
