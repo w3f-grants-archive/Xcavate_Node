@@ -133,10 +133,15 @@ pub mod pallet {
 	#[scale_info(skip_type_params(T))]
 	pub struct LoanInfo<Balance, CollectionId, ItemId, T: Config> {
 		pub borrower: AccountIdOf<T>,
+		/// The loan amount borrowed at the beginning
 		pub loan_amount: Balance,
+		/// The loan amount less the repayment installments
 		pub current_loan_balance: Balance,
+		/// The loan amount that is currently available for the real estate developer.
 		pub available_amount: Balance,
+		/// The loan amount that has been borrowed.
 		pub borrowed_amount: Balance,
+		pub charged_interests: Balance,
 		pub milestones: BoundedProposedMilestones<T>,
 		pub collection_id: CollectionId,
 		pub item_id: ItemId,
@@ -286,6 +291,11 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn total_loan_amount)]
 	pub(super) type TotalLoanAmount<T> = StorageValue<_, u64, ValueQuery>;
+
+	/// Total amount of not paid interests.
+	#[pallet::storage]
+	#[pallet::getter(fn total_loan_interests)]
+	pub(super) type TotalLoanInterests<T> = StorageValue<_, u64, ValueQuery>;
 
 	/// Amount of founds that is still on the pallet but is reserved for loan.
 	#[pallet::storage]
@@ -806,12 +816,35 @@ pub mod pallet {
 				KeepAlive,
 			)?;
 			loan.borrowed_amount = loan.borrowed_amount.saturating_sub(amount);
-			loan.current_loan_balance = loan.current_loan_balance.saturating_sub(amount);
-			Loans::<T>::insert(loan_id, loan);
-			let new_value = Self::total_loan_amount()
-				.checked_sub(Self::balance_to_u64(amount)?)
-				.ok_or(Error::<T>::ArithmeticUnderflow)?;
-			TotalLoanAmount::<T>::put(new_value);
+			if loan.current_loan_balance >= amount{
+				loan.current_loan_balance = loan.current_loan_balance.saturating_sub(amount);
+				Loans::<T>::insert(loan_id, loan);
+				let new_value = Self::total_loan_amount()
+					.checked_sub(Self::balance_to_u64(amount)?)
+					.ok_or(Error::<T>::ArithmeticUnderflow)?;
+				TotalLoanAmount::<T>::put(new_value);
+			} else if loan.current_loan_balance.is_zero() {
+				loan.charged_interests = loan.charged_interests.saturating_sub(amount);
+				Loans::<T>::insert(loan_id, loan);
+				let new_value = Self::total_loan_interests()
+					.checked_sub(Self::balance_to_u64(amount)?)
+					.ok_or(Error::<T>::ArithmeticUnderflow)?;
+				TotalLoanInterests::<T>::put(new_value);
+			} else {
+				let loan_amount_part = loan.current_loan_balance;
+				let interests_amount_part = amount.saturating_sub(loan_amount_part);
+				loan.current_loan_balance = loan.current_loan_balance.saturating_sub(loan_amount_part);
+				loan.charged_interests = loan.charged_interests.saturating_sub(interests_amount_part);
+				Loans::<T>::insert(loan_id, loan);
+				let new_value = Self::total_loan_amount()
+					.checked_sub(Self::balance_to_u64(loan_amount_part)?)
+					.ok_or(Error::<T>::ArithmeticUnderflow)?;
+				TotalLoanAmount::<T>::put(new_value);
+				let new_value = Self::total_loan_interests()
+					.checked_sub(Self::balance_to_u64(interests_amount_part)?)
+					.ok_or(Error::<T>::ArithmeticUnderflow)?;
+				TotalLoanInterests::<T>::put(new_value);
+			}
 			Self::deposit_event(Event::<T>::LoanUpdated { loan_index: loan_id });
 			Ok(())
 		}
@@ -1075,6 +1108,7 @@ pub mod pallet {
 				current_loan_balance: value,
 				available_amount,
 				borrowed_amount: Default::default(),
+				charged_interests: Default::default(),
 				milestones,
 				collection_id,
 				item_id,
@@ -1130,16 +1164,16 @@ pub mod pallet {
 				let mut loan = <Loans<T>>::take(loan_index).ok_or(Error::<T>::InvalidIndex)?;
 				let current_timestamp = T::TimeProvider::now().as_secs();
 				let time_difference = current_timestamp - loan.last_timestamp;
-				let loan_amount = Self::balance_to_u64(loan.current_loan_balance)?;
+				let loan_amount = Self::balance_to_u64(loan.current_loan_balance + loan.charged_interests)?;
 				let interests =
-					loan_amount * time_difference * loan.loan_apy / 365 / 60 / 60 / 24 / 100;
+					loan_amount * time_difference * loan.loan_apy / 365 / 60 / 60 / 24 / 10000;
 				let interest_balance = Self::u64_to_balance_option(interests)?;
 				loan.borrowed_amount += interest_balance;
-				loan.current_loan_balance += interest_balance;
+				loan.charged_interests += interest_balance;
 				loan.last_timestamp = current_timestamp;
 				Loans::<T>::insert(loan_index, loan.clone());
-				let new_value = Self::total_loan_amount() + interests;
-				TotalLoanAmount::<T>::put(new_value);
+				let new_value = Self::total_loan_interests() + interests;
+				TotalLoanInterests::<T>::put(new_value);
 				Self::deposit_event(Event::<T>::ApyCharged { loan_index, interest_balance });
 			}
 			Ok(())

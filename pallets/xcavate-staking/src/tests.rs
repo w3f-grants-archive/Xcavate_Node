@@ -281,8 +281,8 @@ fn claiming_of_rewards_works() {
 		System::set_block_number(System::block_number() + 1);
 		System::on_initialize(System::block_number());
 		XcavateStaking::on_initialize(System::block_number());
-		assert_eq!(XcavateStaking::ledger(1).unwrap().locked, 10000026);
-		System::assert_last_event(Event::RewardsClaimed { amount: 26, apy: 823 }.into());
+		assert_eq!(XcavateStaking::ledger(1).unwrap().locked, 10000000);
+		System::assert_last_event(Event::RewardsClaimed { amount: 0, apy: 823 }.into());
 	})
 }
 
