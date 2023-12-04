@@ -1085,7 +1085,7 @@ pub mod pallet {
 			let value = proposal.amount;
 			let mut milestones = proposal.milestones;
 			let timestamp = T::TimeProvider::now().as_secs();
-			let amount = Self::balance_to_u128(value).unwrap_or_default()
+			let amount = Self::balance_to_u128(value)?
 				* milestones[0].percentage_to_unlock.deconstruct() as u128
 				/ 100;
 			milestones.remove(0);
