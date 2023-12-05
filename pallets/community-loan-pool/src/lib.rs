@@ -39,7 +39,7 @@ pub use pallet_nfts::{
 	CollectionConfig, CollectionSetting, CollectionSettings, ItemConfig, ItemSettings, MintSettings,
 };
 
-use sp_std::prelude::*;
+pub use sp_std::prelude::*;
 
 type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
 
@@ -58,14 +58,14 @@ pub type PositiveImbalanceOf<T> = <<T as Config>::Currency as Currency<
 pub type BalanceOf<T> =
 	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
-type BalanceOf1<T> = <<T as pallet_nfts::Config>::Currency as Currency<
+pub type BalanceOf1<T> = <<T as pallet_nfts::Config>::Currency as Currency<
 	<T as frame_system::Config>::AccountId,
 >>::Balance;
 
-pub type BoundedProposedMilestones<T> =
+type BoundedProposedMilestones<T> =
 	BoundedVec<ProposedMilestone, <T as Config>::MaxMilestonesPerProject>;
 
-pub const BASEINTERESTRATE: f32 = 5.25;
+pub const BASEINTERESTRATE: u32 = 525;
 
 #[cfg(feature = "runtime-benchmarks")]
 pub struct NftHelper;
@@ -184,17 +184,8 @@ pub mod pallet {
 		/// The currency type.
 		type Currency: Currency<AccountIdOf<Self>> + ReservableCurrency<AccountIdOf<Self>>;
 
-		/// Origin from which rejections must come.
-		type RejectOrigin: EnsureOrigin<Self::RuntimeOrigin>;
-
-		/// Origin from which approves must come.
-		type ApproveOrigin: EnsureOrigin<Self::RuntimeOrigin>;
-
 		/// Origin who can add or remove committee members.
 		type CommitteeOrigin: EnsureOrigin<Self::RuntimeOrigin>;
-
-		/// Origin who can delete loans.
-		type DeleteOrigin: EnsureOrigin<Self::RuntimeOrigin>;
 
 		/// Fraction of a proposal's value that should be bonded in order to place the proposal.
 		/// An accepted proposal gets these back. A rejected proposal does not.
@@ -270,7 +261,7 @@ pub mod pallet {
 	/// Number of loans that have been made.
 	#[pallet::storage]
 	#[pallet::getter(fn loan_count)]
-	pub(super) type LoanCount<T> = StorageValue<_, ProposalIndex, ValueQuery>;
+	pub(super) type LoanCount<T> = StorageValue<_, LoanIndex, ValueQuery>;
 
 	/// Number of proposals that have been made.
 	#[pallet::storage]
@@ -378,21 +369,21 @@ pub mod pallet {
 
 	/// Mapping of user who voted for a proposal.
 	#[pallet::storage]
-	#[pallet::getter(fn user_milestone_votes)]
-	pub(super) type UserMilestoneVotes<T: Config> =
-		StorageMap<_, Blake2_128Concat, (ProposalIndex, AccountIdOf<T>), Vote, OptionQuery>;
+	#[pallet::getter(fn user_votes)]
+	pub(super) type UserVotes<T: Config> =
+		StorageDoubleMap<_, Blake2_128Concat, ProposalIndex, Blake2_128Concat, AccountIdOf<T>, Vote, OptionQuery>;
 
 	/// Mapping of user who voted for a milestone proposal.
 	#[pallet::storage]
-	#[pallet::getter(fn user_votes)]
-	pub(super) type UserVotes<T: Config> =
-		StorageMap<_, Blake2_128Concat, (ProposalIndex, AccountIdOf<T>), Vote, OptionQuery>;
+	#[pallet::getter(fn user_milestone_votes)]
+	pub(super) type UserMilestoneVotes<T: Config> =
+		StorageDoubleMap<_, Blake2_128Concat, ProposalIndex, Blake2_128Concat, AccountIdOf<T>, Vote, OptionQuery>;
 
 	/// Mapping of user who voted for a deletion proposal.
 	#[pallet::storage]
 	#[pallet::getter(fn user_deletion_votes)]
 	pub(super) type UserDeletionVotes<T: Config> =
-		StorageMap<_, Blake2_128Concat, (ProposalIndex, AccountIdOf<T>), Vote, OptionQuery>;
+		StorageDoubleMap<_, Blake2_128Concat, ProposalIndex, Blake2_128Concat, AccountIdOf<T>, Vote, OptionQuery>;
 
 	/// Stores the project keys and round types ending on a given block.
 	#[pallet::storage]
@@ -536,15 +527,15 @@ pub mod pallet {
 
 			let ended_votings = RoundsExpiring::<T>::take(n);
 
-			/// Checks if there is a voting for a loan is expiring this block.
+			// Checks if there is a voting for a loan expiring in this block.
 			ended_votings.iter().for_each(|item| {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
 				let voting_result = <OngoingVotes<T>>::take(item);
 				if let Some(voting_result) = voting_result {
 					if voting_result.yes_votes > voting_result.no_votes {
-						Self::approve_loan_proposal(*item).unwrap_or_default();
+						let _ = Self::approve_loan_proposal(*item);
 					} else {
-						Self::reject_loan_proposal(*item).unwrap_or_default();
+						let _ = Self::reject_loan_proposal(*item);
 					}
 					OngoingVotes::<T>::remove(item);
 				}
@@ -552,7 +543,7 @@ pub mod pallet {
 
 			let ended_milestone_votes = MilestoneRoundsExpiring::<T>::take(n);
 
-			/// checks if there is a voting for a milestone is expiring this block
+			// checks if there is a voting for a milestone expiring in this block.
 			ended_milestone_votes.iter().for_each(|item| {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
 				let voting_result = <OngoingMilestoneVotes<T>>::take(item);
@@ -560,10 +551,10 @@ pub mod pallet {
 					if voting_result.yes_votes > voting_result.no_votes {
 						let loan_id = <MilestoneProposals<T>>::take(item);
 						if let Some(loan_id) = loan_id {
-							Self::updating_available_amount(loan_id, item);
+							let _ = Self::updating_available_amount(loan_id, item);
 						}
 					} else {
-						Self::reject_milestone(item);
+						let _ = Self::reject_milestone(item);
 					}
 					OngoingMilestoneVotes::<T>::remove(item);
 				}
@@ -571,7 +562,7 @@ pub mod pallet {
 
 			let ended_deletion_votes = DeletionRoundsExpiring::<T>::take(n);
 
-			/// checks if there is a voting for a loan deletion is expiring this block
+			// checks if there is a voting for a loan deletion expiring in this block.
 			ended_deletion_votes.iter().for_each(|item| {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
 				let voting_result = <OngoingDeletionVotes<T>>::take(item);
@@ -579,16 +570,16 @@ pub mod pallet {
 				if let Some(voting_result) = voting_result {
 					if voting_result.yes_votes > voting_result.no_votes {
 						if let Some(loan_id) = loan_id {
-							Self::delete_loan(loan_id);
+							let _ = Self::delete_loan(loan_id);
 						}
 					} else if let Some(loan_id) = loan_id {
-						Self::open_withdrawl(loan_id);
+						let _ = Self::open_withdrawl(loan_id);
 					}
 
 					OngoingDeletionVotes::<T>::remove(item);
 				}
 			});
-			/// Charging loan apy every block for testing purpose
+			// Charging loan apy every block for testing purpose
 			//let block = n.saturated_into::<u64>();
 			//if block % 10 == 0 {
 			Self::charge_apy().unwrap_or_default();
@@ -624,11 +615,11 @@ pub mod pallet {
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let beneficiary = T::Lookup::lookup(beneficiary)?;
-			let total_loan_amount = Self::u64_to_balance_option(Self::reserved_loan_amount())?;
+			let reserved_loan_amount = Self::u64_to_balance_option(Self::reserved_loan_amount())?;
 			//let decimal = 1000000000000_u64.saturated_into();
 			ensure!(
 				<T as pallet::Config>::Currency::free_balance(&Self::account_id())
-					>= total_loan_amount.saturating_add(amount),
+					>= reserved_loan_amount.saturating_add(amount),
 				Error::<T>::NotEnoughLoanFundsAvailable
 			);
 			let proposal_index = Self::proposal_count() + 1;
@@ -654,6 +645,8 @@ pub mod pallet {
 				created_at: current_block_number,
 			};
 			let vote_stats = VoteStats { yes_votes: 0, no_votes: 0 };
+			let reserved_value = Self::reserved_loan_amount().saturating_add(Self::balance_to_u64(amount)?);
+			ReservedLoanAmount::<T>::put(reserved_value);
 			OngoingVotes::<T>::insert(proposal_index, vote_stats);
 			Proposals::<T>::insert(proposal_index, proposal);
 			ProposalCount::<T>::put(proposal_index);
@@ -769,7 +762,6 @@ pub mod pallet {
 				(sending_amount as u128/* * 1000000000000 */)
 					.try_into()
 					.map_err(|_| Error::<T>::ConversionError)?,
-				//amount,
 				KeepAlive,
 			)?;
 			loan.borrowed_amount = loan.borrowed_amount.saturating_add(amount);
@@ -802,7 +794,6 @@ pub mod pallet {
 			let signer = ensure_signed(origin.clone())?;
 			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(amount <= loan.borrowed_amount, Error::<T>::WantsToRepayTooMuch);
-			//ensure!(signer == loan.contract_account_id, Error::<T>::InsufficientPermission);
 			let loan_pallet = Self::account_id();
 			let sending_amount = Self::balance_to_u64(amount)?;
 			<T as pallet::Config>::Currency::transfer(
@@ -812,7 +803,6 @@ pub mod pallet {
 				(sending_amount as u128/* * 1000000000000 */)
 					.try_into()
 					.map_err(|_| Error::<T>::ConversionError)?,
-				//amount,
 				KeepAlive,
 			)?;
 			loan.borrowed_amount = loan.borrowed_amount.saturating_sub(amount);
@@ -840,10 +830,10 @@ pub mod pallet {
 					.checked_sub(Self::balance_to_u64(loan_amount_part)?)
 					.ok_or(Error::<T>::ArithmeticUnderflow)?;
 				TotalLoanAmount::<T>::put(new_value);
-				let new_value = Self::total_loan_interests()
+				let new__interests_value = Self::total_loan_interests()
 					.checked_sub(Self::balance_to_u64(interests_amount_part)?)
 					.ok_or(Error::<T>::ArithmeticUnderflow)?;
-				TotalLoanInterests::<T>::put(new_value);
+				TotalLoanInterests::<T>::put(new__interests_value);
 			}
 			Self::deposit_event(Event::<T>::LoanUpdated { loan_index: loan_id });
 			Ok(())
@@ -881,10 +871,10 @@ pub mod pallet {
 			Proposals::<T>::insert(proposal_index, proposal);
 			let mut current_vote =
 				<OngoingVotes<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
-			let voted = <UserVotes<T>>::get((proposal_index, origin.clone()));
+			let voted = <UserVotes<T>>::get(proposal_index, origin.clone());
 			if voted.is_none() {
 				current_vote.yes_votes += 1;
-				UserVotes::<T>::insert((proposal_index, origin.clone()), Vote::Yes);
+				UserVotes::<T>::insert(proposal_index, origin.clone(), Vote::Yes);
 				OngoingVotes::<T>::insert(proposal_index, current_vote);
 				Self::deposit_event(Event::<T>::VotedOnProposal {
 					proposal_index,
@@ -919,7 +909,7 @@ pub mod pallet {
 			ensure!(current_members.contains(&origin), Error::<T>::InsufficientPermission);
 			let mut current_vote =
 				<OngoingVotes<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
-			let voted = <UserVotes<T>>::get((proposal_index, origin.clone()));
+			let voted = <UserVotes<T>>::get(proposal_index, origin.clone());
 			ensure!(voted.is_none(), Error::<T>::AlreadyVoted);
 			let proposal = Self::proposals(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(proposal.milestones.len() > 0, Error::<T>::NoMilestones);
@@ -929,7 +919,7 @@ pub mod pallet {
 				current_vote.no_votes += 1;
 			};
 
-			UserVotes::<T>::insert((proposal_index, origin.clone()), vote.clone());
+			UserVotes::<T>::insert(proposal_index, origin.clone(), vote.clone());
 			OngoingVotes::<T>::insert(proposal_index, current_vote);
 			Self::deposit_event(Event::<T>::VotedOnProposal {
 				proposal_index,
@@ -960,7 +950,7 @@ pub mod pallet {
 			ensure!(current_members.contains(&origin), Error::<T>::InsufficientPermission);
 			let mut current_vote =
 				<OngoingMilestoneVotes<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
-			let voted = <UserMilestoneVotes<T>>::get((proposal_index, origin.clone()));
+			let voted = <UserMilestoneVotes<T>>::get(proposal_index, origin.clone());
 			ensure!(voted.is_none(), Error::<T>::AlreadyVoted);
 			if vote == Vote::Yes {
 				current_vote.yes_votes += 1;
@@ -968,7 +958,7 @@ pub mod pallet {
 				current_vote.no_votes += 1;
 			};
 
-			UserMilestoneVotes::<T>::insert((proposal_index, origin.clone()), vote.clone());
+			UserMilestoneVotes::<T>::insert(proposal_index, origin.clone(), vote.clone());
 			OngoingMilestoneVotes::<T>::insert(proposal_index, current_vote);
 			Self::deposit_event(Event::<T>::VotedOnMilestone {
 				proposal_index,
@@ -999,7 +989,7 @@ pub mod pallet {
 			ensure!(current_members.contains(&origin), Error::<T>::InsufficientPermission);
 			let mut current_vote =
 				<OngoingDeletionVotes<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
-			let voted = <UserDeletionVotes<T>>::get((proposal_index, origin.clone()));
+			let voted = <UserDeletionVotes<T>>::get(proposal_index, origin.clone());
 			ensure!(voted.is_none(), Error::<T>::AlreadyVoted);
 			if vote == Vote::Yes {
 				current_vote.yes_votes += 1;
@@ -1007,7 +997,7 @@ pub mod pallet {
 				current_vote.no_votes += 1;
 			};
 
-			UserDeletionVotes::<T>::insert((proposal_index, origin.clone()), vote.clone());
+			UserDeletionVotes::<T>::insert(proposal_index, origin.clone(), vote.clone());
 			OngoingDeletionVotes::<T>::insert(proposal_index, current_vote);
 			Self::deposit_event(Event::<T>::VotedOnDeletion {
 				proposal_index,
@@ -1065,6 +1055,10 @@ pub mod pallet {
 			let imbalance =
 				<T as pallet::Config>::Currency::slash_reserved(&proposal.proposer, value).0;
 			T::OnSlash::on_unbalanced(imbalance);
+			let reserved_value = Self::reserved_loan_amount()
+				.checked_sub(Self::balance_to_u64(proposal.amount)?)
+				.ok_or(Error::<T>::ArithmeticUnderflow)?;
+			ReservedLoanAmount::<T>::put(reserved_value);
 
 			Proposals::<T>::remove(proposal_index);
 
@@ -1075,9 +1069,6 @@ pub mod pallet {
 		/// Approves the proposal and creates the loan.
 		fn approve_loan_proposal(proposal_index: ProposalIndex) -> DispatchResult {
 			let proposal = <Proposals<T>>::take(proposal_index).ok_or(Error::<T>::InvalidIndex)?;
-			//let total_loan_amount = Self::u64_to_balance_option(Self::total_loan_amount()).unwrap();
-			//let decimal = 1000000000000_u64.saturated_into();
-			//ensure!(<T as pallet::Config>::Currency::free_balance(&Self::account_id()) / decimal >= total_loan_amount.saturating_add(proposal.amount), Error::<T>::NotEnoughLoanFundsAvailable);
 			let err_amount =
 				<T as pallet::Config>::Currency::unreserve(&proposal.proposer, proposal.bond);
 			debug_assert!(err_amount.is_zero());
@@ -1086,8 +1077,9 @@ pub mod pallet {
 			let mut milestones = proposal.milestones;
 			let timestamp = T::TimeProvider::now().as_secs();
 			let amount = Self::balance_to_u128(value)?
-				* milestones[0].percentage_to_unlock.deconstruct() as u128
-				/ 100;
+				.saturating_mul(milestones[0].percentage_to_unlock.deconstruct() as u128)
+				.checked_div(100)
+				.ok_or(Error::<T>::DivisionError)?;
 			milestones.remove(0);
 			let available_amount = Self::u128_to_balance_option(amount)?;
 			let loan_apy = proposal.apr_rate;
@@ -1148,8 +1140,6 @@ pub mod pallet {
 
 			let new_value = Self::total_loan_amount() + Self::balance_to_u64(value)?;
 			TotalLoanAmount::<T>::put(new_value);
-			let reserved_value = Self::reserved_loan_amount() + Self::balance_to_u64(value)?;
-			ReservedLoanAmount::<T>::put(reserved_value);
 			Proposals::<T>::remove(proposal_index);
 			LoanCount::<T>::put(loan_index);
 			Self::deposit_event(Event::<T>::Approved { proposal_index });
@@ -1188,9 +1178,9 @@ pub mod pallet {
 			let loan_amount = loan.loan_amount;
 			let mut loan_milestones = loan.milestones;
 			let added_available_amount = Self::balance_to_u64(loan_amount)?
-				* (loan_milestones[0].percentage_to_unlock.deconstruct() as u64)
-					.checked_div(100)
-					.ok_or(Error::<T>::DivisionError)?;
+				.saturating_mul(loan_milestones[0].percentage_to_unlock.deconstruct() as u64)
+				.checked_div(100)
+				.ok_or(Error::<T>::DivisionError)?;
 			loan_milestones.remove(0);
 			let new_available_amount = loan
 				.available_amount
@@ -1233,7 +1223,7 @@ pub mod pallet {
 			let index = loans
 				.iter()
 				.position(|x| *x == loan_id)
-				.ok_or_else(|| Error::<T>::NoLoanFound)?;
+				.ok_or(Error::<T>::NoLoanFound)?;
 			loans.remove(index);
 			let reserved_loan = Self::reserved_loan_amount()
 				.checked_sub(Self::balance_to_u64(loan.current_loan_balance)?)
@@ -1255,21 +1245,21 @@ pub mod pallet {
 
 		/// Calculates the apr for a loan.
 		fn calculate_apr(experience: u64, loan_term: u64) -> u64 {
-			let experinece_number: f32 = match experience {
-				1..=5 => 1.7,
-				6..=15 => 1.5,
-				16..=20 => 1.3,
-				_ => 1.2,
+			let experinece_number: u32 = match experience {
+				1..=5 => 17,
+				6..=15 => 15,
+				16..=20 => 13,
+				_ => 12,
 			};
 
-			let loan_term_number: f32 = match loan_term {
-				1..=12 => 1.4,
-				13..=24 => 1.3,
-				_ => 1.2,
+			let loan_term_number: u32 = match loan_term {
+				1..=12 => 14,
+				13..=24 => 13,
+				_ => 12,
 			};
 
 			let apr = BASEINTERESTRATE * experinece_number * loan_term_number;
-			let interest_points = apr * 100.0;
+			let interest_points = apr / 100;
 			interest_points as u64
 		}
 

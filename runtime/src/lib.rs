@@ -13,7 +13,6 @@ mod voter_bags;
 use constants::{currency::*, time::*};
 use frame_election_provider_support::{onchain, ExtendedBalance, SequentialPhragmen, VoteWeight};
 use frame_support::{
-	dispatch::{Pays, PostDispatchInfo},
 	instances::{Instance1, Instance2},
 	ord_parameter_types,
 	pallet_prelude::{DispatchClass, Get},
@@ -27,10 +26,9 @@ use sp_staking::currency_to_vote::U128CurrencyToVote;
 //use acurast_p256_crypto::MultiSignature;
 // use pallet_acurast_fulfillment_receiver::Fulfillment;
 
-use frame_support::traits::TrackedStorageKey;
 use frame_system::{
 	limits::BlockWeights as SystemBlockWeights, EnsureRoot, EnsureSigned, EnsureSignedBy,
-	EnsureWithSuccess, EventRecord,
+	EnsureWithSuccess,
 };
 use polkadot_primitives::Nonce;
 
@@ -54,7 +52,7 @@ use sp_runtime::{
 		IdentifyAccount, NumberFor, One, OpaqueKeys, Verify,
 	},
 	transaction_validity::{TransactionPriority, TransactionSource, TransactionValidity},
-	ApplyExtrinsicResult, DispatchResultWithInfo, FixedU128, MultiSignature, Percent,
+	ApplyExtrinsicResult, FixedU128, MultiSignature, Percent,
 };
 use sp_std::prelude::*;
 #[cfg(feature = "std")]
@@ -88,7 +86,6 @@ use pallet_nfts::PalletFeatures;
 pub use pallet_staking::StakerStatus;
 pub use pallet_timestamp::Call as TimestampCall;
 use pallet_transaction_payment::{ConstFeeMultiplier, CurrencyAdapter, Multiplier};
-use sp_core::H256;
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
@@ -459,19 +456,7 @@ parameter_types! {
 impl pallet_community_loan_pool::Config for Runtime {
 	type PalletId = CommunityLoanPalletId;
 	type Currency = Balances;
-	type ApproveOrigin = EitherOfDiverse<
-		EnsureRoot<AccountId>,
-		pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 3, 5>,
-	>;
-	type RejectOrigin = EitherOfDiverse<
-		EnsureRoot<AccountId>,
-		pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>,
-	>;
 	type CommitteeOrigin = EitherOfDiverse<
-		EnsureRoot<AccountId>,
-		pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>,
-	>;
-	type DeleteOrigin = EitherOfDiverse<
 		EnsureRoot<AccountId>,
 		pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>,
 	>;
@@ -1178,12 +1163,12 @@ impl pallet_authority_discovery::Config for Runtime {
 }
 
 parameter_types! {
-	pub const LaunchPeriod: BlockNumber = 1 * MINUTES;
+	pub const LaunchPeriod: BlockNumber = MINUTES;
 	pub const VotingPeriod: BlockNumber = 3 * MINUTES;
 	pub const FastTrackVotingPeriod: BlockNumber = 3 * 24 * 60 * MINUTES;
 	pub const MinimumDeposit: Balance = 100 * DOLLARS;
-	pub const EnactmentPeriod: BlockNumber = 1 * MINUTES;
-	pub const CooloffPeriod: BlockNumber = 1 * MINUTES;
+	pub const EnactmentPeriod: BlockNumber = MINUTES;
+	pub const CooloffPeriod: BlockNumber = MINUTES;
 	pub const MaxProposals: u32 = 100;
 }
 
@@ -1412,10 +1397,6 @@ impl pallet_acurast_fulfillment_receiver::traits::OnFulfillment<Runtime> for OnA
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub struct Runtime
-	where
-		Block = Block,
-		NodeBlock = opaque::Block,
-		UncheckedExtrinsic = UncheckedExtrinsic,
 	{
 		System: frame_system,
 		Timestamp: pallet_timestamp,

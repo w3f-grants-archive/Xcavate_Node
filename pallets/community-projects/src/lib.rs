@@ -398,7 +398,7 @@ pub mod pallet {
 			let ended_milestone = MilestonePeriodExpiring::<T>::take(n);
 			ended_milestone.iter().for_each(|item| {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
-				Self::start_voting_period(*item);
+				let _ = Self::start_voting_period(*item);
 			});
 
 			let ended_voting = VotingPeriodExpiring::<T>::take(n);
@@ -407,9 +407,9 @@ pub mod pallet {
 				let voting_result = <OngoingVotes<T>>::take(item);
 				if let Some(voting_result) = voting_result {
 					if voting_result.yes_votes > voting_result.no_votes {
-						Self::distribute_funds(*item).unwrap_or_default();
+						let _ = Self::distribute_funds(*item);
 					} else {
-						Self::ckeck_strikes(*item);
+						let _ = Self::ckeck_strikes(*item);
 					}
 
 					OngoingVotes::<T>::remove(item);
@@ -417,9 +417,9 @@ pub mod pallet {
 				let project = Self::ongoing_projects(*item);
 				if let Some(project) = project {
 					if project.remaining_milestones >= 1 {
-						Self::start_milestone_period(*item);
+						let _ = Self::start_milestone_period(*item);
 					} else {
-						Self::delete_project(*item);
+						let _ = Self::delete_project(*item);
 					}
 				}
 				VotedUser::<T>::take(*item);
@@ -593,7 +593,7 @@ pub mod pallet {
 			project.project_balance += nft.price;
 			if project.project_balance >= project.project_price {
 				OngoingProjects::<T>::insert(collection_id, project);
-				Self::launch_project(collection_id);
+				Self::launch_project(collection_id)?;
 			} else {
 				OngoingProjects::<T>::insert(collection_id, project);
 				let mut listed_nfts = Self::listed_nfts();
@@ -685,7 +685,7 @@ pub mod pallet {
 		fn launch_project(collection_id: <T as pallet::Config>::CollectionId) -> DispatchResult {
 			let remaining_nfts = ListedNftsOfCollection::<T>::take(collection_id);
 			for item in remaining_nfts {
-				pallet_nfts::Pallet::<T>::do_burn(collection_id.into(), item.into(), |_| Ok(()));
+				pallet_nfts::Pallet::<T>::do_burn(collection_id.into(), item.into(), |_| Ok(()))?;
 				let mut listed_nfts = Self::listed_nfts();
 				let index = listed_nfts
 					.iter()
@@ -782,7 +782,7 @@ pub mod pallet {
 			project.strikes += 1;
 			OngoingProjects::<T>::insert(collection_id, project.clone());
 			if project.strikes >= 3 {
-				Self::delete_project_refund(collection_id);
+				Self::delete_project_refund(collection_id)?;
 			}
 			Ok(())
 		}
