@@ -35,9 +35,6 @@ pub use weights::*;
 
 pub type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
 
-/*  pub type BalanceOf<T> =
-<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance; */
-
 type BalanceOf<T> = <T as pallet_assets::Config<pallet_assets::Instance1>>::Balance;
 
 type BalanceOf1<T> = <<T as pallet_nfts::Config>::Currency as Currency<
@@ -87,10 +84,12 @@ pub mod pallet {
 	#[scale_info(skip_type_params(T))]
 	pub struct ProjectDetails<Balance, T: Config> {
 		pub project_owner: AccountIdOf<T>,
+		// The targeted amount of funds that the projects aims to collect.
 		pub project_price: Balance,
 		pub duration: u32,
 		pub milestones: u32,
 		pub remaining_milestones: u32,
+		// The amount of funds that the project collected.
 		pub project_balance: Balance,
 		pub launching_timestamp: BlockNumberFor<T>,
 		pub strikes: u8,
@@ -157,7 +156,6 @@ pub mod pallet {
 		/// The maximum amount of nfts that can be listed at the same time.
 		#[pallet::constant]
 		type MaxListedNfts: Get<u32>;
-
 		/// The maximum amount of nfts for a collection.
 		type MaxNftInCollection: Get<u32>;
 		#[cfg(feature = "runtime-benchmarks")]
@@ -221,10 +219,12 @@ pub mod pallet {
 	/// Mapping from the nft to the nft details.
 	#[pallet::storage]
 	#[pallet::getter(fn ongoing_nft_details)]
-	pub(super) type OngoingNftDetails<T: Config> = StorageMap<
+	pub(super) type OngoingNftDetails<T: Config> = StorageDoubleMap<
 		_,
 		Blake2_128Concat,
-		(<T as pallet::Config>::CollectionId, <T as pallet::Config>::ItemId),
+		<T as pallet::Config>::CollectionId, 
+		Blake2_128Concat,
+		<T as pallet::Config>::ItemId,
 		NftDetails<
 			BalanceOf<T>,
 			<T as pallet::Config>::CollectionId,
@@ -312,10 +312,12 @@ pub mod pallet {
 	/// Mapping of collection id and account id to the voting power.
 	#[pallet::storage]
 	#[pallet::getter(fn voting_power)]
-	pub(super) type VotingPower<T: Config> = StorageMap<
+	pub(super) type VotingPower<T: Config> = StorageDoubleMap<
 		_,
 		Blake2_128Concat,
-		(<T as pallet::Config>::CollectionId, AccountIdOf<T>),
+		<T as pallet::Config>::CollectionId,
+		Blake2_128Concat,
+		AccountIdOf<T>,
 		u64,
 		OptionQuery,
 	>;
@@ -389,6 +391,8 @@ pub mod pallet {
 		WrongAmountOfMetadata,
 		/// The Duration must be at least one.
 		DurationMustBeHigherThanZero,
+		/// The target price is impossible to reach.
+		PriceCannotBeReached,
 	}
 
 	#[pallet::hooks]
@@ -437,7 +441,7 @@ pub mod pallet {
 		///
 		/// Parameters:
 		/// - `nft_types`: The different nft types that the project creator wants to offer for the project.
-		/// - `metadata`: Different metadatas for the different nft types.
+		/// - `metadata`: Different metadatas for the different nfts.
 		/// - `duration`: Amount of months that the project will need.
 		/// - `price`: Amount of funds that needs to be raised.
 		/// - `data`: Metadata of the project collection.
@@ -450,20 +454,21 @@ pub mod pallet {
 			nft_types: BoundedNftDonationTypes<T>,
 			metadata: BoundedVec<
 				BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>,
-				<T as Config>::MaxNftTypes,
+				<T as Config>::MaxListedNfts,
 			>,
 			duration: u32,
 			price: BalanceOf<T>,
 			data: BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>,
 		) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
-			ensure!(metadata.len() == nft_types.len(), Error::<T>::WrongAmountOfMetadata);
+			ensure!(metadata.len() as u32 == nft_types.iter().fold(0, |sum, nft_type| sum + nft_type.amount), Error::<T>::WrongAmountOfMetadata);
+			ensure!(price <= nft_types.iter().fold(Default::default() , |sum, nft_type| sum + nft_type.price), Error::<T>::PriceCannotBeReached);
+			ensure!(duration > 0, Error::<T>::DurationMustBeHigherThanZero);
 			if pallet_nfts::NextCollectionId::<T>::get().is_none() {
 				pallet_nfts::NextCollectionId::<T>::set(
 					<T as pallet_nfts::Config>::CollectionId::initial_value(),
 				);
 			};
-			ensure!(duration > 0, Error::<T>::DurationMustBeHigherThanZero);
 			let collection_id =
 				pallet_nfts::NextCollectionId::<T>::get().ok_or(Error::<T>::UnknownCollection)?;
 			let next_collection_id = collection_id.increment();
@@ -500,7 +505,6 @@ pub mod pallet {
 			OngoingProjects::<T>::insert(collection_id, project);
 			let nft_metadata = &metadata;
 			let mut nft_id_index = 0;
-			let mut metadata_index = 0;
 			for nft_type in nft_types {
 				for _y in 0..nft_type.amount {
 					let item_id: <T as pallet::Config>::ItemId = nft_id_index.into();
@@ -522,18 +526,17 @@ pub mod pallet {
 						origin.clone(),
 						collection_id.into(),
 						item_id.into(),
-						nft_metadata[metadata_index as usize].clone(),
+						nft_metadata[nft_id_index as usize].clone(),
 					)?;
 					ListedNfts::<T>::try_append((collection_id, item_id))
 						.map_err(|_| Error::<T>::TooManyListedNfts)?;
-					OngoingNftDetails::<T>::insert((collection_id, item_id), nft.clone());
+					OngoingNftDetails::<T>::insert(collection_id, item_id, nft.clone());
 					ListedNftsOfCollection::<T>::try_mutate(collection_id, |keys| {
 						keys.try_push(item_id).map_err(|_| Error::<T>::TooManyNfts)?;
 						Ok::<(), DispatchError>(())
 					})?;
 					nft_id_index += 1;
 				}
-				metadata_index += 1;
 			}
 			pallet_nfts::Pallet::<T>::set_team(
 				origin.clone(),
@@ -568,12 +571,12 @@ pub mod pallet {
 			let signer = ensure_signed(origin.clone())?;
 
 			ensure!(
-				OngoingNftDetails::<T>::contains_key((collection_id, item_id)),
+				OngoingNftDetails::<T>::contains_key(collection_id, item_id),
 				Error::<T>::NftNotFound
 			);
 			let mut project =
 				OngoingProjects::<T>::take(collection_id).ok_or(Error::<T>::InvalidIndex)?;
-			let nft = OngoingNftDetails::<T>::take((collection_id, item_id))
+			let nft = OngoingNftDetails::<T>::take(collection_id, item_id)
 				.ok_or(Error::<T>::InvalidIndex)?;
 			let user_lookup = <T::Lookup as StaticLookup>::unlookup(Self::account_id());
 			let asset_id: AssetId<T> = 1.into();
@@ -591,6 +594,13 @@ pub mod pallet {
 				|_, _| Ok(()),
 			)?;
 			project.project_balance += nft.price;
+			let mut listed_items = Self::listed_nfts_of_collection(collection_id);
+			let index = listed_items
+				.iter()
+				.position(|x| *x == item_id)
+				.ok_or(Error::<T>::InvalidIndex)?;
+			listed_items.remove(index);
+			ListedNftsOfCollection::<T>::insert(collection_id, listed_items);
 			if project.project_balance >= project.project_price {
 				OngoingProjects::<T>::insert(collection_id, project);
 				Self::launch_project(collection_id)?;
@@ -603,13 +613,6 @@ pub mod pallet {
 					.ok_or(Error::<T>::InvalidIndex)?;
 				listed_nfts.remove(index);
 				ListedNfts::<T>::put(listed_nfts);
-				let mut listed_items = Self::listed_nfts_of_collection(collection_id);
-				let index = listed_items
-					.iter()
-					.position(|x| *x == item_id)
-					.ok_or(Error::<T>::InvalidIndex)?;
-				listed_items.remove(index);
-				ListedNftsOfCollection::<T>::insert(collection_id, listed_items);
 			};
 			let nft_holder = Self::nft_holder(collection_id);
 			if !nft_holder.contains(&signer.clone()) {
@@ -619,10 +622,10 @@ pub mod pallet {
 				})?;
 			}
 			let mut current_voting_power =
-				Self::voting_power((collection_id, signer.clone())).unwrap_or_default();
+				Self::voting_power(collection_id, signer.clone()).unwrap_or_default();
 			current_voting_power +=
 				TryInto::<u64>::try_into(nft.price).map_err(|_| Error::<T>::ConversionError)?;
-			VotingPower::<T>::insert((collection_id, signer.clone()), current_voting_power);
+			VotingPower::<T>::insert(collection_id, signer.clone(), current_voting_power);
 			Self::deposit_event(Event::<T>::NftBought {
 				collection_index: collection_id,
 				item_index: item_id,
@@ -656,7 +659,7 @@ pub mod pallet {
 			let voted = Self::voted_user(collection_id);
 			ensure!(!voted.contains(&origin), Error::<T>::AlreadyVoted);
 			let voting_power =
-				Self::voting_power((collection_id, origin.clone())).unwrap_or_default();
+				Self::voting_power(collection_id, origin.clone()).unwrap_or_default();
 			if vote == Vote::Yes {
 				current_vote.yes_votes += voting_power;
 			} else {
@@ -796,7 +799,7 @@ pub mod pallet {
 			let percentage = project.remaining_milestones * 10000 / project.milestones;
 			let nft_holders = NftHolder::<T>::take(collection_id);
 			for nft_holder in nft_holders {
-				let voting_power = VotingPower::<T>::take((collection_id, nft_holder.clone()))
+				let voting_power = VotingPower::<T>::take(collection_id, nft_holder.clone())
 					.ok_or(Error::<T>::NoFundsRemaining)?;
 				let remaining_funds = voting_power * percentage as u64 / 10000;
 				let origin: OriginFor<T> = RawOrigin::Signed(Self::account_id()).into();

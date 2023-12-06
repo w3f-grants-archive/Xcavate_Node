@@ -30,9 +30,9 @@ fn get_nft_metadata(
 	mut n: u32,
 ) -> BoundedVec<
 	BoundedVec<u8, <Test as pallet_nfts::Config>::StringLimit>,
-	<Test as Config>::MaxNftTypes,
+	<Test as Config>::MaxListedNfts,
 > {
-	let max = <Test as Config>::MaxNftTypes::get();
+	let max = <Test as Config>::MaxListedNfts::get();
 	if n > max {
 		n = max
 	}
@@ -60,14 +60,14 @@ fn run_to_block(n: u64) {
 fn list_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_ok!(CommunityProjects::list_project(
+ 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
-			get_nft_metadata(3),
+			get_nft_metadata(6),
 			5,
 			900,
 			bvec![22, 22]
-		));
+		)); 
 		assert_eq!(CommunityProjects::listed_nfts().len(), 6);
 	});
 }
@@ -79,7 +79,7 @@ fn buy_works() {
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
-			get_nft_metadata(3),
+			get_nft_metadata(6),
 			5,
 			900,
 			bvec![22, 22]
@@ -98,7 +98,7 @@ fn launch_project_works() {
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
-			get_nft_metadata(3),
+			get_nft_metadata(6),
 			5,
 			300,
 			bvec![22, 22]
@@ -116,7 +116,7 @@ fn voting_works() {
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
-			get_nft_metadata(3),
+			get_nft_metadata(6),
 			5,
 			300,
 			bvec![22, 22]
@@ -141,7 +141,7 @@ fn rejecting_vote_works() {
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
-			get_nft_metadata(3),
+			get_nft_metadata(6),
 			4,
 			900,
 			bvec![22, 22]
@@ -197,7 +197,7 @@ fn voting_fails_with_no_permission() {
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
-			get_nft_metadata(3),
+			get_nft_metadata(6),
 			3,
 			300,
 			bvec![22, 22]
@@ -222,7 +222,7 @@ fn voting_fails_with_double_voting() {
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
-			get_nft_metadata(3),
+			get_nft_metadata(6),
 			3,
 			300,
 			bvec![22, 22]
@@ -252,7 +252,7 @@ fn voting_fails_with_no_ongoing_voting() {
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
-			get_nft_metadata(3),
+			get_nft_metadata(6),
 			3,
 			300,
 			bvec![22, 22]
@@ -276,7 +276,7 @@ fn set_strikes_works() {
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
-			get_nft_metadata(3),
+			get_nft_metadata(6),
 			3,
 			300,
 			bvec![22, 22]
@@ -314,7 +314,7 @@ fn distributing_funds_works() {
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
-			get_nft_metadata(3),
+			get_nft_metadata(6),
 			3,
 			300,
 			bvec![22, 22]
@@ -341,7 +341,7 @@ fn distributing_funds_works_for_2_rounds_works() {
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
-			get_nft_metadata(3),
+			get_nft_metadata(6),
 			3,
 			300,
 			bvec![22, 22]
@@ -377,7 +377,7 @@ fn delete_project_works() {
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
-			get_nft_metadata(3),
+			get_nft_metadata(6),
 			1,
 			300,
 			bvec![22, 22]
@@ -395,4 +395,4 @@ fn delete_project_works() {
 		assert_eq!(Assets::balance(1, &CommunityProjects::account_id()), 0);
 		assert_eq!(CommunityProjects::ongoing_projects(0), None);
 	})
-}
+} 
