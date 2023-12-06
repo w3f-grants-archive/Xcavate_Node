@@ -47,8 +47,6 @@ type BalanceOf1<T> = <<T as pallet_nfts::Config>::Currency as Currency<
 pub type BoundedNftDonationTypes<T> =
 	BoundedVec<NftDonationTypes<BalanceOf<T>>, <T as Config>::MaxNftTypes>;
 
-type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
-
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
@@ -225,7 +223,7 @@ pub mod pallet {
 	#[pallet::getter(fn ongoing_nft_details)]
 	pub(super) type OngoingNftDetails<T: Config> = StorageMap<
 		_,
-		Twox64Concat,
+		Blake2_128Concat,
 		(<T as pallet::Config>::CollectionId, <T as pallet::Config>::ItemId),
 		NftDetails<
 			BalanceOf<T>,
@@ -241,7 +239,7 @@ pub mod pallet {
 	#[pallet::getter(fn ongoing_projects)]
 	pub(super) type OngoingProjects<T: Config> = StorageMap<
 		_,
-		Twox64Concat,
+		Blake2_128Concat,
 		<T as pallet::Config>::CollectionId,
 		ProjectDetails<BalanceOf<T>, T>,
 		OptionQuery,
@@ -252,7 +250,7 @@ pub mod pallet {
 	#[pallet::getter(fn listed_nfts_of_collection)]
 	pub(super) type ListedNftsOfCollection<T: Config> = StorageMap<
 		_,
-		Twox64Concat,
+		Blake2_128Concat,
 		<T as pallet::Config>::CollectionId,
 		BoundedVec<<T as pallet::Config>::ItemId, T::MaxNftInCollection>,
 		ValueQuery,
@@ -281,15 +279,20 @@ pub mod pallet {
 	/// Mapping of ongoing votes.
 	#[pallet::storage]
 	#[pallet::getter(fn ongoing_votes)]
-	pub(super) type OngoingVotes<T: Config> =
-		StorageMap<_, Twox64Concat, <T as pallet::Config>::CollectionId, VoteStats, OptionQuery>;
+	pub(super) type OngoingVotes<T: Config> = StorageMap<
+		_,
+		Blake2_128Concat,
+		<T as pallet::Config>::CollectionId,
+		VoteStats,
+		OptionQuery,
+	>;
 
 	/// Mapping of collection to the users.
 	#[pallet::storage]
 	#[pallet::getter(fn voted_user)]
 	pub(super) type VotedUser<T: Config> = StorageMap<
 		_,
-		Twox64Concat,
+		Blake2_128Concat,
 		<T as pallet::Config>::CollectionId,
 		BoundedVec<AccountIdOf<T>, T::MaxNftHolder>,
 		ValueQuery,
@@ -300,7 +303,7 @@ pub mod pallet {
 	#[pallet::getter(fn nft_holder)]
 	pub(super) type NftHolder<T: Config> = StorageMap<
 		_,
-		Twox64Concat,
+		Blake2_128Concat,
 		<T as pallet::Config>::CollectionId,
 		BoundedVec<AccountIdOf<T>, T::MaxNftHolder>,
 		ValueQuery,
@@ -311,7 +314,7 @@ pub mod pallet {
 	#[pallet::getter(fn voting_power)]
 	pub(super) type VotingPower<T: Config> = StorageMap<
 		_,
-		Twox64Concat,
+		Blake2_128Concat,
 		(<T as pallet::Config>::CollectionId, AccountIdOf<T>),
 		u64,
 		OptionQuery,
@@ -384,6 +387,8 @@ pub mod pallet {
 		NoFundsRemaining,
 		/// Metadata is not the same amount as nft types.
 		WrongAmountOfMetadata,
+		/// The Duration must be at least one.
+		DurationMustBeHigherThanZero,
 	}
 
 	#[pallet::hooks]
@@ -393,7 +398,7 @@ pub mod pallet {
 			let ended_milestone = MilestonePeriodExpiring::<T>::take(n);
 			ended_milestone.iter().for_each(|item| {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
-				Self::start_voting_period(*item);
+				let _ = Self::start_voting_period(*item);
 			});
 
 			let ended_voting = VotingPeriodExpiring::<T>::take(n);
@@ -402,9 +407,9 @@ pub mod pallet {
 				let voting_result = <OngoingVotes<T>>::take(item);
 				if let Some(voting_result) = voting_result {
 					if voting_result.yes_votes > voting_result.no_votes {
-						Self::distribute_funds(*item).unwrap_or_default();
+						let _ = Self::distribute_funds(*item);
 					} else {
-						Self::ckeck_strikes(*item);
+						let _ = Self::ckeck_strikes(*item);
 					}
 
 					OngoingVotes::<T>::remove(item);
@@ -412,9 +417,9 @@ pub mod pallet {
 				let project = Self::ongoing_projects(*item);
 				if let Some(project) = project {
 					if project.remaining_milestones >= 1 {
-						Self::start_milestone_period(*item);
+						let _ = Self::start_milestone_period(*item);
 					} else {
-						Self::delete_project(*item);
+						let _ = Self::delete_project(*item);
 					}
 				}
 				VotedUser::<T>::take(*item);
@@ -426,7 +431,6 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-
 		/// Creates a new project and list the nfts for the project on the marketplace.
 		///
 		/// The origin must be Signed and the sender must have sufficient funds free.
@@ -459,6 +463,7 @@ pub mod pallet {
 					<T as pallet_nfts::Config>::CollectionId::initial_value(),
 				);
 			};
+			ensure!(duration > 0, Error::<T>::DurationMustBeHigherThanZero);
 			let collection_id =
 				pallet_nfts::NextCollectionId::<T>::get().ok_or(Error::<T>::UnknownCollection)?;
 			let next_collection_id = collection_id.increment();
@@ -588,16 +593,21 @@ pub mod pallet {
 			project.project_balance += nft.price;
 			if project.project_balance >= project.project_price {
 				OngoingProjects::<T>::insert(collection_id, project);
-				Self::launch_project(collection_id);
+				Self::launch_project(collection_id)?;
 			} else {
 				OngoingProjects::<T>::insert(collection_id, project);
 				let mut listed_nfts = Self::listed_nfts();
-				let index =
-					listed_nfts.iter().position(|x| *x == (collection_id, item_id)).unwrap();
+				let index = listed_nfts
+					.iter()
+					.position(|x| *x == (collection_id, item_id))
+					.ok_or(Error::<T>::InvalidIndex)?;
 				listed_nfts.remove(index);
 				ListedNfts::<T>::put(listed_nfts);
 				let mut listed_items = Self::listed_nfts_of_collection(collection_id);
-				let index = listed_items.iter().position(|x| *x == item_id).unwrap();
+				let index = listed_items
+					.iter()
+					.position(|x| *x == item_id)
+					.ok_or(Error::<T>::InvalidIndex)?;
 				listed_items.remove(index);
 				ListedNftsOfCollection::<T>::insert(collection_id, listed_items);
 			};
@@ -610,9 +620,8 @@ pub mod pallet {
 			}
 			let mut current_voting_power =
 				Self::voting_power((collection_id, signer.clone())).unwrap_or_default();
-			current_voting_power += TryInto::<u64>::try_into(nft.price)
-				.map_err(|_| Error::<T>::ConversionError)
-				.unwrap();
+			current_voting_power +=
+				TryInto::<u64>::try_into(nft.price).map_err(|_| Error::<T>::ConversionError)?;
 			VotingPower::<T>::insert((collection_id, signer.clone()), current_voting_power);
 			Self::deposit_event(Event::<T>::NftBought {
 				collection_index: collection_id,
@@ -676,13 +685,17 @@ pub mod pallet {
 		fn launch_project(collection_id: <T as pallet::Config>::CollectionId) -> DispatchResult {
 			let remaining_nfts = ListedNftsOfCollection::<T>::take(collection_id);
 			for item in remaining_nfts {
-				pallet_nfts::Pallet::<T>::do_burn(collection_id.into(), item.into(), |_| Ok(()));
+				pallet_nfts::Pallet::<T>::do_burn(collection_id.into(), item.into(), |_| Ok(()))?;
 				let mut listed_nfts = Self::listed_nfts();
-				let index = listed_nfts.iter().position(|x| *x == (collection_id, item)).unwrap();
+				let index = listed_nfts
+					.iter()
+					.position(|x| *x == (collection_id, item))
+					.ok_or(Error::<T>::InvalidIndex)?;
 				listed_nfts.remove(index);
 				ListedNfts::<T>::put(listed_nfts);
 			}
-			let mut project = Self::ongoing_projects(collection_id).unwrap();
+			let mut project =
+				Self::ongoing_projects(collection_id).ok_or(Error::<T>::InvalidIndex)?;
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
 			project.launching_timestamp = current_block_number;
 			// The milestone period is so short for testing purpose. Later on it will be about three weeks if the duration is lower than 12.
@@ -690,8 +703,9 @@ pub mod pallet {
 			let milestone_period =
 				if project.duration > 12 { project.duration * 10 / 12 } else { 10 };
 			OngoingProjects::<T>::insert(collection_id, project);
-			let expiry_block =
-				current_block_number.saturating_add(milestone_period.try_into().ok().unwrap());
+			let expiry_block = current_block_number.saturating_add(
+				milestone_period.try_into().map_err(|_| Error::<T>::ConversionError)?,
+			);
 			MilestonePeriodExpiring::<T>::try_mutate(expiry_block, |keys| {
 				keys.try_push(collection_id).map_err(|_| Error::<T>::TooManyProjects)?;
 				Ok::<(), DispatchError>(())
@@ -708,7 +722,8 @@ pub mod pallet {
 			OngoingVotes::<T>::insert(collection_id, vote_stats);
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
 			// The voting period is so short for testing purpose. Later on it will be about 1 week.
-			let expiry_block = current_block_number.saturating_add(10_u64.try_into().ok().unwrap());
+			let expiry_block = current_block_number
+				.saturating_add(10_u64.try_into().map_err(|_| Error::<T>::ConversionError)?);
 			VotingPeriodExpiring::<T>::try_mutate(expiry_block, |keys| {
 				keys.try_push(collection_id).map_err(|_| Error::<T>::TooManyProjects)?;
 				Ok::<(), DispatchError>(())
@@ -724,7 +739,8 @@ pub mod pallet {
 			collection_id: <T as pallet::Config>::CollectionId,
 		) -> DispatchResult {
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
-			let expiry_block = current_block_number.saturating_add(10_u64.try_into().ok().unwrap());
+			let expiry_block = current_block_number
+				.saturating_add(10_u64.try_into().map_err(|_| Error::<T>::ConversionError)?);
 			MilestonePeriodExpiring::<T>::try_mutate(expiry_block, |keys| {
 				keys.try_push(collection_id).map_err(|_| Error::<T>::TooManyProjects)?;
 				Ok::<(), DispatchError>(())
@@ -733,7 +749,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Distributes funds after a successful voting for the project. 
+		/// Distributes funds after a successful voting for the project.
 		fn distribute_funds(collection_id: <T as pallet::Config>::CollectionId) -> DispatchResult {
 			let mut project =
 				OngoingProjects::<T>::take(collection_id).ok_or(Error::<T>::InvalidIndex)?;
@@ -761,11 +777,12 @@ pub mod pallet {
 
 		/// Evaluates if the project has 3 or more strikes and calls the delete delete_project_refund if its the case.
 		fn ckeck_strikes(collection_id: <T as pallet::Config>::CollectionId) -> DispatchResult {
-			let mut project = Self::ongoing_projects(collection_id).unwrap();
+			let mut project =
+				Self::ongoing_projects(collection_id).ok_or(Error::<T>::InvalidIndex)?;
 			project.strikes += 1;
 			OngoingProjects::<T>::insert(collection_id, project.clone());
 			if project.strikes >= 3 {
-				Self::delete_project_refund(collection_id);
+				Self::delete_project_refund(collection_id)?;
 			}
 			Ok(())
 		}
@@ -789,8 +806,7 @@ pub mod pallet {
 					origin,
 					asset_id.into().into(),
 					user_lookup,
-					Self::u64_to_balance_option(remaining_funds).unwrap_or_default()
-						/* * Self::u64_to_balance_option(1000000000000).unwrap_or_default() */,
+					Self::u64_to_balance_option(remaining_funds)?, /* * Self::u64_to_balance_option(1000000000000)? */
 				)
 				.map_err(|_| Error::<T>::NotEnoughFunds)?;
 			}

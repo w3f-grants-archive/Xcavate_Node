@@ -67,10 +67,7 @@ mod benchmarks {
 		let alice = account("alice", SEED, SEED);
 		let proposal_id = CommunityLoanPool::<T>::proposal_count();
 		let milestones = get_max_milestones::<T>();
-		let sum: u64 = milestones
-		.iter()
-		.map(|i| i.percentage_to_unlock.deconstruct() as u64)
-		.sum();
+		let sum: u64 = milestones.iter().map(|i| i.percentage_to_unlock.deconstruct() as u64).sum();
 		assert_eq!(sum, 100);
 		#[extrinsic_call]
 		set_milestones(RawOrigin::Signed(alice), proposal_id, milestones);
@@ -146,7 +143,7 @@ mod benchmarks {
 		#[extrinsic_call]
 		withdraw(RawOrigin::Signed(beneficiary), 1, withdraw_value);
 		assert_eq!(CommunityLoanPool::<T>::loans(1).unwrap().borrowed_amount, withdraw_value);
-	} 
+	}
 
 	#[benchmark]
 	fn repay() {
@@ -182,7 +179,11 @@ mod benchmarks {
 		assert_eq!(CommunityLoanPool::<T>::ongoing_loans().len(), 1);
 		let withdraw_value: BalanceOf<T> = 100u32.into();
 		let beneficiary: T::AccountId = account("beneficiary", SEED, SEED);
-		CommunityLoanPool::<T>::withdraw(RawOrigin::Signed(beneficiary.clone()).into(), 1, withdraw_value);
+		CommunityLoanPool::<T>::withdraw(
+			RawOrigin::Signed(beneficiary.clone()).into(),
+			1,
+			withdraw_value,
+		);
 		#[extrinsic_call]
 		repay(RawOrigin::Signed(beneficiary), 1, withdraw_value);
 		assert_eq!(CommunityLoanPool::<T>::loans(1).unwrap().borrowed_amount, 0_u32.into());
@@ -224,7 +225,7 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn vote_on_milestone_proposal(){
+	fn vote_on_milestone_proposal() {
 		let alice = account("alice", SEED, SEED);
 		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), alice);
 		let bob: T::AccountId = account("bob", SEED, SEED);
@@ -256,11 +257,14 @@ mod benchmarks {
 		#[extrinsic_call]
 		vote_on_milestone_proposal(RawOrigin::Signed(bob), proposal_id, crate::Vote::Yes);
 
-		assert_eq!(CommunityLoanPool::<T>::ongoing_milestone_votes(proposal_id).unwrap().yes_votes, 1);
+		assert_eq!(
+			CommunityLoanPool::<T>::ongoing_milestone_votes(proposal_id).unwrap().yes_votes,
+			1
+		);
 	}
 
 	#[benchmark]
-	fn propose_deletion(){
+	fn propose_deletion() {
 		let alice = account("alice", SEED, SEED);
 		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), alice);
 		let bob: T::AccountId = account("bob", SEED, SEED);
@@ -295,7 +299,7 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn vote_on_deletion_proposal(){
+	fn vote_on_deletion_proposal() {
 		let alice = account("alice", SEED, SEED);
 		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), alice);
 		let bob: T::AccountId = account("bob", SEED, SEED);
@@ -326,9 +330,12 @@ mod benchmarks {
 		let beneficiary = account("beneficiary", SEED, SEED);
 		CommunityLoanPool::<T>::propose_deletion(RawOrigin::Signed(beneficiary).into(), 1);
 		#[extrinsic_call]
-		vote_on_deletion_proposal(RawOrigin::Signed(bob), 1, crate::Vote::Yes); 
+		vote_on_deletion_proposal(RawOrigin::Signed(bob), 1, crate::Vote::Yes);
 
-		assert_eq!(CommunityLoanPool::<T>::ongoing_deletion_votes(proposal_id).unwrap().yes_votes, 1);
+		assert_eq!(
+			CommunityLoanPool::<T>::ongoing_deletion_votes(proposal_id).unwrap().yes_votes,
+			1
+		);
 	}
 
 	impl_benchmark_test_suite!(CommunityLoanPool, crate::mock::new_test_ext(), crate::mock::Test);
@@ -357,14 +364,16 @@ fn assert_last_event<T: Config>(generic_event: <T as Config>::RuntimeEvent) {
 }
 
 fn run_to_block<T: Config>(new_block: frame_system::pallet_prelude::BlockNumberFor<T>) {
-	while frame_system::Pallet::<T>::block_number() < new_block{
+	while frame_system::Pallet::<T>::block_number() < new_block {
 		if frame_system::Pallet::<T>::block_number() > 0u32.into() {
 			CommunityLoanPool::<T>::on_initialize(frame_system::Pallet::<T>::block_number());
 			frame_system::Pallet::<T>::on_finalize(frame_system::Pallet::<T>::block_number());
 		}
 		frame_system::Pallet::<T>::reset_events();
-		frame_system::Pallet::<T>::set_block_number(frame_system::Pallet::<T>::block_number() + 1u32.into());
+		frame_system::Pallet::<T>::set_block_number(
+			frame_system::Pallet::<T>::block_number() + 1u32.into(),
+		);
 		frame_system::Pallet::<T>::on_initialize(frame_system::Pallet::<T>::block_number());
 		CommunityLoanPool::<T>::on_initialize(frame_system::Pallet::<T>::block_number());
 	}
-} 
+}

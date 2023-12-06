@@ -396,4 +396,3 @@ fn delete_project_works() {
 		assert_eq!(CommunityProjects::ongoing_projects(0), None);
 	})
 }
- 

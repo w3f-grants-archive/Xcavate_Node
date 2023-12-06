@@ -66,6 +66,52 @@ fn propose_doesnt_work_not_enough_userbalance() {
 }
 
 #[test]
+fn propose_doesnt_work_too_much_reserved() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(CommunityLoanPool::propose(
+			RuntimeOrigin::signed([0; 32].into()),
+			60_000_000,
+			sp_runtime::MultiAddress::Id([1; 32].into()),
+			13,
+			20
+		));
+		assert_noop!(CommunityLoanPool::propose(
+			RuntimeOrigin::signed([1; 32].into()),
+			60_000_000,
+			sp_runtime::MultiAddress::Id([1; 32].into()),
+			13,
+			20
+		),
+		Error::<Test>::NotEnoughLoanFundsAvailable
+		);
+	})
+}
+
+#[test]
+fn free_reserved_funds_after_rejection() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(CommunityLoanPool::propose(
+			RuntimeOrigin::signed([0; 32].into()),
+			60_000_000,
+			sp_runtime::MultiAddress::Id([1; 32].into()),
+			13,
+			20
+		));
+		run_to_block(22);
+		assert_ok!(CommunityLoanPool::propose(
+			RuntimeOrigin::signed([0; 32].into()),
+			60_000_000,
+			sp_runtime::MultiAddress::Id([1; 32].into()),
+			13,
+			20
+		));
+	})
+}
+
+#[test]
 fn add_committee_member_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
@@ -118,6 +164,7 @@ fn voting_works() {
 fn vote_rejected_with_no_votes() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		Timestamp::set_timestamp(1);
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
@@ -175,6 +222,7 @@ fn voting_works_only_for_members() {
 #[test]
 fn vote_evaluated_after_yes_votes() {
 	new_test_ext().execute_with(|| {
+		Timestamp::set_timestamp(1);
 		System::set_block_number(1);
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
@@ -197,6 +245,7 @@ fn vote_evaluated_after_yes_votes() {
 #[test]
 fn milestone_works() {
 	new_test_ext().execute_with(|| {
+		Timestamp::set_timestamp(1);
 		System::set_block_number(1);
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
@@ -212,6 +261,7 @@ fn milestone_works() {
 			get_milestones(10),
 		));
 		run_to_block(22);
+		assert_eq!(CommunityLoanPool::loans(1).unwrap().available_amount, 10);
 		assert_ok!(CommunityLoanPool::propose_milestone(RuntimeOrigin::signed([1; 32].into()), 1));
 		assert_ok!(CommunityLoanPool::vote_on_milestone_proposal(
 			RuntimeOrigin::signed([0; 32].into()),
@@ -227,6 +277,7 @@ fn milestone_works() {
 #[test]
 fn withdraw_works() {
 	new_test_ext().execute_with(|| {
+		Timestamp::set_timestamp(1);
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
@@ -250,6 +301,7 @@ fn withdraw_works() {
 #[test]
 fn withdraw_fails_by_wrong_caller() {
 	new_test_ext().execute_with(|| {
+		Timestamp::set_timestamp(1);
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
@@ -274,6 +326,7 @@ fn withdraw_fails_by_wrong_caller() {
 #[test]
 fn repay_works() {
 	new_test_ext().execute_with(|| {
+		Timestamp::set_timestamp(1);
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
@@ -298,6 +351,7 @@ fn repay_works() {
 #[test]
 fn repay_if_its_too_much() {
 	new_test_ext().execute_with(|| {
+		Timestamp::set_timestamp(1);
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
@@ -323,6 +377,7 @@ fn repay_if_its_too_much() {
 #[test]
 fn deletion_works() {
 	new_test_ext().execute_with(|| {
+		Timestamp::set_timestamp(1);
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
@@ -349,5 +404,71 @@ fn deletion_works() {
 		));
 		run_to_block(32);
 		assert_eq!(CommunityLoanPool::loans(1), None);
+	})
+}
+
+#[test]
+fn charge_apy_works() {
+	new_test_ext().execute_with(|| {
+		Timestamp::set_timestamp(1);
+		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(CommunityLoanPool::propose(
+			RuntimeOrigin::signed([0; 32].into()),
+			100000000,
+			sp_runtime::MultiAddress::Id([0; 32].into()),
+			1,
+			1
+		));
+		assert_ok!(CommunityLoanPool::set_milestones(
+			RuntimeOrigin::signed([0; 32].into()),
+			1,
+			get_milestones(10),
+		));
+		run_to_block(11);
+		Timestamp::set_timestamp(10000);
+		System::reset_events();
+		System::set_block_number(System::block_number() + 1);
+		System::on_initialize(System::block_number());
+		CommunityLoanPool::on_initialize(System::block_number());
+		assert_eq!(CommunityLoanPool::loans(1).unwrap().borrowed_amount, 3);
+		System::assert_last_event(
+			Event::ApyCharged { loan_index: 1, interest_balance: 3 }.into(),
+		);
+	})
+}
+
+#[test]
+fn charge_apy_and_repaying_the_interests_works() {
+	new_test_ext().execute_with(|| {
+		Timestamp::set_timestamp(1);
+		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(CommunityLoanPool::propose(
+			RuntimeOrigin::signed([0; 32].into()),
+			100000000,
+			sp_runtime::MultiAddress::Id([0; 32].into()),
+			1,
+			1
+		));
+		assert_ok!(CommunityLoanPool::set_milestones(
+			RuntimeOrigin::signed([0; 32].into()),
+			1,
+			get_milestones(10),
+		));
+		run_to_block(11);
+		Timestamp::set_timestamp(10000);
+		System::reset_events();
+		System::set_block_number(System::block_number() + 1);
+		System::on_initialize(System::block_number());
+		CommunityLoanPool::on_initialize(System::block_number());
+		assert_eq!(CommunityLoanPool::loans(1).unwrap().borrowed_amount, 3);
+		System::assert_last_event(
+			Event::ApyCharged { loan_index: 1, interest_balance: 3 }.into(),
+		);
+		assert_eq!(CommunityLoanPool::total_loan_amount(), 100000000);
+		assert_eq!(CommunityLoanPool::total_loan_interests(), 3);
+		assert_ok!(CommunityLoanPool::withdraw(RuntimeOrigin::signed([0; 32].into()), 1, 10000000));
+		assert_ok!(CommunityLoanPool::repay(RuntimeOrigin::signed([0; 32].into()), 1, 10000000));
+		assert_eq!(CommunityLoanPool::total_loan_amount(), 90000000);
+		assert_eq!(CommunityLoanPool::total_loan_interests(), 3);
 	})
 }

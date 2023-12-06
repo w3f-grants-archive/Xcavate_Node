@@ -4,18 +4,18 @@ use super::*;
 
 #[allow(unused)]
 use crate::Pallet as CommunityProjects;
-use sp_std::prelude::*;
 use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
+use sp_std::prelude::*;
 const SEED: u32 = 0;
 use frame_support::sp_runtime::traits::Bounded;
 use frame_support::traits::Get;
 type DepositBalanceOf<T> = <<T as pallet_nfts::Config>::Currency as Currency<
 	<T as frame_system::Config>::AccountId,
 >>::Balance;
-use pallet_assets::Pallet as Assets;
 use frame_support::assert_ok;
 use frame_support::traits::Hooks;
+use pallet_assets::Pallet as Assets;
 
 fn setup_listing<T: Config>(
 	u: u32,
@@ -143,7 +143,11 @@ mod benchmarks {
 			amount2,
 		));
 		assert_eq!(Assets::<T, Instance1>::balance(asset_id, buyer.clone()), amount2);
-		CommunityProjects::<T>::buy_nft(RawOrigin::Signed(buyer.clone()).into(), 0.into(), 1.into());
+		CommunityProjects::<T>::buy_nft(
+			RawOrigin::Signed(buyer.clone()).into(),
+			0.into(),
+			1.into(),
+		);
 		run_to_block::<T>(11u32.into());
 		#[extrinsic_call]
 		vote_on_milestone(RawOrigin::Signed(buyer), 0.into(), crate::Vote::Yes);
@@ -186,14 +190,16 @@ fn get_nft_metadata<T: Config>(
 }
 
 fn run_to_block<T: Config>(new_block: frame_system::pallet_prelude::BlockNumberFor<T>) {
-	while frame_system::Pallet::<T>::block_number() < new_block{
+	while frame_system::Pallet::<T>::block_number() < new_block {
 		if frame_system::Pallet::<T>::block_number() > 0u32.into() {
 			CommunityProjects::<T>::on_initialize(frame_system::Pallet::<T>::block_number());
 			frame_system::Pallet::<T>::on_finalize(frame_system::Pallet::<T>::block_number());
 		}
 		frame_system::Pallet::<T>::reset_events();
-		frame_system::Pallet::<T>::set_block_number(frame_system::Pallet::<T>::block_number() + 1u32.into());
+		frame_system::Pallet::<T>::set_block_number(
+			frame_system::Pallet::<T>::block_number() + 1u32.into(),
+		);
 		frame_system::Pallet::<T>::on_initialize(frame_system::Pallet::<T>::block_number());
 		CommunityProjects::<T>::on_initialize(frame_system::Pallet::<T>::block_number());
 	}
-} 
+}

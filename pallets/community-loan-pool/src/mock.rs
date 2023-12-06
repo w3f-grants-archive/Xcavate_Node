@@ -176,10 +176,7 @@ parameter_types! {
 impl pallet_community_loan_pool::Config for Test {
 	type PalletId = CommunityLoanPalletIdPalletId;
 	type Currency = Balances;
-	type ApproveOrigin = frame_system::EnsureRoot<Self::AccountId>;
-	type RejectOrigin = frame_system::EnsureRoot<Self::AccountId>;
 	type CommitteeOrigin = frame_system::EnsureRoot<Self::AccountId>;
-	type DeleteOrigin = frame_system::EnsureRoot<Self::AccountId>;
 	type RuntimeEvent = RuntimeEvent;
 	type ProposalBond = ProposalBond;
 	type ProposalBondMinimum = ConstU32<10000>;
@@ -207,7 +204,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 			([1; 32].into(), 15_000),
 			([2; 32].into(), 150_000),
 			([3; 32].into(), 5_000),
-			((CommunityLoanPool::account_id()), 20_000_000),
+			((CommunityLoanPool::account_id()), 100_000_000),
 		],
 	}
 	.assimilate_storage(&mut test)

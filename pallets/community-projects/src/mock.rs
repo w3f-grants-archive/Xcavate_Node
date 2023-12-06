@@ -45,7 +45,7 @@ pub const HOURS: BlockNumber = MINUTES * 60;
 pub const DAYS: BlockNumber = HOURS * 24;
 pub const SEED: u32 = 0;
 
-use frame_benchmarking::account;
+//use frame_benchmarking::account;
 
 // Configure a mock runtime to test the pallet.
 frame_support::construct_runtime!(
@@ -191,6 +191,7 @@ parameter_types! {
 /// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
 impl pallet_community_projects::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = weights::SubstrateWeight<Test>;
 	type Currency = Balances;
 	type PalletId = CommunityProjectPalletId;
 	type MaxNftTypes = MaxNftType;
@@ -222,8 +223,8 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 	.assimilate_storage(&mut test)
 	.unwrap();
 
-/* 	pallet_assets::GenesisConfig::<Test, Instance1> {
-		assets: vec![(1, account("buyer", SEED, SEED), true, 1)], // Genesis assets: id, owner, is_sufficient, min_balance
+	pallet_assets::GenesisConfig::<Test, Instance1> {
+		assets: vec![(1, /* account("buyer", SEED, SEED) */ [0; 32].into(), true, 1)], // Genesis assets: id, owner, is_sufficient, min_balance
 		metadata: vec![(1, "XUSD".into(), "XUSD".into(), 0)], // Genesis metadata: id, name, symbol, decimals
 		accounts: vec![
 			(1, [0; 32].into(), 20_000_000),
@@ -233,7 +234,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 		], // Genesis accounts: id, account_id, balance
 	}
 	.assimilate_storage(&mut test)
-	.unwrap(); */
+	.unwrap();
 
 	test.into()
 }

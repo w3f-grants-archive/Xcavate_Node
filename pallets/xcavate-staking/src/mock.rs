@@ -196,10 +196,13 @@ impl pallet_community_loan_pool::Config for Test {
 	type VotingTime = VotingTime;
 	type MaxCommitteeMembers = MaximumCommitteeMembers;
 	type MaxMilestonesPerProject = MaxMilestones;
+	type CollectionId = u32;
+	type ItemId = u32;
 }
 
 parameter_types! {
 	pub const MaxStaker: u32 = 10000;
+	pub const RewardsDistributing: BlockNumber = 1;
 }
 
 impl pallet_xcavate_staking::Config for Test {
@@ -209,18 +212,19 @@ impl pallet_xcavate_staking::Config for Test {
 	type MaxStakers = MaxStaker;
 	type TimeProvider = Timestamp;
 	type WeightInfo = weights::SubstrateWeight<Test>;
+	type RewardsDistributingTime = RewardsDistributing;
 }
 
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> sp_io::TestExternalities {
 	let mut test = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
-
 	pallet_balances::GenesisConfig::<Test> {
 		balances: vec![
 			([0; 32].into(), 20_000_000),
-			([1; 32].into(), 15_000),
+			([1; 32].into(), 15_000_000),
 			([2; 32].into(), 150_000),
 			([3; 32].into(), 5_000),
+			((CommunityLoanPool::account_id()), 2_000_000_000),
 		],
 	}
 	.assimilate_storage(&mut test)

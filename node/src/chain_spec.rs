@@ -80,7 +80,7 @@ pub fn get_endowed_accounts_with_balance() -> Vec<(AccountId, u128)> {
 		accounts.iter().cloned().map(|k| (k, ENDOWMENT)).collect();
 	let json_data = &include_bytes!("../../seed/balances.json")[..];
 	let additional_accounts_with_balance: Vec<(AccountId, u128)> =
-		serde_json::from_slice(json_data).unwrap();
+		serde_json::from_slice(json_data).unwrap_or_default();
 
 	let mut accounts = additional_accounts_with_balance.clone();
 
@@ -238,8 +238,7 @@ fn testnet_genesis(
 		assets: AssetsConfig {
 			assets: vec![(1, root_key.clone(), true, 1)], // Genesis assets: id, owner, is_sufficient, min_balance
 			metadata: vec![(1, "XUSD".into(), "XUSD".into(), 0)], // Genesis metadata: id, name, symbol, decimals
-			accounts: endowed_accounts.iter().cloned().map(|x| (1, x.0.clone(), x.1)).collect(), 
-			
+			accounts: endowed_accounts.iter().cloned().map(|x| (1, x.0.clone(), x.1)).collect(),
 		},
 		pool_assets: Default::default(),
 		im_online: Default::default(),
