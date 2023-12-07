@@ -65,10 +65,40 @@ fn list_works() {
 			get_project_nfts(3),
 			get_nft_metadata(6),
 			5,
-			900,
+			400,
 			bvec![22, 22]
 		)); 
 		assert_eq!(CommunityProjects::listed_nfts().len(), 6);
+	});
+}
+
+#[test]
+fn list_fails_with_not_enough_metadata() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+ 		assert_noop!(CommunityProjects::list_project(
+			RuntimeOrigin::signed([0; 32].into()),
+			get_project_nfts(3),
+			get_nft_metadata(5),
+			5,
+			400,
+			bvec![22, 22]
+		), Error::<Test>::WrongAmountOfMetadata); 
+	});
+}
+
+#[test]
+fn list_fails_with_price_too_high() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+ 		assert_noop!(CommunityProjects::list_project(
+			RuntimeOrigin::signed([0; 32].into()),
+			get_project_nfts(3),
+			get_nft_metadata(6),
+			5,
+			1000,
+			bvec![22, 22]
+		), Error::<Test>::PriceCannotBeReached); 
 	});
 }
 
@@ -81,13 +111,46 @@ fn buy_works() {
 			get_project_nfts(3),
 			get_nft_metadata(6),
 			5,
-			900,
+			400,
 			bvec![22, 22]
 		));
 		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 1));
 		assert_eq!(CommunityProjects::listed_nfts().len(), 5);
 		assert_eq!(Assets::balance(1, &[1; 32].into()), 1300);
 		assert_eq!(Assets::balance(1, &CommunityProjects::account_id()), 200);
+	});
+}
+
+#[test]
+fn buy_fails_nft_not_available(){
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(CommunityProjects::list_project(
+			RuntimeOrigin::signed([0; 32].into()),
+			get_project_nfts(3),
+			get_nft_metadata(6),
+			5,
+			400,
+			bvec![22, 22]
+		));
+		assert_noop!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 2, 1), Error::<Test>::NftNotFound);
+	});
+}
+
+#[test]
+fn buy_fails_nft_not_enough_assets(){
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(CommunityProjects::list_project(
+			RuntimeOrigin::signed([0; 32].into()),
+			get_project_nfts(3),
+			get_nft_metadata(6),
+			5,
+			400,
+			bvec![22, 22]
+		));
+		assert_noop!(CommunityProjects::buy_nft(RuntimeOrigin::signed([4; 32].into()), 0, 1), Error::<Test>::NotEnoughFunds);
+		assert_eq!(CommunityProjects::listed_nfts().len(), 6);
 	});
 }
 
@@ -140,8 +203,8 @@ fn rejecting_vote_works() {
 		System::set_block_number(1);
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(3),
-			get_nft_metadata(6),
+			get_project_nfts(4),
+			get_nft_metadata(10),
 			4,
 			900,
 			bvec![22, 22]
@@ -335,7 +398,7 @@ fn distributing_funds_works() {
 }
 
 #[test]
-fn distributing_funds_works_for_2_rounds_works() {
+fn distributing_funds_for_2_rounds_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(CommunityProjects::list_project(

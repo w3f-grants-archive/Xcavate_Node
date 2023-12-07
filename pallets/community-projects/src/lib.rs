@@ -569,7 +569,6 @@ pub mod pallet {
 			item_id: <T as pallet::Config>::ItemId,
 		) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
-
 			ensure!(
 				OngoingNftDetails::<T>::contains_key(collection_id, item_id),
 				Error::<T>::NftNotFound
@@ -606,14 +605,14 @@ pub mod pallet {
 				Self::launch_project(collection_id)?;
 			} else {
 				OngoingProjects::<T>::insert(collection_id, project);
-				let mut listed_nfts = Self::listed_nfts();
-				let index = listed_nfts
-					.iter()
-					.position(|x| *x == (collection_id, item_id))
-					.ok_or(Error::<T>::InvalidIndex)?;
-				listed_nfts.remove(index);
-				ListedNfts::<T>::put(listed_nfts);
 			};
+			let mut listed_nfts = Self::listed_nfts();
+			let index = listed_nfts
+				.iter()
+				.position(|x| *x == (collection_id, item_id))
+				.ok_or(Error::<T>::InvalidIndex)?;
+			listed_nfts.remove(index);
+			ListedNfts::<T>::put(listed_nfts);
 			let nft_holder = Self::nft_holder(collection_id);
 			if !nft_holder.contains(&signer.clone()) {
 				NftHolder::<T>::try_mutate(collection_id, |keys| {
@@ -741,9 +740,14 @@ pub mod pallet {
 		fn start_milestone_period(
 			collection_id: <T as pallet::Config>::CollectionId,
 		) -> DispatchResult {
+			let project =
+			Self::ongoing_projects(collection_id).ok_or(Error::<T>::InvalidIndex)?;
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
-			let expiry_block = current_block_number
-				.saturating_add(10_u64.try_into().map_err(|_| Error::<T>::ConversionError)?);
+			let milestone_period =
+				if project.duration > 12 { project.duration * 10 / 12 } else { 10 };
+			let expiry_block = current_block_number.saturating_add(
+				milestone_period.try_into().map_err(|_| Error::<T>::ConversionError)?,
+			);
 			MilestonePeriodExpiring::<T>::try_mutate(expiry_block, |keys| {
 				keys.try_push(collection_id).map_err(|_| Error::<T>::TooManyProjects)?;
 				Ok::<(), DispatchError>(())
