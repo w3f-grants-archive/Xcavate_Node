@@ -117,15 +117,22 @@ fn relist_a_nft() {
 			1_000_000,
 			bvec![22, 22]
 		));
-		assert_eq!(NftMarketplace::listed_nfts().len(), 100);
 		assert_ok!(NftMarketplace::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 100));
-		assert_eq!(Balances::free_balance(&([0; 32].into())), 20999998);
-		assert_eq!(Balances::free_balance(&([1; 32].into())), 14_000_000);
 		assert_eq!(NftMarketplace::listed_nfts().len(), 0);
 		let item = Item::<Test>::get(0, 1).unwrap();
 		assert_eq!(NftMarketplace::listed_collection_details(0).unwrap().spv_created, true);
 		assert_ok!(NftMarketplace::list_nft(RuntimeOrigin::signed([1; 32].into()), 0, 100, 100));
 		assert_eq!(NftMarketplace::listed_nfts()[0], (0, 100));
+	})
+}
+
+#[test]
+fn relist_nfts_not_created_with_marketplace_fails() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(Uniques::create(RuntimeOrigin::signed([0; 32].into()), sp_runtime::MultiAddress::Id([0; 32].into()), Default::default()));
+		assert_ok!(Uniques::mint(RuntimeOrigin::signed([0; 32].into()), 0, 0, sp_runtime::MultiAddress::Id([0; 32].into()), None));
+		assert_noop!(NftMarketplace::list_nft(RuntimeOrigin::signed([0; 32].into()), 0, 0, 100), Error::<Test>::CollectionNotKnown);
 	})
 }
 

@@ -308,6 +308,8 @@ pub mod pallet {
 		SpvNotCreated,
 		/// The Nft is not listed on the marketplace.
 		NftNotForSale,
+		/// Collection is not known to this pallet.
+		CollectionNotKnown,
 	}
 
 	#[pallet::call]
@@ -436,6 +438,7 @@ pub mod pallet {
 			price: BalanceOf<T>,
 		) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
+			ensure!(Self::listed_collection_details(collection_id).is_some(), Error::<T>::CollectionNotKnown);
 			let pallet_lookup = <T::Lookup as StaticLookup>::unlookup(Self::account_id());
  			pallet_nfts::Pallet::<T>::transfer(
 				origin,
@@ -479,7 +482,7 @@ pub mod pallet {
 		/// - `collection`: The collection that the investor wants to buy from.
 		/// - `amount`: The amount of nfts that the investor wants to buy.
 		///
-		/// Emits `NftBought` event when succesfful
+		/// Emits `NftBought` event when succesfful.
 		#[pallet::call_index(2)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::buy_nft())]
 		pub fn buy_nft(
@@ -555,6 +558,15 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Buy single nfts from the marketplace.
+		///
+		/// The origin must be Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `collection_id`: The collection that the investor wants to buy from.
+		/// - `item_id`: The Item from the collection that the investor wants to buy from.
+		///
+		/// Emits `NftBought` event when succesfful.
 		#[pallet::call_index(3)]
 		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
 		pub fn buy_single_nft(
@@ -605,6 +617,16 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Upgrade the price from a listed nft.
+		///
+		/// The origin must be Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `collection_id`: The collection that the investor wants to buy from.
+		/// - `item_id`: The Item from the collection that the investor wants to buy from.
+		/// - `new_price`: The new price for the nft.
+		///
+		/// Emits `NftUpdated` event when succesfful.
 		#[pallet::call_index(4)]
 		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
 		pub fn upgrade_listing(
@@ -626,7 +648,16 @@ pub mod pallet {
 			Ok(())
 		}
 
-
+		/// Delist the choosen nft from the marketplace.
+		/// Works only for relisted nfts.
+		///
+		/// The origin must be Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `collection_id`: The collection that the investor wants to buy from.
+		/// - `item_id`: The Item from the collection that the investor wants to buy from.
+		///
+		/// Emits `NftDelisted` event when succesfful.
 		#[pallet::call_index(5)]
 		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
 		pub fn delist_nft(
