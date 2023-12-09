@@ -217,6 +217,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 			([1; 32].into(), 15_000),
 			([2; 32].into(), 150_000),
 			([3; 32].into(), 5_000),
+			([4; 32].into(), 5_000),
 			((CommunityProjects::account_id()), 20_000_000),
 		],
 	}
@@ -231,6 +232,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 			(1, [1; 32].into(), 1_500),
 			(1, [2; 32].into(), 150_000),
 			(1, [3; 32].into(), 5_000),
+			(1, [4; 32].into(), 50),
 		], // Genesis accounts: id, account_id, balance
 	}
 	.assimilate_storage(&mut test)

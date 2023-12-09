@@ -1,6 +1,8 @@
 use crate::{mock::*, Error, Event};
 use frame_support::{assert_noop, assert_ok};
 
+use pallet_nfts::Item;
+
 macro_rules! bvec {
 	($( $x:tt )*) => {
 		vec![$( $x )*].try_into().unwrap()
@@ -61,6 +63,8 @@ fn distributes_nfts_and_funds() {
 		assert_eq!(Balances::free_balance(&([0; 32].into())), 20999998);
 		assert_eq!(Balances::free_balance(&([1; 32].into())), 14_000_000);
 		assert_eq!(NftMarketplace::listed_nfts().len(), 0);
+		let item = Item::<Test>::get(0, 1).unwrap();
+		assert_eq!(NftMarketplace::listed_collection_details(0).unwrap().spv_created, true);
 	})
 }
 
@@ -85,7 +89,7 @@ fn listing_and_selling_multiple_objects() {
 		assert_eq!(NftMarketplace::listed_nfts().len(), 300);
 		assert_ok!(NftMarketplace::buy_nft(RuntimeOrigin::signed([1; 32].into()), 1, 100));
 		assert_eq!(NftMarketplace::listed_nfts().len(), 200);
-		assert_eq!(NftMarketplace::ongoing_nft_details((1, 8)), None);
+		assert_eq!(NftMarketplace::ongoing_nft_details(1, 8), None);
 		assert_ok!(NftMarketplace::buy_nft(RuntimeOrigin::signed([1; 32].into()), 2, 20));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([3; 32].into()),
@@ -93,13 +97,113 @@ fn listing_and_selling_multiple_objects() {
 			bvec![22, 22]
 		));
 		assert_ok!(NftMarketplace::buy_nft(RuntimeOrigin::signed([2; 32].into()), 0, 33));
-		assert_eq!(NftMarketplace::ongoing_nft_details((0, 3)).unwrap().sold, true);
-		assert_eq!(NftMarketplace::ongoing_nft_details((0, 34)).unwrap().sold, false);
+		assert_eq!(NftMarketplace::ongoing_nft_details(0, 3).unwrap().sold, true);
+		assert_eq!(NftMarketplace::ongoing_nft_details(0, 34).unwrap().sold, false);
 		assert_eq!(NftMarketplace::listed_nfts().len(), 247);
 		assert_eq!(NftMarketplace::listed_nfts_of_collection(0).len(), 67);
 		assert_eq!(NftMarketplace::listed_nfts_of_collection(1).len(), 0);
 		assert_eq!(NftMarketplace::listed_nfts_of_collection(2).len(), 80);
 		assert_eq!(NftMarketplace::listed_nfts_of_collection(3).len(), 100);
-		assert_eq!(NftMarketplace::ongoing_nft_details((2, 2)).unwrap().sold, true);
+		assert_eq!(NftMarketplace::ongoing_nft_details(2, 2).unwrap().sold, true);
 	});
+}
+
+#[test]
+fn relist_a_nft() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(NftMarketplace::list_object(
+			RuntimeOrigin::signed([0; 32].into()),
+			1_000_000,
+			bvec![22, 22]
+		));
+		assert_ok!(NftMarketplace::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_eq!(NftMarketplace::listed_nfts().len(), 0);
+		let item = Item::<Test>::get(0, 1).unwrap();
+		assert_eq!(NftMarketplace::listed_collection_details(0).unwrap().spv_created, true);
+		assert_ok!(NftMarketplace::list_nft(RuntimeOrigin::signed([1; 32].into()), 0, 100, 100));
+		assert_eq!(NftMarketplace::listed_nfts()[0], (0, 100));
+	})
+}
+
+#[test]
+fn relist_nfts_not_created_with_marketplace_fails() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(Uniques::create(RuntimeOrigin::signed([0; 32].into()), sp_runtime::MultiAddress::Id([0; 32].into()), Default::default()));
+		assert_ok!(Uniques::mint(RuntimeOrigin::signed([0; 32].into()), 0, 0, sp_runtime::MultiAddress::Id([0; 32].into()), None));
+		assert_noop!(NftMarketplace::list_nft(RuntimeOrigin::signed([0; 32].into()), 0, 0, 100), Error::<Test>::CollectionNotKnown);
+	})
+}
+
+#[test]
+fn buy_single_nft_works() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(NftMarketplace::list_object(
+			RuntimeOrigin::signed([0; 32].into()),
+			1_000_000,
+			bvec![22, 22]
+		));
+		assert_eq!(NftMarketplace::listed_nfts().len(), 100);
+		assert_ok!(NftMarketplace::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_eq!(Balances::free_balance(&([0; 32].into())), 20999998);
+		assert_eq!(Balances::free_balance(&([1; 32].into())), 14_000_000);
+		assert_eq!(NftMarketplace::listed_nfts().len(), 0);
+		let item = Item::<Test>::get(0, 1).unwrap();
+		assert_eq!(NftMarketplace::listed_collection_details(0).unwrap().spv_created, true);
+		assert_ok!(NftMarketplace::list_nft(RuntimeOrigin::signed([1; 32].into()), 0, 27, 100));
+		assert_ok!(NftMarketplace::buy_single_nft(RuntimeOrigin::signed([3; 32].into()), 0, 27));
+	})
+}
+
+#[test]
+fn delist_single_nft_works() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(NftMarketplace::list_object(
+			RuntimeOrigin::signed([0; 32].into()),
+			1_000_000,
+			bvec![22, 22]
+		));
+		assert_ok!(NftMarketplace::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_eq!(NftMarketplace::listed_nfts().len(), 0);
+		assert_ok!(NftMarketplace::list_nft(RuntimeOrigin::signed([1; 32].into()), 0, 27, 100));
+		assert_ok!(NftMarketplace::delist_nft(RuntimeOrigin::signed([1; 32].into()), 0, 27));
+		assert_eq!(NftMarketplace::listed_nfts().len(), 0);
+	})
+}
+
+#[test]
+fn delist_fails() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(NftMarketplace::list_object(
+			RuntimeOrigin::signed([0; 32].into()),
+			1_000_000,
+			bvec![22, 22]
+		));
+		assert_ok!(NftMarketplace::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_eq!(NftMarketplace::listed_nfts().len(), 0);
+		assert_ok!(NftMarketplace::list_nft(RuntimeOrigin::signed([1; 32].into()), 0, 27, 100));
+		assert_noop!(NftMarketplace::delist_nft(RuntimeOrigin::signed([4; 32].into()), 0, 27), Error::<Test>::NoPermission);
+		assert_noop!(NftMarketplace::delist_nft(RuntimeOrigin::signed([4; 32].into()), 0, 28), Error::<Test>::NftNotListed);
+	})
+}
+
+#[test]
+fn upgrade_price_works() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(NftMarketplace::list_object(
+			RuntimeOrigin::signed([0; 32].into()),
+			1_000_000,
+			bvec![22, 22]
+		));
+		assert_ok!(NftMarketplace::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_eq!(NftMarketplace::listed_nfts().len(), 0);
+		assert_ok!(NftMarketplace::list_nft(RuntimeOrigin::signed([1; 32].into()), 0, 27, 100));
+		assert_ok!(NftMarketplace::upgrade_listing(RuntimeOrigin::signed([1; 32].into()), 0, 27, 300));
+		assert_eq!(NftMarketplace::ongoing_nft_details(0, 27).unwrap().price, 300);
+	})
 }
