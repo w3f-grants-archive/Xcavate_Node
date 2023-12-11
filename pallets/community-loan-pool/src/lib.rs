@@ -62,7 +62,7 @@ pub type BalanceOf1<T> = <<T as pallet_nfts::Config>::Currency as Currency<
 	<T as frame_system::Config>::AccountId,
 >>::Balance;
 
-type BoundedProposedMilestones<T> =
+pub type BoundedProposedMilestones<T> =
 	BoundedVec<ProposedMilestone, <T as Config>::MaxMilestonesPerProject>;
 
 pub const BASEINTERESTRATE: u32 = 525;

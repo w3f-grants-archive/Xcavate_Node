@@ -18,7 +18,7 @@ use frame_support::{
 	pallet_prelude::{DispatchClass, Get},
 	traits::{
 		tokens::nonfungibles_v2::Inspect, AsEnsureOriginWithArg, EitherOfDiverse,
-		EqualPrivilegeOnly,
+		EqualPrivilegeOnly, TrackedStorageKey
 	},
 	PalletId,
 };

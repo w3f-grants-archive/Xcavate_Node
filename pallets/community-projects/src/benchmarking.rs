@@ -22,7 +22,7 @@ fn setup_listing<T: Config>(
 ) -> (
 	T::AccountId,
 	BoundedNftDonationTypes<T>,
-	BoundedVec<BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>, <T as Config>::MaxNftTypes>,
+	BoundedVec<BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>, <T as Config>::MaxListedNfts>,
 	u32,
 	BalanceOf<T>,
 	BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>,
@@ -172,9 +172,9 @@ fn get_project_nfts<T: Config>(mut n: u32) -> BoundedNftDonationTypes<T> {
 
 fn get_nft_metadata<T: Config>(
 	mut n: u32,
-) -> BoundedVec<BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>, <T as Config>::MaxNftTypes>
+) -> BoundedVec<BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>, <T as Config>::MaxListedNfts>
 {
-	let max = <T as Config>::MaxNftTypes::get();
+	let max = <T as Config>::MaxListedNfts::get();
 	if n > max {
 		n = max
 	}

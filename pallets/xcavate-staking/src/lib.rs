@@ -234,7 +234,7 @@ pub mod pallet {
 		pub fn stake(
 			origin: OriginFor<T>,
 			#[pallet::compact] value: BalanceOf<T>,
-		) -> DispatchResultWithPostInfo {
+		) -> DispatchResult {
 			let staker = ensure_signed(origin)?;
 
 			ensure!(!value.is_zero(), Error::<T>::StakingWithNoValue);
@@ -267,7 +267,7 @@ pub mod pallet {
 				Self::stake_helper(staker.clone(), value_to_stake)?;
 			}
 			Self::deposit_event(Event::Locked { staker, amount: value });
-			Ok(().into())
+			Ok(())
 		}
 
 		/// Lets the user unstake.
@@ -284,7 +284,7 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			staking_index: StakingIndex,
 			#[pallet::compact] value: BalanceOf<T>,
-		) -> DispatchResultWithPostInfo {
+		) -> DispatchResult {
 			let staker = ensure_signed(origin)?;
 
 			ensure!(Self::ledger(staking_index).is_some(), Error::<T>::NoStaker);
@@ -328,7 +328,7 @@ pub mod pallet {
 			TotalStake::<T>::put(total_stake - value);
 
 			Self::deposit_event(Event::Unlocked { staker, amount: value });
-			Ok(().into())
+			Ok(())
 		}
 
 		#[pallet::call_index(2)]
@@ -337,7 +337,7 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			queue_index: QueueIndex,
 			#[pallet::compact] value: BalanceOf<T>,
-		) -> DispatchResultWithPostInfo {
+		) -> DispatchResult {
 			let staker = ensure_signed(origin)?;
 	
 			ensure!(Self::queue_ledger(queue_index).is_some(), Error::<T>::NotInQueue);
@@ -382,7 +382,7 @@ pub mod pallet {
 			AmountLocked::<T>::insert(queue_ledger.staker.clone(), new_locked_amount);
 	
 			Self::deposit_event(Event::Unlocked { staker, amount: value });
-			Ok(().into())
+			Ok(())
 		}
 	}
 

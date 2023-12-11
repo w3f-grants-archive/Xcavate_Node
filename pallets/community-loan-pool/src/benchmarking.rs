@@ -8,6 +8,7 @@ use frame_benchmarking::v2::*;
 use frame_support::sp_runtime::Saturating;
 use frame_system::RawOrigin;
 const SEED: u32 = 0;
+use frame_support::assert_ok;
 
 fn setup_proposal<T: Config>(
 	u: u32,
@@ -20,6 +21,12 @@ fn setup_proposal<T: Config>(
 	let developer_experience = 13;
 	let loan_term = 20;
 	(caller, value, beneficiary_lookup, developer_experience, loan_term)
+}
+
+fn setup_loan_account<T: Config>() {
+	let loan_account = CommunityLoanPool::<T>::account_id();
+	let value = <T as pallet::Config>::Currency::minimum_balance().saturating_mul(1_000_000_000u32.into());
+	let _ = <T as pallet::Config>::Currency::make_free_balance_be(&loan_account, value);
 }
 
 #[benchmarks]
@@ -41,6 +48,7 @@ mod benchmarks {
 		);
 
 		assert_last_event::<T>(Event::Proposed { proposal_index: 1 }.into());
+		assert_eq!(CommunityLoanPool::<T>::proposals(1).is_some(), true);
 	}
 
 	#[benchmark]
@@ -105,7 +113,7 @@ mod benchmarks {
 		assert_eq!(CommunityLoanPool::<T>::ongoing_votes(proposal_id).unwrap().yes_votes, 2);
 	}
 
-	#[benchmark]
+ 	#[benchmark]
 	fn withdraw() {
 		let alice = account("alice", SEED, SEED);
 		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), alice);
@@ -139,11 +147,12 @@ mod benchmarks {
 		assert_eq!(CommunityLoanPool::<T>::ongoing_loans().len(), 1);
 		let withdraw_value: BalanceOf<T> = 100u32.into();
 		let beneficiary = account("beneficiary", SEED, SEED);
+		let _ = <T as pallet::Config>::Currency::make_free_balance_be(&CommunityLoanPool::<T>::account_id(), 100_000_000u32.into());
 
 		#[extrinsic_call]
 		withdraw(RawOrigin::Signed(beneficiary), 1, withdraw_value);
 		assert_eq!(CommunityLoanPool::<T>::loans(1).unwrap().borrowed_amount, withdraw_value);
-	}
+	} 
 
 	#[benchmark]
 	fn repay() {
@@ -179,11 +188,16 @@ mod benchmarks {
 		assert_eq!(CommunityLoanPool::<T>::ongoing_loans().len(), 1);
 		let withdraw_value: BalanceOf<T> = 100u32.into();
 		let beneficiary: T::AccountId = account("beneficiary", SEED, SEED);
-		CommunityLoanPool::<T>::withdraw(
+		<T as pallet::Config>::Currency::make_free_balance_be(
+			&beneficiary,
+			withdraw_value,
+		);
+		//setup_loan_account::<T>();
+		assert_ok!(CommunityLoanPool::<T>::withdraw(
 			RawOrigin::Signed(beneficiary.clone()).into(),
 			1,
 			withdraw_value,
-		);
+		));
 		#[extrinsic_call]
 		repay(RawOrigin::Signed(beneficiary), 1, withdraw_value);
 		assert_eq!(CommunityLoanPool::<T>::loans(1).unwrap().borrowed_amount, 0_u32.into());

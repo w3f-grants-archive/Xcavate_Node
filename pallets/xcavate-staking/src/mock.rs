@@ -181,10 +181,7 @@ parameter_types! {
 impl pallet_community_loan_pool::Config for Test {
 	type PalletId = CommunityLoanPalletIdPalletId;
 	type Currency = Balances;
-	type ApproveOrigin = frame_system::EnsureRoot<Self::AccountId>;
-	type RejectOrigin = frame_system::EnsureRoot<Self::AccountId>;
 	type CommitteeOrigin = frame_system::EnsureRoot<Self::AccountId>;
-	type DeleteOrigin = frame_system::EnsureRoot<Self::AccountId>;
 	type RuntimeEvent = RuntimeEvent;
 	type ProposalBond = ProposalBond;
 	type ProposalBondMinimum = ConstU32<10000>;
