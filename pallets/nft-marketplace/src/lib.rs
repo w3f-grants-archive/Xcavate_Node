@@ -416,7 +416,7 @@ pub mod pallet {
 		///
 		/// Emits `NftListed` event when succesfful
 		#[pallet::call_index(1)]
-		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::list_nft())]
 		pub fn list_nft(
 			origin: OriginFor<T>,
 			collection_id: <T as pallet::Config>::CollectionId,
@@ -550,7 +550,7 @@ pub mod pallet {
 		///
 		/// Emits `NftBought` event when succesfful.
 		#[pallet::call_index(3)]
-		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::buy_single_nft())]
 		pub fn buy_single_nft(
 			origin: OriginFor<T>,
 			collection_id: <T as pallet::Config>::CollectionId,
@@ -612,7 +612,7 @@ pub mod pallet {
 		///
 		/// Emits `NftUpdated` event when succesfful.
 		#[pallet::call_index(4)]
-		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::upgrade_listing())]
 		pub fn upgrade_listing(
 			origin: OriginFor<T>,
 			collection_id: <T as pallet::Config>::CollectionId,
@@ -643,7 +643,7 @@ pub mod pallet {
 		///
 		/// Emits `NftUpdated` event when succesfful.
 		#[pallet::call_index(5)]
-		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::upgrade_object())]
 		pub fn upgrade_object(
 			origin: OriginFor<T>,
 			collection_id: <T as pallet::Config>::CollectionId,
@@ -675,7 +675,7 @@ pub mod pallet {
 		///
 		/// Emits `NftDelisted` event when succesfful.
 		#[pallet::call_index(6)]
-		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::delist_nft())]
 		pub fn delist_nft(
 			origin: OriginFor<T>,
 			collection_id: <T as pallet::Config>::CollectionId,

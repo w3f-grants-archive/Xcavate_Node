@@ -13,6 +13,7 @@ use frame_system::RawOrigin;
 const SEED: u32 = 0;
 use pallet_community_loan_pool::Pallet as CommunityLoanPool;
 use pallet_community_loan_pool::{BoundedProposedMilestones, ProposedMilestone};
+use frame_support::sp_runtime::traits::Bounded;
 
 use frame_support::sp_runtime::traits::StaticLookup;
 
@@ -21,6 +22,10 @@ use frame_system::pallet_prelude::{BlockNumberFor, HeaderFor};
 type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
 
 pub type BalanceOf1<T> = <<T as pallet_community_loan_pool::Config>::Currency as Currency<
+	<T as frame_system::Config>::AccountId,
+>>::Balance;
+
+type DepositBalanceOf<T> = <<T as pallet::Config>::Currency as Currency<
 	<T as frame_system::Config>::AccountId,
 >>::Balance;
 
@@ -69,18 +74,19 @@ mod benchmarks {
 			milestones,
 		);
 		run_to_block::<T>(30u32.into()); */
-		let caller: T::AccountId = whitelisted_caller();
+		let caller: T::AccountId = account("Alice", SEED, SEED);
 		let value: BalanceOf<T> = 100u32.into();
+		let _ = <T as pallet::Config>::Currency::make_free_balance_be(&caller, DepositBalanceOf::<T>::max_value());
 
 		#[extrinsic_call]
 		stake(RawOrigin::Signed(caller.clone()), value);
-
+		let index = XcavateStaking::<T>::queue_count();
 		assert_last_event::<T>(Event::Locked { staker: caller.clone(), amount: value }.into());
 		assert_eq!(XcavateStaking::<T>::queue_staking().len(), 1);
-		assert_eq!(XcavateStaking::<T>::queue_ledger(1).is_none(), true); 
+		assert_eq!(XcavateStaking::<T>::queue_ledger(index).is_none(), false); 
 	}
 
-/*  	#[benchmark]
+  	#[benchmark]
 	fn unstake() {
 		let alice: T::AccountId = account("alice", SEED, SEED);
 		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), alice); 
@@ -106,7 +112,7 @@ mod benchmarks {
 		run_to_block::<T>(30u32.into());
 		let caller: T::AccountId = account("alice", SEED, SEED);
 		let value: BalanceOf<T> = 1_000u32.into();
-		<T as pallet::Config>::Currency::make_free_balance_be(&caller, 100_000_000u32.into());
+		let _ = <T as pallet::Config>::Currency::make_free_balance_be(&caller, DepositBalanceOf::<T>::max_value());
 		XcavateStaking::<T>::stake(RawOrigin::Signed(caller.clone()).into(), value);
 		assert_eq!(XcavateStaking::<T>::active_stakings().len(), 1);
 		let unstake_value: BalanceOf<T> = 1u32.into();
@@ -117,13 +123,13 @@ mod benchmarks {
 		assert_last_event::<T>(Event::Unlocked { staker: caller, amount: unstake_value }.into());
 		let staked_value: BalanceOf<T> = 999u32.into();
 		assert_eq!(XcavateStaking::<T>::ledger(index).unwrap().locked, staked_value);
-	}  */
+	}  
 
 	#[benchmark]
 	fn withdraw_from_queue() {
-		let caller: T::AccountId = account("alice", SEED, SEED);
-		let value: BalanceOf<T> = 1_000u32.into();
-		<T as pallet::Config>::Currency::make_free_balance_be(&caller, 100_000_000u32.into());
+		let caller: T::AccountId = account("Alice", SEED, SEED);
+		let value: BalanceOf<T> = 1000u32.into();
+		let _ = <T as pallet::Config>::Currency::make_free_balance_be(&caller, DepositBalanceOf::<T>::max_value());
 		assert_ok!(XcavateStaking::<T>::stake(RawOrigin::Signed(caller.clone()).into(), value));
 		assert_eq!(XcavateStaking::<T>::queue_staking().len(), 1);
 		let unstake_value: BalanceOf<T> = 100u32.into();

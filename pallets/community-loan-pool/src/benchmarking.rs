@@ -9,13 +9,18 @@ use frame_support::sp_runtime::Saturating;
 use frame_system::RawOrigin;
 const SEED: u32 = 0;
 use frame_support::assert_ok;
+use frame_support::sp_runtime::traits::Bounded;
+
+type DepositBalanceOf<T> = <<T as pallet::Config>::Currency as Currency<
+	<T as frame_system::Config>::AccountId,
+>>::Balance;
 
 fn setup_proposal<T: Config>(
 	u: u32,
 ) -> (T::AccountId, BalanceOf<T>, AccountIdLookupOf<T>, u64, u64) {
 	let caller = account("caller", u, SEED);
 	let value: BalanceOf<T> = T::ProposalBondMinimum::get().saturating_mul(100u32.into());
-	let _ = <T as pallet::Config>::Currency::make_free_balance_be(&caller, value);
+	let _ = <T as pallet::Config>::Currency::make_free_balance_be(&caller, DepositBalanceOf::<T>::max_value());
 	let beneficiary = account("beneficiary", u, SEED);
 	let beneficiary_lookup = T::Lookup::unlookup(beneficiary);
 	let developer_experience = 13;
@@ -25,8 +30,7 @@ fn setup_proposal<T: Config>(
 
 fn setup_loan_account<T: Config>() {
 	let loan_account = CommunityLoanPool::<T>::account_id();
-	let value = <T as pallet::Config>::Currency::minimum_balance().saturating_mul(1_000_000_000u32.into());
-	let _ = <T as pallet::Config>::Currency::make_free_balance_be(&loan_account, value);
+	let _ = <T as pallet::Config>::Currency::make_free_balance_be(&loan_account, DepositBalanceOf::<T>::max_value());
 }
 
 #[benchmarks]
@@ -147,7 +151,9 @@ mod benchmarks {
 		assert_eq!(CommunityLoanPool::<T>::ongoing_loans().len(), 1);
 		let withdraw_value: BalanceOf<T> = 100u32.into();
 		let beneficiary = account("beneficiary", SEED, SEED);
-		let _ = <T as pallet::Config>::Currency::make_free_balance_be(&CommunityLoanPool::<T>::account_id(), 100_000_000u32.into());
+		let _ = <T as pallet::Config>::Currency::make_free_balance_be(&beneficiary, DepositBalanceOf::<T>::max_value() - withdraw_value);
+		let loan_account = CommunityLoanPool::<T>::account_id();
+		let _ = <T as pallet::Config>::Currency::make_free_balance_be(&loan_account, DepositBalanceOf::<T>::max_value());
 
 		#[extrinsic_call]
 		withdraw(RawOrigin::Signed(beneficiary), 1, withdraw_value);
@@ -190,18 +196,20 @@ mod benchmarks {
 		let beneficiary: T::AccountId = account("beneficiary", SEED, SEED);
 		<T as pallet::Config>::Currency::make_free_balance_be(
 			&beneficiary,
-			withdraw_value,
+			DepositBalanceOf::<T>::max_value() - withdraw_value,
 		);
-		//setup_loan_account::<T>();
+		let loan_account = CommunityLoanPool::<T>::account_id();
+		let _ = <T as pallet::Config>::Currency::make_free_balance_be(&loan_account, DepositBalanceOf::<T>::max_value() - withdraw_value - withdraw_value);
 		assert_ok!(CommunityLoanPool::<T>::withdraw(
 			RawOrigin::Signed(beneficiary.clone()).into(),
 			1,
 			withdraw_value,
 		));
+		let _ = <T as pallet::Config>::Currency::make_free_balance_be(&loan_account, <T as pallet::Config>::Currency::minimum_balance());
 		#[extrinsic_call]
 		repay(RawOrigin::Signed(beneficiary), 1, withdraw_value);
 		assert_eq!(CommunityLoanPool::<T>::loans(1).unwrap().borrowed_amount, 0_u32.into());
-	}
+	} 
 
 	#[benchmark]
 	fn propose_milestone() {

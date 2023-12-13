@@ -279,7 +279,7 @@ pub mod pallet {
 		///
 		/// Emits `Unlocked` event when succesfful
 		#[pallet::call_index(1)]
-		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::unstake())]
 		pub fn unstake(
 			origin: OriginFor<T>,
 			staking_index: StakingIndex,
@@ -332,7 +332,7 @@ pub mod pallet {
 		}
 
 		#[pallet::call_index(2)]
-		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::withdraw_from_queue())]
 		pub fn withdraw_from_queue(
 			origin: OriginFor<T>,
 			queue_index: QueueIndex,
