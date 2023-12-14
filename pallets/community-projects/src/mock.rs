@@ -57,6 +57,7 @@ frame_support::construct_runtime!(
 		CommunityProjects: pallet_community_projects,
 		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
 		Assets: pallet_assets::<Instance1>,
+		Whitelist: pallet_whitelist,
 	}
 );
 
@@ -177,6 +178,16 @@ impl pallet_assets::Config<Instance1> for Test {
 	type CallbackHandle = ();
 	type WeightInfo = ();
 	type RemoveItemsLimit = ConstU32<1000>;
+}
+
+parameter_types! {
+	pub const MaxWhitelistUsers: u32 = 1000000;
+}
+
+impl pallet_whitelist::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type WhitelistOrigin = frame_system::EnsureRoot<Self::AccountId>;
+	type MaxUsersInWhitelist = MaxWhitelistUsers;
 }
 
 parameter_types! {

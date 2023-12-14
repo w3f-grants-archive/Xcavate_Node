@@ -13,6 +13,7 @@ macro_rules! bvec {
 fn list_object_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			1_000_000,
@@ -29,6 +30,7 @@ fn list_object_works() {
 fn buy_nft_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			1_000_000,
@@ -45,6 +47,7 @@ fn buy_nft_works() {
 fn buy_nft_doesnt_work() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_noop!(
 			NftMarketplace::buy_nft(RuntimeOrigin::signed([0; 32].into()), 1, 1),
 			Error::<Test>::CollectionNotFound
@@ -56,12 +59,14 @@ fn buy_nft_doesnt_work() {
 fn distributes_nfts_and_funds() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			1_000_000,
 			bvec![22, 22]
 		));
 		assert_eq!(NftMarketplace::listed_nfts().len(), 100);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(NftMarketplace::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 100));
 		assert_eq!(Balances::free_balance(&([0; 32].into())), 20999998);
 		assert_eq!(Balances::free_balance(&([1; 32].into())), 14_000_000);
@@ -76,6 +81,10 @@ fn distributes_nfts_and_funds() {
 #[test]
 fn listing_and_selling_multiple_objects() {
 	new_test_ext().execute_with(|| {
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [3; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([3; 32].into()),
 			1_000_000,
@@ -117,6 +126,8 @@ fn listing_and_selling_multiple_objects() {
 fn relist_a_nft() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			1_000_000,
@@ -139,6 +150,7 @@ fn relist_a_nft() {
 fn relist_nfts_not_created_with_marketplace_fails() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(Uniques::create(RuntimeOrigin::signed([0; 32].into()), sp_runtime::MultiAddress::Id([0; 32].into()), Default::default()));
 		assert_ok!(Uniques::mint(RuntimeOrigin::signed([0; 32].into()), 0, 0, sp_runtime::MultiAddress::Id([0; 32].into()), None));
 		assert_noop!(NftMarketplace::list_nft(RuntimeOrigin::signed([0; 32].into()), 0, 0, 100), Error::<Test>::CollectionNotKnown);
@@ -149,6 +161,9 @@ fn relist_nfts_not_created_with_marketplace_fails() {
 fn buy_single_nft_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [3; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			1_000_000,
@@ -174,6 +189,8 @@ fn buy_single_nft_works() {
 fn delist_single_nft_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			1_000_000,
@@ -191,6 +208,9 @@ fn delist_single_nft_works() {
 fn delist_fails() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [4; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			1_000_000,
@@ -208,6 +228,8 @@ fn delist_fails() {
 fn upgrade_price_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			1_000_000,
@@ -225,6 +247,9 @@ fn upgrade_price_works() {
 fn upgrade_price_fails_if_not_owner() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [4; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			1_000_000,
@@ -241,6 +266,7 @@ fn upgrade_price_fails_if_not_owner() {
 fn upgrade_object_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			1_000_000,
@@ -255,6 +281,9 @@ fn upgrade_object_works() {
 fn upgrade_object_and_distribute_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			1_000_000,
@@ -279,6 +308,7 @@ fn upgrade_object_and_distribute_works() {
 fn upgrade_single_nft_from_listed_object_fails() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			1_000_000,
@@ -292,6 +322,7 @@ fn upgrade_single_nft_from_listed_object_fails() {
 fn upgrade_object_for_relisted_nft_fails() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			1_000_000,
@@ -307,6 +338,7 @@ fn upgrade_object_for_relisted_nft_fails() {
 fn upgrade_unknown_collection_fails() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_noop!(NftMarketplace::upgrade_object(RuntimeOrigin::signed([0; 32].into()), 0, 300), Error::<Test>::CollectionNotFound);
 	})
 }

@@ -177,7 +177,7 @@ pub mod pallet {
 	pub struct Pallet<T>(_);
 
 	#[pallet::config]
-	pub trait Config: frame_system::Config + pallet_nfts::Config {
+	pub trait Config: frame_system::Config + pallet_nfts::Config + pallet_whitelist::Config{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
@@ -481,6 +481,8 @@ pub mod pallet {
 		DivisionError,
 		/// This loan does not exist
 		NoLoanFound,
+		/// User has not passed the kyc.
+		UserNotWhitelisted,
 	}
 
 	#[pallet::event]
@@ -614,6 +616,7 @@ pub mod pallet {
 			loan_term: u64,
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
+			ensure!(pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&origin), Error::<T>::UserNotWhitelisted);
 			let beneficiary = T::Lookup::lookup(beneficiary)?;
 			let reserved_loan_amount = Self::u64_to_balance_option(Self::reserved_loan_amount())?;
 			//let decimal = 1000000000000_u64.saturated_into();
@@ -667,6 +670,7 @@ pub mod pallet {
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::propose_milestone())]
 		pub fn propose_milestone(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
+			ensure!(pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&origin), Error::<T>::UserNotWhitelisted);
 			let loan = Self::loans(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(loan.milestones.len() > 0, Error::<T>::NoMilestonesLeft);
 			let milestone_proposal_index = Self::milestone_proposal_count() + 1;
@@ -707,6 +711,7 @@ pub mod pallet {
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::propose_deletion())]
 		pub fn propose_deletion(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
 			let origin = ensure_signed(origin.clone())?;
+			ensure!(pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&origin), Error::<T>::UserNotWhitelisted);
 			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(origin == loan.borrower, Error::<T>::InsufficientPermission);
 			ensure!(loan.borrowed_amount.is_zero(), Error::<T>::LoanStillOngoing);
@@ -748,6 +753,7 @@ pub mod pallet {
 			amount: BalanceOf<T>,
 		) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
+			ensure!(pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&signer), Error::<T>::UserNotWhitelisted);
 			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(signer == loan.borrower, Error::<T>::InsufficientPermission);
 			ensure!(amount <= loan.available_amount, Error::<T>::NotEnoughFundsToWithdraw);
@@ -792,6 +798,7 @@ pub mod pallet {
 			amount: BalanceOf<T>,
 		) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
+			ensure!(pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&signer), Error::<T>::UserNotWhitelisted);
 			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(amount <= loan.borrowed_amount, Error::<T>::WantsToRepayTooMuch);
 			let loan_pallet = Self::account_id();

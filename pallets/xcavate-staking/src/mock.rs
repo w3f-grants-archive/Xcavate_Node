@@ -54,6 +54,7 @@ frame_support::construct_runtime!(
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
 		Uniques: pallet_nfts::{Pallet, Call, Storage, Event<T>},
 		CommunityLoanPool: pallet_community_loan_pool,
+		Whitelist: pallet_whitelist,
 		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
 		Randomness: pallet_insecure_randomness_collective_flip::{Pallet, Storage},
 		TransactionPayment: pallet_transaction_payment::{Pallet, Storage, Event<T>},
@@ -195,6 +196,16 @@ impl pallet_community_loan_pool::Config for Test {
 	type MaxMilestonesPerProject = MaxMilestones;
 	type CollectionId = u32;
 	type ItemId = u32;
+}
+
+parameter_types! {
+	pub const MaxWhitelistUsers: u32 = 1000000;
+}
+
+impl pallet_whitelist::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type WhitelistOrigin = frame_system::EnsureRoot<Self::AccountId>;
+	type MaxUsersInWhitelist = MaxWhitelistUsers;
 }
 
 parameter_types! {

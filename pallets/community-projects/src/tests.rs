@@ -60,6 +60,7 @@ fn run_to_block(n: u64) {
 fn list_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
  		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
@@ -76,6 +77,7 @@ fn list_works() {
 fn list_fails_with_not_enough_metadata() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
  		assert_noop!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
@@ -91,6 +93,7 @@ fn list_fails_with_not_enough_metadata() {
 fn list_fails_with_price_too_high() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
  		assert_noop!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
@@ -106,6 +109,7 @@ fn list_fails_with_price_too_high() {
 fn buy_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
@@ -125,6 +129,7 @@ fn buy_works() {
 fn buy_fails_nft_not_available(){
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
@@ -141,6 +146,7 @@ fn buy_fails_nft_not_available(){
 fn buy_fails_nft_not_enough_assets(){
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
@@ -158,6 +164,7 @@ fn buy_fails_nft_not_enough_assets(){
 fn launch_project_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
@@ -176,6 +183,7 @@ fn launch_project_works() {
 fn voting_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
@@ -201,6 +209,7 @@ fn voting_works() {
 fn rejecting_vote_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(4),
@@ -257,6 +266,7 @@ fn rejecting_vote_works() {
 fn voting_fails_with_no_permission() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
@@ -282,6 +292,7 @@ fn voting_fails_with_no_permission() {
 fn voting_fails_with_double_voting() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
@@ -312,6 +323,7 @@ fn voting_fails_with_double_voting() {
 fn voting_fails_with_no_ongoing_voting() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
@@ -336,6 +348,7 @@ fn voting_fails_with_no_ongoing_voting() {
 fn set_strikes_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
@@ -374,6 +387,7 @@ fn set_strikes_works() {
 fn distributing_funds_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
@@ -401,6 +415,7 @@ fn distributing_funds_works() {
 fn distributing_funds_for_2_rounds_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),
@@ -437,6 +452,7 @@ fn distributing_funds_for_2_rounds_works() {
 fn delete_project_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityProjects::list_project(
 			RuntimeOrigin::signed([0; 32].into()),
 			get_project_nfts(3),

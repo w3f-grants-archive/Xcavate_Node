@@ -140,7 +140,7 @@ pub mod pallet {
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
 	pub trait Config:
-		frame_system::Config + pallet_nfts::Config + pallet_assets::Config<Instance1>
+		frame_system::Config + pallet_nfts::Config + pallet_assets::Config<Instance1> + pallet_whitelist::Config
 	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
@@ -393,6 +393,8 @@ pub mod pallet {
 		DurationMustBeHigherThanZero,
 		/// The target price is impossible to reach.
 		PriceCannotBeReached,
+		/// User has not passed the kyc.
+		UserNotWhitelisted,
 	}
 
 	#[pallet::hooks]
@@ -461,6 +463,9 @@ pub mod pallet {
 			data: BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>,
 		) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
+
+			ensure!(pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&signer), Error::<T>::UserNotWhitelisted);
+
 			ensure!(metadata.len() as u32 == nft_types.iter().fold(0, |sum, nft_type| sum + nft_type.amount), Error::<T>::WrongAmountOfMetadata);
 			ensure!(price <= nft_types.iter().fold(Default::default() , |sum, nft_type| sum + nft_type.price), Error::<T>::PriceCannotBeReached);
 			ensure!(duration > 0, Error::<T>::DurationMustBeHigherThanZero);

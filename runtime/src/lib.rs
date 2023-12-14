@@ -543,6 +543,21 @@ impl pallet_community_projects::Config for Runtime {
 }
 
 parameter_types! {
+
+	pub const MaxWhitelistUsers: u32 = 1000000;
+}
+
+/// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
+impl pallet_whitelist::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WhitelistOrigin = EitherOfDiverse<
+		EnsureRoot<AccountId>,
+		pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>,
+	>;
+	type MaxUsersInWhitelist = MaxWhitelistUsers;
+}
+
+parameter_types! {
 	pub Features: PalletFeatures = PalletFeatures::all_enabled();
 	pub const MaxAttributesPerCall: u32 = 10;
 	pub const CollectionDeposit: Balance = DOLLARS;
@@ -1409,6 +1424,7 @@ construct_runtime!(
 		XcavateStaking: pallet_xcavate_staking,
 		NftMarketplace: pallet_nft_marketplace,
 		CommunityProject: pallet_community_projects,
+		Whitelist: pallet_whitelist,
 		Nfts: pallet_nfts,
 		Uniques: pallet_uniques, //10
 		RandomnessCollectiveFlip: pallet_insecure_randomness_collective_flip,

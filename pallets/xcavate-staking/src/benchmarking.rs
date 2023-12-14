@@ -12,6 +12,7 @@ use frame_support::{
 use frame_system::RawOrigin;
 const SEED: u32 = 0;
 use pallet_community_loan_pool::Pallet as CommunityLoanPool;
+use pallet_whitelist::Pallet as Whitelist;
 use pallet_community_loan_pool::{BoundedProposedMilestones, ProposedMilestone};
 use frame_support::sp_runtime::traits::Bounded;
 
@@ -56,6 +57,7 @@ mod benchmarks {
 		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), alice); 
  		let bob: T::AccountId = account("bob", SEED, SEED);
 		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), bob.clone());
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		let (caller, value, beneficiary_lookup, developer_experience, loan_term) =
 			setup_proposal::<T>(SEED);
 		CommunityLoanPool::<T>::propose(
@@ -77,6 +79,7 @@ mod benchmarks {
 		let caller: T::AccountId = account("Alice", SEED, SEED);
 		let value: BalanceOf<T> = 100u32.into();
 		let _ = <T as pallet::Config>::Currency::make_free_balance_be(&caller, DepositBalanceOf::<T>::max_value());
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
 
 		#[extrinsic_call]
 		stake(RawOrigin::Signed(caller.clone()), value);
@@ -94,13 +97,14 @@ mod benchmarks {
 		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), bob.clone());
 		let (caller, value, beneficiary_lookup, developer_experience, loan_term) =
 			setup_proposal::<T>(SEED);
-		CommunityLoanPool::<T>::propose(
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
+		assert_ok!(CommunityLoanPool::<T>::propose(
 			RawOrigin::Signed(caller.clone()).into(),
 			value,
 			beneficiary_lookup,
 			developer_experience,
 			loan_term,
-		);
+		));
 		let alice = account("alice", SEED, SEED);
 		let proposal_id = CommunityLoanPool::<T>::proposal_count();
 		let milestones = get_max_milestones::<T>();
@@ -113,7 +117,8 @@ mod benchmarks {
 		let caller: T::AccountId = account("alice", SEED, SEED);
 		let value: BalanceOf<T> = 1_000u32.into();
 		let _ = <T as pallet::Config>::Currency::make_free_balance_be(&caller, DepositBalanceOf::<T>::max_value());
-		XcavateStaking::<T>::stake(RawOrigin::Signed(caller.clone()).into(), value);
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
+		assert_ok!(XcavateStaking::<T>::stake(RawOrigin::Signed(caller.clone()).into(), value));
 		assert_eq!(XcavateStaking::<T>::active_stakings().len(), 1);
 		let unstake_value: BalanceOf<T> = 1u32.into();
 		let index = XcavateStaking::<T>::active_stakings()[0];
@@ -130,6 +135,7 @@ mod benchmarks {
 		let caller: T::AccountId = account("Alice", SEED, SEED);
 		let value: BalanceOf<T> = 1000u32.into();
 		let _ = <T as pallet::Config>::Currency::make_free_balance_be(&caller, DepositBalanceOf::<T>::max_value());
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
 		assert_ok!(XcavateStaking::<T>::stake(RawOrigin::Signed(caller.clone()).into(), value));
 		assert_eq!(XcavateStaking::<T>::queue_staking().len(), 1);
 		let unstake_value: BalanceOf<T> = 100u32.into();

@@ -100,6 +100,7 @@ pallet-community-loan-pool = {  default-features = false, path = "../pallets/com
 pallet-xcavate-staking = {  default-features = false, path = "../pallets/xcavate-staking" }
 pallet-nft-marketplace = {  default-features = false, path = "../pallets/nft-marketplace" }
 pallet-community-projects = {  default-features = false, path = "../pallets/community-projects" }
+pallet-whitelist = {  default-features = false, path = "../pallets/whitelist" }
 
 
 [build-dependencies]
@@ -129,6 +130,7 @@ std = [
 	"pallet-xcavate-staking/std",
 	"pallet-nft-marketplace/std",
 	"pallet-community-projects/std",
+	"pallet-whitelist/std",
 	"pallet-timestamp/std",
 	"pallet-transaction-payment-rpc-runtime-api/std",
 	"pallet-transaction-payment/std",
@@ -235,6 +237,7 @@ try-runtime = [
 	"pallet-xcavate-staking/try-runtime",
 	"pallet-nft-marketplace/try-runtime",
 	"pallet-community-projects/try-runtime",
+	"pallet-whitelist/try-runtime",
 	"pallet-nfts/try-runtime",
 	"pallet-insecure-randomness-collective-flip/try-runtime",
 	"pallet-assets/try-runtime",

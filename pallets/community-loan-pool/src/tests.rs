@@ -37,6 +37,7 @@ fn run_to_block(n: u64) {
 fn propose_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([0; 32].into()),
 			100,
@@ -52,6 +53,7 @@ fn propose_works() {
 fn propose_doesnt_work_not_enough_userbalance() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [6; 32].into()));
 		assert_noop!(
 			CommunityLoanPool::propose(
 				RuntimeOrigin::signed([6; 32].into()),
@@ -69,6 +71,7 @@ fn propose_doesnt_work_not_enough_userbalance() {
 fn propose_doesnt_work_too_much_reserved() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([0; 32].into()),
 			60_000_000,
@@ -76,6 +79,7 @@ fn propose_doesnt_work_too_much_reserved() {
 			13,
 			20
 		));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_noop!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
 			60_000_000,
@@ -93,6 +97,7 @@ fn free_reserved_funds_after_rejection() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([0; 32].into()),
 			60_000_000,
@@ -139,6 +144,8 @@ fn voting_works() {
 		System::set_block_number(1);
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
 			100,
@@ -165,6 +172,7 @@ fn vote_rejected_with_no_votes() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		Timestamp::set_timestamp(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
@@ -195,6 +203,7 @@ fn vote_rejected_with_no_votes() {
 fn voting_works_only_for_members() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
@@ -224,6 +233,7 @@ fn vote_evaluated_after_yes_votes() {
 	new_test_ext().execute_with(|| {
 		Timestamp::set_timestamp(1);
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
@@ -247,6 +257,7 @@ fn milestone_works() {
 	new_test_ext().execute_with(|| {
 		Timestamp::set_timestamp(1);
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
@@ -278,6 +289,7 @@ fn milestone_works() {
 fn withdraw_works() {
 	new_test_ext().execute_with(|| {
 		Timestamp::set_timestamp(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
@@ -302,6 +314,8 @@ fn withdraw_works() {
 fn withdraw_fails_by_wrong_caller() {
 	new_test_ext().execute_with(|| {
 		Timestamp::set_timestamp(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
@@ -327,6 +341,7 @@ fn withdraw_fails_by_wrong_caller() {
 fn repay_works() {
 	new_test_ext().execute_with(|| {
 		Timestamp::set_timestamp(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
@@ -352,6 +367,7 @@ fn repay_works() {
 fn repay_if_its_too_much() {
 	new_test_ext().execute_with(|| {
 		Timestamp::set_timestamp(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
@@ -378,6 +394,7 @@ fn repay_if_its_too_much() {
 fn deletion_works() {
 	new_test_ext().execute_with(|| {
 		Timestamp::set_timestamp(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
@@ -411,6 +428,7 @@ fn deletion_works() {
 fn charge_apy_works() {
 	new_test_ext().execute_with(|| {
 		Timestamp::set_timestamp(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([0; 32].into()),
@@ -441,6 +459,7 @@ fn charge_apy_works() {
 fn charge_apy_and_repaying_the_interests_works() {
 	new_test_ext().execute_with(|| {
 		Timestamp::set_timestamp(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([0; 32].into()),

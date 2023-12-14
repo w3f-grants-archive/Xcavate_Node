@@ -80,7 +80,7 @@ pub mod pallet {
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config + pallet_community_loan_pool::Config {
+	pub trait Config: frame_system::Config + pallet_community_loan_pool::Config + pallet_whitelist::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 		/// Type representing the weight of this pallet.
@@ -199,6 +199,8 @@ pub mod pallet {
 		CallerNotStaker,
 		/// The Staker has nothing locked.
 		StakerNothingLocked,
+		/// User has not passed the kyc.
+		UserNotWhitelisted,
 	}
 
 	#[pallet::hooks]
@@ -236,6 +238,8 @@ pub mod pallet {
 			#[pallet::compact] value: BalanceOf<T>,
 		) -> DispatchResult {
 			let staker = ensure_signed(origin)?;
+
+			ensure!(pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&staker), Error::<T>::UserNotWhitelisted);
 
 			ensure!(!value.is_zero(), Error::<T>::StakingWithNoValue);
 
@@ -286,6 +290,8 @@ pub mod pallet {
 			#[pallet::compact] value: BalanceOf<T>,
 		) -> DispatchResult {
 			let staker = ensure_signed(origin)?;
+
+			ensure!(pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&staker), Error::<T>::UserNotWhitelisted);
 
 			ensure!(Self::ledger(staking_index).is_some(), Error::<T>::NoStaker);
 
@@ -339,6 +345,8 @@ pub mod pallet {
 			#[pallet::compact] value: BalanceOf<T>,
 		) -> DispatchResult {
 			let staker = ensure_signed(origin)?;
+
+			ensure!(pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&staker), Error::<T>::UserNotWhitelisted);
 	
 			ensure!(Self::queue_ledger(queue_index).is_some(), Error::<T>::NotInQueue);
 	

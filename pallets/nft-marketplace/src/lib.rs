@@ -96,7 +96,7 @@ pub mod pallet {
 
 	/// The module configuration trait.
 	#[pallet::config]
-	pub trait Config: frame_system::Config + pallet_nfts::Config {
+	pub trait Config: frame_system::Config + pallet_nfts::Config + pallet_whitelist::Config{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
@@ -296,6 +296,8 @@ pub mod pallet {
 		NftNotForSale,
 		/// Collection is not known to this pallet.
 		CollectionNotKnown,
+		/// User has not passed the kyc.
+		UserNotWhitelisted,
 	}
 
 	#[pallet::call]
@@ -318,6 +320,9 @@ pub mod pallet {
 			data: BoundedVec<u8, T::StringLimit>,
 		) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
+
+			ensure!(pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&signer), Error::<T>::UserNotWhitelisted);
+
 			if pallet_nfts::NextCollectionId::<T>::get().is_none() {
 				pallet_nfts::NextCollectionId::<T>::set(
 					<T as pallet_nfts::Config>::CollectionId::initial_value(),
@@ -424,6 +429,9 @@ pub mod pallet {
 			price: BalanceOf<T>,
 		) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
+
+			ensure!(pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&signer), Error::<T>::UserNotWhitelisted);
+
 			ensure!(Self::listed_collection_details(collection_id).is_some(), Error::<T>::CollectionNotKnown);
 			let pallet_lookup = <T::Lookup as StaticLookup>::unlookup(Self::account_id());
  			pallet_nfts::Pallet::<T>::transfer(
@@ -476,6 +484,7 @@ pub mod pallet {
 			amount: u32,
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
+			ensure!(pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&origin), Error::<T>::UserNotWhitelisted);
 			ensure!(Self::collection_exists(collection), Error::<T>::CollectionNotFound);
 			ensure!(
 				Self::listed_nfts_of_collection(collection).len() as u32
@@ -557,6 +566,7 @@ pub mod pallet {
 			item_id: <T as pallet::Config>::ItemId,
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
+			ensure!(pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&origin), Error::<T>::UserNotWhitelisted);
 			ensure!(Self::collection_exists(collection_id), Error::<T>::CollectionNotFound);
 			let collection_details = Self::listed_collection_details(collection_id).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(collection_details.spv_created, Error::<T>::SpvNotCreated);
@@ -620,6 +630,7 @@ pub mod pallet {
 			new_price: BalanceOf<T>,
 		) -> DispatchResult {
 			let signer = ensure_signed(origin)?;
+			ensure!(pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&signer), Error::<T>::UserNotWhitelisted);
 			ensure!(Self::ongoing_nft_details(collection_id, item_id).is_some(), Error::<T>::NftNotListed);
 			let mut nft = Self::ongoing_nft_details(collection_id, item_id).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(nft.owner == signer, Error::<T>::NoPermission);
@@ -650,6 +661,7 @@ pub mod pallet {
 			new_price: BalanceOf<T>,
 		) -> DispatchResult {
 			let signer = ensure_signed(origin)?;
+			ensure!(pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&signer), Error::<T>::UserNotWhitelisted);
  			ensure!(Self::collection_exists(collection_id), Error::<T>::CollectionNotFound);
 			let collection_details = Self::listed_collection_details(collection_id).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(!collection_details.spv_created, Error::<T>::NftAlreadyRelisted);
@@ -682,6 +694,7 @@ pub mod pallet {
 			item_id: <T as pallet::Config>::ItemId,
 		) -> DispatchResult {
 			let signer = ensure_signed(origin)?;
+			ensure!(pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&signer), Error::<T>::UserNotWhitelisted);
 			ensure!(Self::ongoing_nft_details(collection_id, item_id).is_some(), Error::<T>::NftNotListed);
 			let nft = <OngoingNftDetails<T>>::take(collection_id, item_id)
 			.ok_or(Error::<T>::InvalidIndex)?;

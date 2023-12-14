@@ -96,6 +96,16 @@ pub fn get_endowed_accounts_with_balance() -> Vec<(AccountId, u128)> {
 	accounts
 }
 
+
+
+pub fn get_root_account() -> AccountId{
+	let json_data = &include_bytes!("../../seed/balances.json")[..];
+	let additional_accounts_with_balance: Vec<(AccountId, u128)> =
+	serde_json::from_slice(json_data).unwrap_or_default();
+
+	additional_accounts_with_balance[0].0.clone()
+}
+
 pub fn development_config() -> Result<ChainSpec, String> {
 	let wasm_binary = WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?;
 
@@ -116,7 +126,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 				wasm_binary,
 				vec![authority_keys_from_seed("Alice")],
 				vec![],
-				get_account_id_from_seed::<sr25519::Public>("Alice"),
+				get_root_account(),
 				get_endowed_accounts_with_balance(),
 				true,
 			)
@@ -154,7 +164,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 				wasm_binary,
 				vec![authority_keys_from_seed("Alice"), authority_keys_from_seed("Bob")],
 				vec![],
-				get_account_id_from_seed::<sr25519::Public>("Alice"),
+				get_root_account(),
 				get_endowed_accounts_with_balance(),
 				true,
 			)

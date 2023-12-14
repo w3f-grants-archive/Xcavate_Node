@@ -53,6 +53,7 @@ frame_support::construct_runtime!(
 		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
 		Randomness: pallet_insecure_randomness_collective_flip::{Pallet, Storage},
 		TransactionPayment: pallet_transaction_payment::{Pallet, Storage, Event<T>},
+		Whitelist: pallet_whitelist,
 	}
 );
 
@@ -171,6 +172,16 @@ parameter_types! {
 	pub const VotingTime: BlockNumber = 10;
 	pub const MaximumCommitteeMembers: u32 = 10;
 	pub const MaxMilestones: u32 = 10;
+}
+
+parameter_types! {
+	pub const MaxWhitelistUsers: u32 = 1000000;
+}
+
+impl pallet_whitelist::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type WhitelistOrigin = frame_system::EnsureRoot<Self::AccountId>;
+	type MaxUsersInWhitelist = MaxWhitelistUsers;
 }
 
 impl pallet_community_loan_pool::Config for Test {

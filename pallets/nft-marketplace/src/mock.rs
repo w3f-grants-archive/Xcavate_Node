@@ -46,6 +46,7 @@ frame_support::construct_runtime!(
 		Uniques: pallet_nfts::{Pallet, Call, Storage, Event<T>},
 		NftMarketplace: pallet_nft_marketplace,
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
+		Whitelist: pallet_whitelist,
 	}
 );
 
@@ -130,6 +131,16 @@ impl pallet_nfts::Config for Test {
 	type Features = Features;
 	type OffchainSignature = Signature;
 	type OffchainPublic = AccountPublic;
+}
+
+parameter_types! {
+	pub const MaxWhitelistUsers: u32 = 1000000;
+}
+
+impl pallet_whitelist::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type WhitelistOrigin = frame_system::EnsureRoot<Self::AccountId>;
+	type MaxUsersInWhitelist = MaxWhitelistUsers;
 }
 
 parameter_types! {
