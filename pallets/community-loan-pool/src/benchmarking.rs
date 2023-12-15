@@ -10,6 +10,7 @@ use frame_system::RawOrigin;
 const SEED: u32 = 0;
 use frame_support::assert_ok;
 use frame_support::sp_runtime::traits::Bounded;
+use pallet_whitelist::Pallet as Whitelist;
 
 type DepositBalanceOf<T> = <<T as pallet::Config>::Currency as Currency<
 	<T as frame_system::Config>::AccountId,
@@ -41,7 +42,7 @@ mod benchmarks {
 	fn propose() {
 		let (caller, value, beneficiary_lookup, developer_experience, loan_term) =
 			setup_proposal::<T>(SEED);
-
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
 		#[extrinsic_call]
 		propose(
 			RawOrigin::Signed(caller),
@@ -69,6 +70,7 @@ mod benchmarks {
 		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), alice);
 		let (caller, value, beneficiary_lookup, developer_experience, loan_term) =
 			setup_proposal::<T>(SEED);
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
 		CommunityLoanPool::<T>::propose(
 			RawOrigin::Signed(caller).into(),
 			value,
@@ -95,6 +97,7 @@ mod benchmarks {
 		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), bob);
 		let (caller, value, beneficiary_lookup, developer_experience, loan_term) =
 			setup_proposal::<T>(SEED);
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
 		CommunityLoanPool::<T>::propose(
 			RawOrigin::Signed(caller).into(),
 			value,
@@ -125,49 +128,7 @@ mod benchmarks {
 		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), bob);
 		let (caller, value, beneficiary_lookup, developer_experience, loan_term) =
 			setup_proposal::<T>(SEED);
-		CommunityLoanPool::<T>::propose(
-			RawOrigin::Signed(caller.clone()).into(),
-			value,
-			beneficiary_lookup,
-			developer_experience,
-			loan_term,
-		);
-		let alice = account("alice", SEED, SEED);
-		let proposal_id = CommunityLoanPool::<T>::proposal_count();
-		let milestones = get_max_milestones::<T>();
-		CommunityLoanPool::<T>::set_milestones(
-			RawOrigin::Signed(alice).into(),
-			proposal_id,
-			milestones,
-		);
-		let bob = account("bob", SEED, SEED);
-		CommunityLoanPool::<T>::vote_on_proposal(
-			RawOrigin::Signed(bob).into(),
-			proposal_id,
-			crate::Vote::Yes,
-		);
-		run_to_block::<T>(30u32.into());
-		//assert_eq!(CommunityLoanPool::<T>::ongoing_votes(proposal_id).unwrap().yes_votes, 2);
-		assert_eq!(CommunityLoanPool::<T>::ongoing_loans().len(), 1);
-		let withdraw_value: BalanceOf<T> = 100u32.into();
-		let beneficiary = account("beneficiary", SEED, SEED);
-		let _ = <T as pallet::Config>::Currency::make_free_balance_be(&beneficiary, DepositBalanceOf::<T>::max_value() - withdraw_value);
-		let loan_account = CommunityLoanPool::<T>::account_id();
-		let _ = <T as pallet::Config>::Currency::make_free_balance_be(&loan_account, DepositBalanceOf::<T>::max_value());
-
-		#[extrinsic_call]
-		withdraw(RawOrigin::Signed(beneficiary), 1, withdraw_value);
-		assert_eq!(CommunityLoanPool::<T>::loans(1).unwrap().borrowed_amount, withdraw_value);
-	} 
-
-	#[benchmark]
-	fn repay() {
-		let alice = account("alice", SEED, SEED);
-		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), alice);
-		let bob = account("bob", SEED, SEED);
-		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), bob);
-		let (caller, value, beneficiary_lookup, developer_experience, loan_term) =
-			setup_proposal::<T>(SEED);
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
 		CommunityLoanPool::<T>::propose(
 			RawOrigin::Signed(caller.clone()).into(),
 			value,
@@ -194,6 +155,52 @@ mod benchmarks {
 		assert_eq!(CommunityLoanPool::<T>::ongoing_loans().len(), 1);
 		let withdraw_value: BalanceOf<T> = 100u32.into();
 		let beneficiary: T::AccountId = account("beneficiary", SEED, SEED);
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), beneficiary.clone());
+		let _ = <T as pallet::Config>::Currency::make_free_balance_be(&beneficiary, DepositBalanceOf::<T>::max_value() - withdraw_value);
+		let loan_account = CommunityLoanPool::<T>::account_id();
+		let _ = <T as pallet::Config>::Currency::make_free_balance_be(&loan_account, DepositBalanceOf::<T>::max_value());
+
+		#[extrinsic_call]
+		withdraw(RawOrigin::Signed(beneficiary), 1, withdraw_value);
+		assert_eq!(CommunityLoanPool::<T>::loans(1).unwrap().borrowed_amount, withdraw_value);
+	} 
+
+	#[benchmark]
+	fn repay() {
+		let alice = account("alice", SEED, SEED);
+		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), alice);
+		let bob = account("bob", SEED, SEED);
+		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), bob);
+		let (caller, value, beneficiary_lookup, developer_experience, loan_term) =
+			setup_proposal::<T>(SEED);
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
+		CommunityLoanPool::<T>::propose(
+			RawOrigin::Signed(caller.clone()).into(),
+			value,
+			beneficiary_lookup,
+			developer_experience,
+			loan_term,
+		);
+		let alice = account("alice", SEED, SEED);
+		let proposal_id = CommunityLoanPool::<T>::proposal_count();
+		let milestones = get_max_milestones::<T>();
+		CommunityLoanPool::<T>::set_milestones(
+			RawOrigin::Signed(alice).into(),
+			proposal_id,
+			milestones,
+		);
+		let bob = account("bob", SEED, SEED);
+		CommunityLoanPool::<T>::vote_on_proposal(
+			RawOrigin::Signed(bob).into(),
+			proposal_id,
+			crate::Vote::Yes,
+		);
+		run_to_block::<T>(30u32.into());
+		//assert_eq!(CommunityLoanPool::<T>::ongoing_votes(proposal_id).unwrap().yes_votes, 2);
+		assert_eq!(CommunityLoanPool::<T>::ongoing_loans().len(), 1);
+		let withdraw_value: BalanceOf<T> = 100u32.into();
+		let beneficiary: T::AccountId = account("beneficiary", SEED, SEED);
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), beneficiary.clone());
 		<T as pallet::Config>::Currency::make_free_balance_be(
 			&beneficiary,
 			DepositBalanceOf::<T>::max_value() - withdraw_value,
@@ -219,6 +226,7 @@ mod benchmarks {
 		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), bob);
 		let (caller, value, beneficiary_lookup, developer_experience, loan_term) =
 			setup_proposal::<T>(SEED);
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
 		CommunityLoanPool::<T>::propose(
 			RawOrigin::Signed(caller.clone()).into(),
 			value,
@@ -254,6 +262,7 @@ mod benchmarks {
 		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), bob.clone());
 		let (caller, value, beneficiary_lookup, developer_experience, loan_term) =
 			setup_proposal::<T>(SEED);
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
 		CommunityLoanPool::<T>::propose(
 			RawOrigin::Signed(caller.clone()).into(),
 			value,
@@ -293,6 +302,7 @@ mod benchmarks {
 		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), bob.clone());
 		let (caller, value, beneficiary_lookup, developer_experience, loan_term) =
 			setup_proposal::<T>(SEED);
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
 		CommunityLoanPool::<T>::propose(
 			RawOrigin::Signed(caller.clone()).into(),
 			value,
@@ -314,7 +324,8 @@ mod benchmarks {
 			crate::Vote::Yes,
 		);
 		run_to_block::<T>(30u32.into());
-		let beneficiary = account("beneficiary", SEED, SEED);
+		let beneficiary: T::AccountId = account("beneficiary", SEED, SEED);
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), beneficiary.clone());
 		#[extrinsic_call]
 		propose_deletion(RawOrigin::Signed(beneficiary), 1);
 		assert_last_event::<T>(Event::DeletionProposed { proposal_index: 1, loan_index: 1 }.into());
@@ -328,6 +339,7 @@ mod benchmarks {
 		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), bob.clone());
 		let (caller, value, beneficiary_lookup, developer_experience, loan_term) =
 			setup_proposal::<T>(SEED);
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
 		CommunityLoanPool::<T>::propose(
 			RawOrigin::Signed(caller.clone()).into(),
 			value,
@@ -349,7 +361,8 @@ mod benchmarks {
 			crate::Vote::Yes,
 		);
 		run_to_block::<T>(30u32.into());
-		let beneficiary = account("beneficiary", SEED, SEED);
+		let beneficiary: T::AccountId = account("beneficiary", SEED, SEED);
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), beneficiary.clone());
 		CommunityLoanPool::<T>::propose_deletion(RawOrigin::Signed(beneficiary).into(), 1);
 		#[extrinsic_call]
 		vote_on_deletion_proposal(RawOrigin::Signed(bob), 1, crate::Vote::Yes);

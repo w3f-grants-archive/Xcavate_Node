@@ -16,6 +16,7 @@ type DepositBalanceOf<T> = <<T as pallet_nfts::Config>::Currency as Currency<
 use frame_support::assert_ok;
 use frame_support::traits::Hooks;
 use pallet_assets::Pallet as Assets;
+use pallet_whitelist::Pallet as Whitelist;
 
 fn setup_listing<T: Config>(
 	u: u32,
@@ -52,6 +53,7 @@ mod benchmarks {
 	fn list_project() {
 		let (caller, project_types, metadatas, duration, value, single_metadata) =
 			setup_listing::<T>(SEED);
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
 		let amount: BalanceOf<T> = 1u32.into();
 		#[extrinsic_call]
 		list_project(
@@ -69,6 +71,7 @@ mod benchmarks {
 	fn buy_nft() {
 		let (caller, project_types, metadatas, duration, value, single_metadata) =
 			setup_listing::<T>(SEED);
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
 		CommunityProjects::<T>::list_project(
 			RawOrigin::Signed(caller).into(),
 			project_types,
@@ -78,6 +81,7 @@ mod benchmarks {
 			single_metadata,
 		);
 		let buyer: T::AccountId = account("buyer", SEED, SEED);
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), buyer.clone());
 		<T as pallet_nfts::Config>::Currency::make_free_balance_be(
 			&buyer,
 			DepositBalanceOf::<T>::max_value(),
@@ -111,6 +115,7 @@ mod benchmarks {
 	fn vote_on_milestone() {
 		let (caller, project_types, metadatas, duration, value, single_metadata) =
 			setup_listing::<T>(SEED);
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
 		CommunityProjects::<T>::list_project(
 			RawOrigin::Signed(caller).into(),
 			project_types,
@@ -120,6 +125,7 @@ mod benchmarks {
 			single_metadata,
 		);
 		let buyer: T::AccountId = account("buyer", SEED, SEED);
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), buyer.clone());
 		<T as pallet_nfts::Config>::Currency::make_free_balance_be(
 			&buyer,
 			DepositBalanceOf::<T>::max_value(),

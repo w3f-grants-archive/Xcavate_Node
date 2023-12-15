@@ -198,6 +198,7 @@ runtime-benchmarks = [
 	"pallet-xcavate-staking/runtime-benchmarks",
 	"pallet-nft-marketplace/runtime-benchmarks",
 	"pallet-community-projects/runtime-benchmarks",
+	"pallet-whitelist/runtime-benchmarks",
 	"pallet-nfts/runtime-benchmarks",
 	"pallet-uniques/runtime-benchmarks",
 	"pallet-assets/runtime-benchmarks",

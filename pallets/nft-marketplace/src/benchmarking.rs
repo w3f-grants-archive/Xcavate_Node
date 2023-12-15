@@ -9,6 +9,7 @@ use frame_benchmarking::v2::*;
 use frame_support::sp_runtime::traits::Bounded;
 use frame_support::traits::Get;
 use frame_system::RawOrigin;
+use pallet_whitelist::Pallet as Whitelist;
 type DepositBalanceOf<T> = <<T as pallet_nfts::Config>::Currency as Currency<
 	<T as frame_system::Config>::AccountId,
 >>::Balance;
@@ -29,6 +30,7 @@ mod benchmarks {
 	#[benchmark]
 	fn list_object() {
 		let (caller, value) = setup_object_listing::<T>();
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
 
 		#[extrinsic_call]
 		list_object(
@@ -43,6 +45,7 @@ mod benchmarks {
  	#[benchmark]
 	fn list_nft() {
 		let (caller, value) = setup_object_listing::<T>();
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
 		NftMarketplace::<T>::list_object(
 			RawOrigin::Signed(caller.clone()).into(),
 			value,
@@ -62,6 +65,7 @@ mod benchmarks {
 	#[benchmark]
 	fn buy_nft() {
 		let (caller, value) = setup_object_listing::<T>();
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
 		NftMarketplace::<T>::list_object(
 			RawOrigin::Signed(caller.clone()).into(),
 			value,
@@ -76,6 +80,7 @@ mod benchmarks {
 	#[benchmark]
 	fn buy_single_nft() {
 		let (caller, value) = setup_object_listing::<T>();
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
 		NftMarketplace::<T>::list_object(
 			RawOrigin::Signed(caller.clone()).into(),
 			value,
@@ -94,6 +99,7 @@ mod benchmarks {
 			listing_value,
 		);
 		let nft_buyer: T::AccountId = whitelisted_caller();
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), nft_buyer.clone());
 		<T as pallet_nfts::Config>::Currency::make_free_balance_be(
 			&nft_buyer,
 			DepositBalanceOf::<T>::max_value(),
@@ -106,6 +112,7 @@ mod benchmarks {
 	#[benchmark]
 	fn upgrade_listing() {
 		let (caller, value) = setup_object_listing::<T>();
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
 		NftMarketplace::<T>::list_object(
 			RawOrigin::Signed(caller.clone()).into(),
 			value,
@@ -132,6 +139,7 @@ mod benchmarks {
 	#[benchmark]
 	fn upgrade_object() {
 		let (caller, value) = setup_object_listing::<T>();
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
 		NftMarketplace::<T>::list_object(
 			RawOrigin::Signed(caller.clone()).into(),
 			value,
@@ -148,6 +156,7 @@ mod benchmarks {
 	#[benchmark]
 	fn delist_nft() {
 		let (caller, value) = setup_object_listing::<T>();
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
 		NftMarketplace::<T>::list_object(
 			RawOrigin::Signed(caller.clone()).into(),
 			value,

@@ -543,7 +543,6 @@ impl pallet_community_projects::Config for Runtime {
 }
 
 parameter_types! {
-
 	pub const MaxWhitelistUsers: u32 = 1000000;
 }
 
@@ -1519,6 +1518,7 @@ mod benches {
 		[pallet_xcavate_staking, XcavateStaking]
 		[pallet_nft_marketplace, NftMarketplace]
 		[pallet_community_projects, CommunityProject]
+		[pallet_whitelist, Whitelist]
 		[pallet_nfts, Nfts]
 		[pallet_uniques, Uniques]
 		[pallet_assets, Assets]
