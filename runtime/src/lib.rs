@@ -18,7 +18,7 @@ use frame_support::{
 	pallet_prelude::{DispatchClass, Get},
 	traits::{
 		tokens::nonfungibles_v2::Inspect, AsEnsureOriginWithArg, EitherOfDiverse,
-		EqualPrivilegeOnly, TrackedStorageKey
+		EqualPrivilegeOnly,
 	},
 	PalletId,
 };
@@ -549,6 +549,7 @@ parameter_types! {
 /// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
 impl pallet_whitelist::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_whitelist::weights::SubstrateWeight<Runtime>;
 	type WhitelistOrigin = EitherOfDiverse<
 		EnsureRoot<AccountId>,
 		pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>,

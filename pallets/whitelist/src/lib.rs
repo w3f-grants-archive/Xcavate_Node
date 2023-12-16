@@ -10,8 +10,8 @@ mod tests;
 
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
-/* pub mod weights;
-pub use weights::*; */
+pub mod weights;
+pub use weights::*;
 
 type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
 
@@ -29,8 +29,9 @@ pub mod pallet {
 	pub trait Config: frame_system::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-		/// Type representing the weight of this pallet
-		//type WeightInfo: WeightInfo;
+		/// Type representing the weight of this pallet.
+		type WeightInfo: WeightInfo;
+		/// Origin who can add and remove users to the whitelist.
 		type WhitelistOrigin: EnsureOrigin<Self::RuntimeOrigin>;
 
 		/// Max users allowed in the whitelist.
@@ -40,12 +41,8 @@ pub mod pallet {
 	/// Mapping of an account to a bool.
 	#[pallet::storage]
 	#[pallet::getter(fn whitelisted_accounts)]
-	// Learn more about declaring storage items:
-	// https://docs.substrate.io/main-docs/build/runtime-storage/#declaring-storage-items
 	pub type WhitelistedAccounts<T: Config> = StorageValue<_,BoundedVec<AccountIdOf<T>, T::MaxUsersInWhitelist>, ValueQuery>;
 
-	// Pallets use events to inform users when important changes are made.
-	// https://docs.substrate.io/main-docs/build/events-errors/
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
@@ -68,10 +65,16 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		/// An example dispatchable that takes a singles value as a parameter, writes the value to
-		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
+		/// Adds a user to the whitelist.
+		///
+		/// The origin must be the sudo.
+		///
+		/// Parameters:
+		/// - `user`: The address of the new account added to the whitelist.
+		///
+		/// Emits `NewUserWhitelisted` event when succesfful
 		#[pallet::call_index(0)]
-		#[pallet::weight(0)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::add_to_whitelist())]
 		pub fn add_to_whitelist(origin: OriginFor<T>, user: AccountIdOf<T>) -> DispatchResult {
 
 			T::WhitelistOrigin::ensure_origin(origin)?;
@@ -82,9 +85,16 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// An example dispatchable that may throw a custom error.
+		/// Removes a user from the whitelist.
+		///
+		/// The origin must be the sudo.
+		///
+		/// Parameters:
+		/// - `user`: The address of the new account removed from the whitelist.
+		///
+		/// Emits `UserRemoved` event when succesfful
 		#[pallet::call_index(1)]
-		#[pallet::weight(0)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::remove_from_whitelist())]
 		pub fn remove_from_whitelist(origin: OriginFor<T>, user: AccountIdOf<T>) -> DispatchResult {
 			T::WhitelistOrigin::ensure_origin(origin)?;
 			let mut current_whitelist = Self::whitelisted_accounts();

@@ -42,7 +42,7 @@ mod benchmarks {
 		assert_eq!(NftMarketplace::<T>::listed_nfts().len(), 100);
 	}
 
- 	#[benchmark]
+	#[benchmark]
 	fn list_nft() {
 		let (caller, value) = setup_object_listing::<T>();
 		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
@@ -51,16 +51,12 @@ mod benchmarks {
 			value,
 			vec![0; T::StringLimit::get() as usize].try_into().unwrap(),
 		);
-		NftMarketplace::<T>::buy_nft(
-			RawOrigin::Signed(caller.clone()).into(),
-			0.into(),
-			100,
-		);
+		NftMarketplace::<T>::buy_nft(RawOrigin::Signed(caller.clone()).into(), 0.into(), 100);
 		let listing_value: BalanceOf<T> = 2_000u32.into();
 		#[extrinsic_call]
 		list_nft(RawOrigin::Signed(caller), 0.into(), 22.into(), listing_value);
 		assert_eq!(NftMarketplace::<T>::listed_nfts().len(), 1);
-	} 
+	}
 
 	#[benchmark]
 	fn buy_nft() {
@@ -86,11 +82,7 @@ mod benchmarks {
 			value,
 			vec![0; T::StringLimit::get() as usize].try_into().unwrap(),
 		);
-		NftMarketplace::<T>::buy_nft(
-			RawOrigin::Signed(caller.clone()).into(),
-			0.into(),
-			100,
-		);
+		NftMarketplace::<T>::buy_nft(RawOrigin::Signed(caller.clone()).into(), 0.into(), 100);
 		let listing_value: BalanceOf<T> = 2_000u32.into();
 		NftMarketplace::<T>::list_nft(
 			RawOrigin::Signed(caller.clone()).into(),
@@ -105,9 +97,9 @@ mod benchmarks {
 			DepositBalanceOf::<T>::max_value(),
 		);
 		#[extrinsic_call]
-		buy_single_nft(RawOrigin::Signed(nft_buyer), 0.into(), 22.into(),);
+		buy_single_nft(RawOrigin::Signed(nft_buyer), 0.into(), 22.into());
 		assert_eq!(NftMarketplace::<T>::listed_nfts().len(), 0);
-	} 
+	}
 
 	#[benchmark]
 	fn upgrade_listing() {
@@ -118,11 +110,7 @@ mod benchmarks {
 			value,
 			vec![0; T::StringLimit::get() as usize].try_into().unwrap(),
 		);
-		NftMarketplace::<T>::buy_nft(
-			RawOrigin::Signed(caller.clone()).into(),
-			0.into(),
-			100,
-		);
+		NftMarketplace::<T>::buy_nft(RawOrigin::Signed(caller.clone()).into(), 0.into(), 100);
 		let listing_value: BalanceOf<T> = 2_000u32.into();
 		NftMarketplace::<T>::list_nft(
 			RawOrigin::Signed(caller.clone()).into(),
@@ -133,8 +121,16 @@ mod benchmarks {
 		let new_price: BalanceOf<T> = 5_000u32.into();
 		#[extrinsic_call]
 		upgrade_listing(RawOrigin::Signed(caller), 0.into(), 22.into(), new_price);
-		assert_eq!(NftMarketplace::<T>::ongoing_nft_details::<<T as pallet::Config>::CollectionId, <T as pallet::Config>::ItemId>(0.into(), 22.into()).unwrap().price, new_price);
-	} 
+		assert_eq!(
+			NftMarketplace::<T>::ongoing_nft_details::<
+				<T as pallet::Config>::CollectionId,
+				<T as pallet::Config>::ItemId,
+			>(0.into(), 22.into())
+			.unwrap()
+			.price,
+			new_price
+		);
+	}
 
 	#[benchmark]
 	fn upgrade_object() {
@@ -145,13 +141,21 @@ mod benchmarks {
 			value,
 			vec![0; T::StringLimit::get() as usize].try_into().unwrap(),
 		);
-		
+
 		let new_price: BalanceOf<T> = 300_000u32.into();
 		let nft_price: BalanceOf<T> = 3_000u32.into();
 		#[extrinsic_call]
 		upgrade_object(RawOrigin::Signed(caller), 0.into(), new_price);
-		assert_eq!(NftMarketplace::<T>::ongoing_nft_details::<<T as pallet::Config>::CollectionId, <T as pallet::Config>::ItemId>(0.into(), 22.into()).unwrap().price, nft_price);
-	} 
+		assert_eq!(
+			NftMarketplace::<T>::ongoing_nft_details::<
+				<T as pallet::Config>::CollectionId,
+				<T as pallet::Config>::ItemId,
+			>(0.into(), 22.into())
+			.unwrap()
+			.price,
+			nft_price
+		);
+	}
 
 	#[benchmark]
 	fn delist_nft() {
@@ -162,11 +166,7 @@ mod benchmarks {
 			value,
 			vec![0; T::StringLimit::get() as usize].try_into().unwrap(),
 		);
-		NftMarketplace::<T>::buy_nft(
-			RawOrigin::Signed(caller.clone()).into(),
-			0.into(),
-			100,
-		);
+		NftMarketplace::<T>::buy_nft(RawOrigin::Signed(caller.clone()).into(), 0.into(), 100);
 		let listing_value: BalanceOf<T> = 2_000u32.into();
 		NftMarketplace::<T>::list_nft(
 			RawOrigin::Signed(caller.clone()).into(),
@@ -177,6 +177,6 @@ mod benchmarks {
 		#[extrinsic_call]
 		delist_nft(RawOrigin::Signed(caller), 0.into(), 22.into());
 		assert_eq!(NftMarketplace::<T>::listed_nfts().len(), 0);
-	} 
+	}
 	impl_benchmark_test_suite!(NftMarketplace, crate::mock::new_test_ext(), crate::mock::Test);
 }

@@ -23,7 +23,10 @@ fn setup_listing<T: Config>(
 ) -> (
 	T::AccountId,
 	BoundedNftDonationTypes<T>,
-	BoundedVec<BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>, <T as Config>::MaxListedNfts>,
+	BoundedVec<
+		BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>,
+		<T as Config>::MaxListedNfts,
+	>,
 	u32,
 	BalanceOf<T>,
 	BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>,

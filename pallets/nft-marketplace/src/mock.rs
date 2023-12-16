@@ -139,6 +139,7 @@ parameter_types! {
 
 impl pallet_whitelist::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_whitelist::weights::SubstrateWeight<Test>;
 	type WhitelistOrigin = frame_system::EnsureRoot<Self::AccountId>;
 	type MaxUsersInWhitelist = MaxWhitelistUsers;
 }

@@ -108,7 +108,11 @@ fn withdraw_from_queue() {
 		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([0; 32].into()), 100));
 		assert_eq!(XcavateStaking::queue_ledger(1).unwrap().locked, 100);
 		assert_eq!(XcavateStaking::ledger(1), None);
-		assert_ok!(XcavateStaking::withdraw_from_queue(RuntimeOrigin::signed([0; 32].into()), 1, 200));
+		assert_ok!(XcavateStaking::withdraw_from_queue(
+			RuntimeOrigin::signed([0; 32].into()),
+			1,
+			200
+		));
 		assert_eq!(XcavateStaking::queue_ledger(1), None);
 	})
 }
@@ -122,7 +126,10 @@ fn withdraw_fails_if_caller_not_staker() {
 		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([0; 32].into()), 100));
 		assert_eq!(XcavateStaking::queue_ledger(1).unwrap().locked, 100);
 		assert_eq!(XcavateStaking::ledger(1), None);
-		assert_noop!(XcavateStaking::withdraw_from_queue(RuntimeOrigin::signed([3; 32].into()), 1, 100), Error::<Test>::CallerNotStaker);
+		assert_noop!(
+			XcavateStaking::withdraw_from_queue(RuntimeOrigin::signed([3; 32].into()), 1, 100),
+			Error::<Test>::CallerNotStaker
+		);
 	})
 }
 
@@ -306,7 +313,10 @@ fn unstake_fails_if_caller_not_staker() {
 		run_to_block(21);
 		assert_eq!(CommunityLoanPool::ongoing_loans().len(), 1);
 		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([0; 32].into()), 100));
-		assert_noop!(XcavateStaking::unstake(RuntimeOrigin::signed([3; 32].into()), 1, 100), Error::<Test>::CallerNotStaker);
+		assert_noop!(
+			XcavateStaking::unstake(RuntimeOrigin::signed([3; 32].into()), 1, 100),
+			Error::<Test>::CallerNotStaker
+		);
 	})
 }
 

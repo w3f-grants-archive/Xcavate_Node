@@ -1,13 +1,12 @@
 use crate as pallet_whitelist;
-use frame_support::{
-	traits::ConstU64,
-	parameter_types,
-};
+use frame_support::{parameter_types, traits::ConstU64};
 use sp_core::H256;
 use sp_runtime::{
 	traits::{AccountIdLookup, BlakeTwo256, IdentityLookup},
 	BuildStorage,
 };
+
+use frame_support::weights::IdentityFee;
 
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -52,6 +51,7 @@ parameter_types! {
 
 impl pallet_whitelist::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_whitelist::weights::SubstrateWeight<Test>;
 	type WhitelistOrigin = frame_system::EnsureRoot<Self::AccountId>;
 	type MaxUsersInWhitelist = MaxWhitelistUsers;
 }

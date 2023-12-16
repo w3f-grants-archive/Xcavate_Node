@@ -37,10 +37,7 @@ pub type BalanceOf<T> =
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	use frame_support::{
-		dispatch::DispatchResultWithPostInfo,
-		traits::{Currency, LockIdentifier, LockableCurrency, WithdrawReasons},
-	};
+	use frame_support::traits::{Currency, LockIdentifier, LockableCurrency, WithdrawReasons};
 
 	pub type StakingIndex = u64;
 	pub type QueueIndex = u64;
@@ -80,7 +77,9 @@ pub mod pallet {
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config + pallet_community_loan_pool::Config + pallet_whitelist::Config {
+	pub trait Config:
+		frame_system::Config + pallet_community_loan_pool::Config + pallet_whitelist::Config
+	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 		/// Type representing the weight of this pallet.
@@ -149,13 +148,8 @@ pub mod pallet {
 	/// Mapping of account id to the amount locked
 	#[pallet::storage]
 	#[pallet::getter(fn amount_locked)]
-	pub type AmountLocked<T: Config> = StorageMap<
-		_,
-		Blake2_128Concat,
-		AccountIdOf<T>,
-		BalanceOf<T>,
-		OptionQuery,
-	>;
+	pub type AmountLocked<T: Config> =
+		StorageMap<_, Blake2_128Concat, AccountIdOf<T>, BalanceOf<T>, OptionQuery>;
 
 	// Pallets use events to inform users when important changes are made.
 	// https://docs.substrate.io/main-docs/build/events-errors/
@@ -239,7 +233,10 @@ pub mod pallet {
 		) -> DispatchResult {
 			let staker = ensure_signed(origin)?;
 
-			ensure!(pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&staker), Error::<T>::UserNotWhitelisted);
+			ensure!(
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&staker),
+				Error::<T>::UserNotWhitelisted
+			);
 
 			ensure!(!value.is_zero(), Error::<T>::StakingWithNoValue);
 
@@ -251,20 +248,17 @@ pub mod pallet {
 					.saturating_sub(T::MinimumRemainingAmount::get());
 				let value_to_queue = value.min(available_balance);
 				Self::queue_helper(staker.clone(), value_to_queue)?;
-			} else if total_stake + Self::balance_to_u128(value)?
-				>= total_amount_loan
-			{
+			} else if total_stake + Self::balance_to_u128(value)? >= total_amount_loan {
 				let available_balance = <T as pallet::Config>::Currency::free_balance(&staker)
 					.saturating_sub(T::MinimumRemainingAmount::get());
 				let value_available = value.min(available_balance);
 				let staking_value = total_amount_loan - total_stake;
-				let queue_value =
-					Self::balance_to_u128(value_available)? - staking_value;
+				let queue_value = Self::balance_to_u128(value_available)? - staking_value;
 				Self::queue_helper(staker.clone(), Self::u128_to_balance_option(queue_value)?)?;
 				Self::stake_helper(staker.clone(), Self::u128_to_balance_option(staking_value)?)?;
 			} else {
 				let available_balance = <T as pallet::Config>::Currency::free_balance(&staker)
-						.saturating_sub(T::MinimumRemainingAmount::get());
+					.saturating_sub(T::MinimumRemainingAmount::get());
 
 				let value_to_stake = value.min(available_balance);
 
@@ -291,7 +285,10 @@ pub mod pallet {
 		) -> DispatchResult {
 			let staker = ensure_signed(origin)?;
 
-			ensure!(pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&staker), Error::<T>::UserNotWhitelisted);
+			ensure!(
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&staker),
+				Error::<T>::UserNotWhitelisted
+			);
 
 			ensure!(Self::ledger(staking_index).is_some(), Error::<T>::NoStaker);
 
@@ -300,20 +297,20 @@ pub mod pallet {
 
 			ledger.locked = ledger.locked.saturating_sub(value);
 
-			let locked_amount = Self::amount_locked(ledger.staker.clone()).ok_or(Error::<T>::StakerNothingLocked)?;
+			let locked_amount = Self::amount_locked(ledger.staker.clone())
+				.ok_or(Error::<T>::StakerNothingLocked)?;
 			let new_locked_amount = locked_amount.saturating_sub(value);
 			if new_locked_amount.is_zero() {
 				<T as pallet::Config>::Currency::remove_lock(EXAMPLE_ID, &ledger.staker);
 			} else {
-				let locking_amount =
-					Self::balance_to_u128(new_locked_amount)? * 1000000000000;
+				let locking_amount = Self::balance_to_u128(new_locked_amount)? * 1000000000000;
 				if Self::u128_to_balance_option(locking_amount).is_ok() {
 					<T as pallet::Config>::Currency::set_lock(
 						EXAMPLE_ID,
 						&ledger.staker,
 						Self::u128_to_balance_option(locking_amount)?,
 						WithdrawReasons::all(),
-					);				
+					);
 				}
 			}
 
@@ -346,25 +343,27 @@ pub mod pallet {
 		) -> DispatchResult {
 			let staker = ensure_signed(origin)?;
 
-			ensure!(pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&staker), Error::<T>::UserNotWhitelisted);
-	
-			ensure!(Self::queue_ledger(queue_index).is_some(), Error::<T>::NotInQueue);
-	
-			let mut queue_ledger = Self::queue_ledger(queue_index).ok_or(Error::<T>::LedgerNotFound)?;
-			ensure!(queue_ledger.staker == staker, Error::<T>::CallerNotStaker);
-	
-			queue_ledger.locked = queue_ledger.locked.saturating_sub(value);
-	
+			ensure!(
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&staker),
+				Error::<T>::UserNotWhitelisted
+			);
 
-	
-			let locked_amount = Self::amount_locked(queue_ledger.staker.clone()).ok_or(Error::<T>::StakerNothingLocked)?;
+			ensure!(Self::queue_ledger(queue_index).is_some(), Error::<T>::NotInQueue);
+
+			let mut queue_ledger =
+				Self::queue_ledger(queue_index).ok_or(Error::<T>::LedgerNotFound)?;
+			ensure!(queue_ledger.staker == staker, Error::<T>::CallerNotStaker);
+
+			queue_ledger.locked = queue_ledger.locked.saturating_sub(value);
+
+			let locked_amount = Self::amount_locked(queue_ledger.staker.clone())
+				.ok_or(Error::<T>::StakerNothingLocked)?;
 			let new_locked_amount = locked_amount.saturating_sub(value);
 			if new_locked_amount.is_zero() {
 				QueueLedger::<T>::remove(queue_index);
 				<T as pallet::Config>::Currency::remove_lock(EXAMPLE_ID, &queue_ledger.staker);
 			} else {
-				let locking_amount =
-					Self::balance_to_u128(new_locked_amount)? * 1000000000000;
+				let locking_amount = Self::balance_to_u128(new_locked_amount)? * 1000000000000;
 				if Self::u128_to_balance_option(locking_amount).is_ok() {
 					<T as pallet::Config>::Currency::set_lock(
 						EXAMPLE_ID,
@@ -372,7 +371,7 @@ pub mod pallet {
 						Self::u128_to_balance_option(locking_amount)?,
 						WithdrawReasons::all(),
 					);
-				} 
+				}
 			}
 
 			if queue_ledger.locked.is_zero() {
@@ -388,25 +387,27 @@ pub mod pallet {
 				QueueLedger::<T>::insert(queue_index, queue_ledger.clone());
 			}
 			AmountLocked::<T>::insert(queue_ledger.staker.clone(), new_locked_amount);
-	
+
 			Self::deposit_event(Event::Unlocked { staker, amount: value });
 			Ok(())
 		}
 	}
 
 	impl<T: Config> Pallet<T> {
-
-		fn stake_helper(staker: T::AccountId, value: BalanceOf<T>) -> DispatchResult{
+		fn stake_helper(staker: T::AccountId, value: BalanceOf<T>) -> DispatchResult {
 			let staking_index = Self::staking_count() + 1;
 			ensure!(Self::ledger(staking_index).is_none(), Error::<T>::IndexInUse);
 
 			let timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
 
-			let ledger =
-				LedgerAccount { staker: staker.clone(), locked: value, timestamp, earned_rewards: Default::default() };
+			let ledger = LedgerAccount {
+				staker: staker.clone(),
+				locked: value,
+				timestamp,
+				earned_rewards: Default::default(),
+			};
 
-			let locked_amount = 
-			if Self::amount_locked(staker.clone()).is_none() {
+			let locked_amount = if Self::amount_locked(staker.clone()).is_none() {
 				Default::default()
 			} else {
 				Self::amount_locked(staker).ok_or(Error::<T>::StakerNothingLocked)?
@@ -416,8 +417,7 @@ pub mod pallet {
 				Ledger::<T>::remove(staking_index);
 				<T as pallet::Config>::Currency::remove_lock(EXAMPLE_ID, &ledger.staker);
 			} else {
-				let locking_amount =
-					Self::balance_to_u128(new_locked_amount)? * 1000000000000;
+				let locking_amount = Self::balance_to_u128(new_locked_amount)? * 1000000000000;
 				if Self::u128_to_balance_option(locking_amount).is_ok() {
 					<T as pallet::Config>::Currency::set_lock(
 						EXAMPLE_ID,
@@ -438,28 +438,27 @@ pub mod pallet {
 			let total_stake = Self::total_stake();
 			StakingCount::<T>::put(staking_index);
 			TotalStake::<T>::put(total_stake + value);
-			Ok(())			
+			Ok(())
 		}
 
 		fn queue_helper(staker: T::AccountId, value: BalanceOf<T>) -> DispatchResult {
 			let queue_index = Self::queue_count() + 1;
 			ensure!(Self::queue_ledger(queue_index).is_none(), Error::<T>::IndexInUse);
 			let timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
-			let queue_ledger = QueueLedgerAccount { staker: staker.clone(), locked: value, timestamp };
+			let queue_ledger =
+				QueueLedgerAccount { staker: staker.clone(), locked: value, timestamp };
 
-			let locked_amount = 
-				if Self::amount_locked(staker.clone()).is_none() {
-					Default::default()
-				} else {
-					Self::amount_locked(staker).ok_or(Error::<T>::StakerNothingLocked)?
-				};
+			let locked_amount = if Self::amount_locked(staker.clone()).is_none() {
+				Default::default()
+			} else {
+				Self::amount_locked(staker).ok_or(Error::<T>::StakerNothingLocked)?
+			};
 			let new_locked_amount = locked_amount.saturating_add(value);
 			if new_locked_amount.is_zero() {
 				QueueLedger::<T>::remove(queue_index);
 				<T as pallet::Config>::Currency::remove_lock(EXAMPLE_ID, &queue_ledger.staker);
 			} else {
-				let locking_amount =
-					Self::balance_to_u128(new_locked_amount)? * 1000000000000;
+				let locking_amount = Self::balance_to_u128(new_locked_amount)? * 1000000000000;
 				if Self::u128_to_balance_option(locking_amount).is_ok() {
 					<T as pallet::Config>::Currency::set_lock(
 						EXAMPLE_ID,
@@ -474,9 +473,8 @@ pub mod pallet {
 			}
 			AmountLocked::<T>::insert(queue_ledger.staker, new_locked_amount);
 			QueueCount::<T>::put(queue_index);
-			QueueStaking::<T>::try_append(queue_index)
-				.map_err(|_| Error::<T>::TooManyStakers)?;	
-			Ok(())		
+			QueueStaking::<T>::try_append(queue_index).map_err(|_| Error::<T>::TooManyStakers)?;
+			Ok(())
 		}
 
 		/// Calculates the current staking apy.
@@ -497,8 +495,8 @@ pub mod pallet {
 					.ok_or(Error::<T>::NoLoanFound)?;
 				loan_apys += loan.loan_apy as u128
 					* TryInto::<u128>::try_into(loan.current_loan_balance)
-						.map_err(|_| Error::<T>::ConversionError)? * 10000
-					/ total_amount_loan;
+						.map_err(|_| Error::<T>::ConversionError)?
+					* 10000 / total_amount_loan;
 			}
 			let average_loan_apy = loan_apys / 10000;
 			Ok(average_loan_apy.saturating_sub(200))
@@ -515,8 +513,10 @@ pub mod pallet {
 				let current_timestamp = <T as pallet::Config>::TimeProvider::now().as_secs();
 				let locked_amount = Self::balance_to_u128(ledger.locked)?;
 				let rewards = locked_amount * apy * (current_timestamp - ledger.timestamp) as u128
-					/ 365 / 60 / 60 / 24 / 100 / 100;
-				let new_earned_rewards = ledger.earned_rewards + Self::u128_to_balance_option(rewards)?;
+					/ 365 / 60 / 60 / 24 / 100
+					/ 100;
+				let new_earned_rewards =
+					ledger.earned_rewards + Self::u128_to_balance_option(rewards)?;
 				ledger.earned_rewards = new_earned_rewards;
 				ledger.timestamp = current_timestamp;
 				Ledger::<T>::insert(staking, ledger.clone());
@@ -550,10 +550,7 @@ pub mod pallet {
 					Self::unstake_staker(*first_staking, ledger.locked)?;
 				} else {
 					let value = total_stake.saturating_sub(total_amount_loan);
-					Self::unstake_staker(
-						*first_staking,
-						Self::u128_to_balance_option(value)?,
-					)?;
+					Self::unstake_staker(*first_staking, Self::u128_to_balance_option(value)?)?;
 				};
 				total_amount_loan =
 					pallet_community_loan_pool::Pallet::<T>::total_loan_amount() as u128;
@@ -565,16 +562,17 @@ pub mod pallet {
 					break;
 				}
 				let first_queue = queue[0];
-				let queue_ledger = Self::queue_ledger(first_queue).ok_or(Error::<T>::LedgerNotFound)?;
+				let queue_ledger =
+					Self::queue_ledger(first_queue).ok_or(Error::<T>::LedgerNotFound)?;
 				if Self::balance_to_u128(queue_ledger.locked)?
-				< total_amount_loan.saturating_sub(total_stake) {
-
+					< total_amount_loan.saturating_sub(total_stake)
+				{
 				} else {
 					let value = total_amount_loan.saturating_sub(total_stake);
-					Self::stake_from_queue(first_queue, Self::u128_to_balance_option(value)?)?;				
+					Self::stake_from_queue(first_queue, Self::u128_to_balance_option(value)?)?;
 				}
 				total_amount_loan =
-				pallet_community_loan_pool::Pallet::<T>::total_loan_amount() as u128;
+					pallet_community_loan_pool::Pallet::<T>::total_loan_amount() as u128;
 				total_stake = Self::balance_to_u128(Self::total_stake())?;
 			}
 			Ok(())
@@ -586,8 +584,7 @@ pub mod pallet {
 
 			ledger.locked = ledger.locked.saturating_sub(value);
 
-			let locked_amount = 
-			if Self::amount_locked(ledger.staker.clone()).is_none() {
+			let locked_amount = if Self::amount_locked(ledger.staker.clone()).is_none() {
 				Default::default()
 			} else {
 				Self::amount_locked(ledger.staker.clone()).ok_or(Error::<T>::StakerNothingLocked)?
@@ -597,8 +594,7 @@ pub mod pallet {
 				Ledger::<T>::remove(staking_index);
 				<T as pallet::Config>::Currency::remove_lock(EXAMPLE_ID, &ledger.staker);
 			} else {
-				let locking_amount =
-					Self::balance_to_u128(new_locked_amount)? * 1000000000000;
+				let locking_amount = Self::balance_to_u128(new_locked_amount)? * 1000000000000;
 				if Self::u128_to_balance_option(locking_amount).is_ok() {
 					<T as pallet::Config>::Currency::set_lock(
 						EXAMPLE_ID,
@@ -615,7 +611,7 @@ pub mod pallet {
 					.iter()
 					.position(|x| *x == staking_index)
 					.ok_or(Error::<T>::NoStaker)?;
-					active_stakings.remove(index);
+				active_stakings.remove(index);
 				Ledger::<T>::remove(staking_index);
 				ActiveStakings::<T>::put(active_stakings);
 			} else {
@@ -632,23 +628,23 @@ pub mod pallet {
 
 		/// Staker from the queue
 		fn stake_from_queue(queue_index: QueueIndex, value: BalanceOf<T>) -> DispatchResult {
-			let mut queue_ledger = Self::queue_ledger(queue_index).ok_or(Error::<T>::LedgerNotFound)?;
+			let mut queue_ledger =
+				Self::queue_ledger(queue_index).ok_or(Error::<T>::LedgerNotFound)?;
 
 			queue_ledger.locked = queue_ledger.locked.saturating_sub(value);
 
-			let locked_amount = 
-			if Self::amount_locked(queue_ledger.staker.clone()).is_none() {
+			let locked_amount = if Self::amount_locked(queue_ledger.staker.clone()).is_none() {
 				Default::default()
 			} else {
-				Self::amount_locked(queue_ledger.staker.clone()).ok_or(Error::<T>::StakerNothingLocked)?
+				Self::amount_locked(queue_ledger.staker.clone())
+					.ok_or(Error::<T>::StakerNothingLocked)?
 			};
 			let new_locked_amount = locked_amount.saturating_sub(value);
 			if new_locked_amount.is_zero() {
 				QueueLedger::<T>::remove(queue_index);
 				<T as pallet::Config>::Currency::remove_lock(EXAMPLE_ID, &queue_ledger.staker);
 			} else {
-				let locking_amount =
-					Self::balance_to_u128(new_locked_amount)? * 1000000000000;
+				let locking_amount = Self::balance_to_u128(new_locked_amount)? * 1000000000000;
 				if Self::u128_to_balance_option(locking_amount).is_ok() {
 					<T as pallet::Config>::Currency::set_lock(
 						EXAMPLE_ID,
@@ -656,7 +652,7 @@ pub mod pallet {
 						Self::u128_to_balance_option(locking_amount)?,
 						WithdrawReasons::all(),
 					);
-				} 
+				}
 			}
 
 			if queue_ledger.locked.is_zero() {
@@ -673,8 +669,8 @@ pub mod pallet {
 			}
 			AmountLocked::<T>::insert(queue_ledger.staker.clone(), new_locked_amount);
 			Self::stake_helper(queue_ledger.staker.clone(), value)?;
-			Self::deposit_event(Event::Locked {staker: queue_ledger.staker, amount: value});
-			Ok(())			
+			Self::deposit_event(Event::Locked { staker: queue_ledger.staker, amount: value });
+			Ok(())
 		}
 
 		pub fn balance_to_u128(input: BalanceOf<T>) -> Result<u128, Error<T>> {

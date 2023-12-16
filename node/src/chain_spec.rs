@@ -96,12 +96,10 @@ pub fn get_endowed_accounts_with_balance() -> Vec<(AccountId, u128)> {
 	accounts
 }
 
-
-
-pub fn get_root_account() -> AccountId{
+pub fn get_root_account() -> AccountId {
 	let json_data = &include_bytes!("../../seed/balances.json")[..];
 	let additional_accounts_with_balance: Vec<(AccountId, u128)> =
-	serde_json::from_slice(json_data).unwrap_or_default();
+		serde_json::from_slice(json_data).unwrap_or_default();
 
 	additional_accounts_with_balance[0].0.clone()
 }

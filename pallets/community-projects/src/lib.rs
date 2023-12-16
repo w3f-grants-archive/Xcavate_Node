@@ -140,7 +140,10 @@ pub mod pallet {
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
 	pub trait Config:
-		frame_system::Config + pallet_nfts::Config + pallet_assets::Config<Instance1> + pallet_whitelist::Config
+		frame_system::Config
+		+ pallet_nfts::Config
+		+ pallet_assets::Config<Instance1>
+		+ pallet_whitelist::Config
 	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
@@ -222,7 +225,7 @@ pub mod pallet {
 	pub(super) type OngoingNftDetails<T: Config> = StorageDoubleMap<
 		_,
 		Blake2_128Concat,
-		<T as pallet::Config>::CollectionId, 
+		<T as pallet::Config>::CollectionId,
 		Blake2_128Concat,
 		<T as pallet::Config>::ItemId,
 		NftDetails<
@@ -464,10 +467,23 @@ pub mod pallet {
 		) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
 
-			ensure!(pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&signer), Error::<T>::UserNotWhitelisted);
+			ensure!(
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&signer),
+				Error::<T>::UserNotWhitelisted
+			);
 
-			ensure!(metadata.len() as u32 == nft_types.iter().fold(0, |sum, nft_type| sum + nft_type.amount), Error::<T>::WrongAmountOfMetadata);
-			ensure!(price <= nft_types.iter().fold(Default::default() , |sum, nft_type| sum + nft_type.price), Error::<T>::PriceCannotBeReached);
+			ensure!(
+				metadata.len()
+					== nft_types.len(),
+				Error::<T>::WrongAmountOfMetadata
+			);
+			ensure!(
+				price
+					<= nft_types
+						.iter()
+						.fold(Default::default(), |sum, nft_type| sum + nft_type.price),
+				Error::<T>::PriceCannotBeReached
+			);
 			ensure!(duration > 0, Error::<T>::DurationMustBeHigherThanZero);
 			if pallet_nfts::NextCollectionId::<T>::get().is_none() {
 				pallet_nfts::NextCollectionId::<T>::set(
@@ -497,12 +513,17 @@ pub mod pallet {
 				collection_id.into(),
 				data.clone(),
 			)?;
+			let milestone = if duration <= 12 {
+				duration
+			} else {
+				12
+			};
 			let project = ProjectDetails {
 				project_owner: signer.clone(),
 				project_price: price,
 				duration,
-				milestones: duration,
-				remaining_milestones: duration,
+				milestones: milestone,
+				remaining_milestones: milestone,
 				project_balance: Default::default(),
 				launching_timestamp: Default::default(),
 				strikes: Default::default(),
@@ -510,6 +531,7 @@ pub mod pallet {
 			OngoingProjects::<T>::insert(collection_id, project);
 			let nft_metadata = &metadata;
 			let mut nft_id_index = 0;
+			let mut nft_metadata_index = 0;
 			for nft_type in nft_types {
 				for _y in 0..nft_type.amount {
 					let item_id: <T as pallet::Config>::ItemId = nft_id_index.into();
@@ -531,7 +553,7 @@ pub mod pallet {
 						origin.clone(),
 						collection_id.into(),
 						item_id.into(),
-						nft_metadata[nft_id_index as usize].clone(),
+						nft_metadata[nft_metadata_index as usize].clone(),
 					)?;
 					ListedNfts::<T>::try_append((collection_id, item_id))
 						.map_err(|_| Error::<T>::TooManyListedNfts)?;
@@ -542,6 +564,7 @@ pub mod pallet {
 					})?;
 					nft_id_index += 1;
 				}
+				nft_metadata_index += 1;
 			}
 			pallet_nfts::Pallet::<T>::set_team(
 				origin.clone(),
@@ -574,6 +597,10 @@ pub mod pallet {
 			item_id: <T as pallet::Config>::ItemId,
 		) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
+			ensure!(
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&signer),
+				Error::<T>::UserNotWhitelisted
+			);
 			ensure!(
 				OngoingNftDetails::<T>::contains_key(collection_id, item_id),
 				Error::<T>::NftNotFound
@@ -656,6 +683,10 @@ pub mod pallet {
 			vote: Vote,
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
+			ensure!(
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&origin),
+				Error::<T>::UserNotWhitelisted
+			);
 			let mut current_vote =
 				OngoingVotes::<T>::take(collection_id).ok_or(Error::<T>::NoOngoingVotingPeriod)?;
 			let nft_voter = Self::nft_holder(collection_id);
@@ -745,8 +776,7 @@ pub mod pallet {
 		fn start_milestone_period(
 			collection_id: <T as pallet::Config>::CollectionId,
 		) -> DispatchResult {
-			let project =
-			Self::ongoing_projects(collection_id).ok_or(Error::<T>::InvalidIndex)?;
+			let project = Self::ongoing_projects(collection_id).ok_or(Error::<T>::InvalidIndex)?;
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
 			let milestone_period =
 				if project.duration > 12 { project.duration * 10 / 12 } else { 10 };
