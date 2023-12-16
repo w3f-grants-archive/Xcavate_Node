@@ -8,12 +8,6 @@ use sp_runtime::{
 	MultiSignature,
 };
 
-use frame_support::traits::ConstU8;
-
-use frame_support::weights::IdentityFee;
-
-use sp_runtime::traits::One;
-
 use sp_runtime::BuildStorage;
 
 use pallet_nfts::PalletFeatures;

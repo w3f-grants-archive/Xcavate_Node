@@ -1,12 +1,9 @@
 use crate as pallet_whitelist;
 use frame_support::{parameter_types, traits::ConstU64};
-use sp_core::H256;
 use sp_runtime::{
-	traits::{AccountIdLookup, BlakeTwo256, IdentityLookup},
+	traits::{BlakeTwo256, IdentityLookup},
 	BuildStorage,
 };
-
-use frame_support::weights::IdentityFee;
 
 type Block = frame_system::mocking::MockBlock<Test>;
 

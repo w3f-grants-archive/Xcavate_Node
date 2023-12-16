@@ -3,12 +3,11 @@ use super::*;
 use crate as pallet_xcavate_staking;
 use frame_support::{
 	parameter_types,
-	traits::{AsEnsureOriginWithArg, ConstBool, ConstU16, ConstU64, Nothing},
+	traits::AsEnsureOriginWithArg,
 };
-use sp_core::{ConstU32, H256};
+use sp_core::ConstU32;
 use sp_runtime::{
-	testing::Header,
-	traits::{AccountIdLookup, BlakeTwo256, IdentifyAccount, IdentityLookup, Verify},
+	traits::{AccountIdLookup, BlakeTwo256, IdentifyAccount, Verify},
 	MultiSignature,
 };
 
@@ -32,7 +31,6 @@ use frame_support::PalletId;
 
 use sp_runtime::BuildStorage;
 
-type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
 
 pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;

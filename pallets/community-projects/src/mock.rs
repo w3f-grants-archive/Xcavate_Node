@@ -12,13 +12,7 @@ use frame_system::EnsureRoot;
 
 //use pallet_transaction_payment::CurrencyAdapter;
 
-use frame_support::traits::ConstU8;
-
-use frame_support::weights::IdentityFee;
-
 //use pallet_transaction_payment::{ConstFeeMultiplier, Multiplier};
-
-use sp_runtime::traits::One;
 
 use sp_runtime::BuildStorage;
 
@@ -43,7 +37,6 @@ pub const MILLISECS_PER_BLOCK: u64 = 6000;
 pub const MINUTES: BlockNumber = 60_000 / (MILLISECS_PER_BLOCK as BlockNumber);
 pub const HOURS: BlockNumber = MINUTES * 60;
 pub const DAYS: BlockNumber = HOURS * 24;
-pub const SEED: u32 = 0;
 
 //use frame_benchmarking::account;
 

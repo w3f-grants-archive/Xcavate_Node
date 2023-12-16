@@ -1,4 +1,4 @@
-use crate::{mock::*, Error, Event};
+use crate::{mock::*, Error};
 use frame_support::{
 	assert_noop, assert_ok,
 	traits::{OnFinalize, OnInitialize},
@@ -6,7 +6,7 @@ use frame_support::{
 
 use crate::Config;
 use crate::{BalanceOf, BoundedNftDonationTypes, NftDonationTypes};
-use sp_core::{bounded::BoundedVec, Pair};
+use sp_core::bounded::BoundedVec;
 
 macro_rules! bvec {
 	($( $x:tt )*) => {
@@ -505,5 +505,46 @@ fn delete_project_works() {
 		assert_eq!(Assets::balance(1, &[0; 32].into()), 20_000_300);
 		assert_eq!(Assets::balance(1, &CommunityProjects::account_id()), 0);
 		assert_eq!(CommunityProjects::ongoing_projects(0), None);
+	})
+}
+
+#[test]
+fn create_project_duration_longer_12() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
+		assert_ok!(CommunityProjects::list_project(
+			RuntimeOrigin::signed([0; 32].into()),
+			get_project_nfts(3),
+			get_nft_metadata(3),
+			24,
+			300,
+			bvec![22, 22]
+		));
+		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 1));
+		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([2; 32].into()), 0, 0));
+		run_to_block(18);
+		assert_noop!(CommunityProjects::vote_on_milestone(
+			RuntimeOrigin::signed([2; 32].into()),
+			0,
+			crate::Vote::Yes
+		), Error::<Test>::NoOngoingVotingPeriod);
+		run_to_block(21);
+		assert_ok!(CommunityProjects::vote_on_milestone(
+			RuntimeOrigin::signed([2; 32].into()),
+			0,
+			crate::Vote::Yes
+		));
+		run_to_block(32);
+		assert_eq!(Assets::balance(1, &[0; 32].into()), 20_000_025);
+		assert_eq!(Assets::balance(1, &CommunityProjects::account_id()), 275);
+		run_to_block(52);
+		assert_ok!(CommunityProjects::vote_on_milestone(
+			RuntimeOrigin::signed([2; 32].into()),
+			0,
+			crate::Vote::Yes
+		));
 	})
 }

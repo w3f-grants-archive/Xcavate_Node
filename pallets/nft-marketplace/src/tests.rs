@@ -1,7 +1,5 @@
-use crate::{mock::*, Error, Event};
+use crate::{mock::*, Error};
 use frame_support::{assert_noop, assert_ok};
-
-use pallet_nfts::Item;
 
 macro_rules! bvec {
 	($( $x:tt )*) => {
@@ -71,7 +69,6 @@ fn distributes_nfts_and_funds() {
 		assert_eq!(Balances::free_balance(&([0; 32].into())), 20999998);
 		assert_eq!(Balances::free_balance(&([1; 32].into())), 14_000_000);
 		assert_eq!(NftMarketplace::listed_nfts().len(), 0);
-		let item = Item::<Test>::get(0, 1).unwrap();
 		assert_eq!(NftMarketplace::listed_collection_details(0).unwrap().spv_created, true);
 		assert_eq!(NftMarketplace::ongoing_nft_details(0, 22).is_some(), false);
 		assert_eq!(NftMarketplace::listed_nfts_of_collection(0).len(), 0);
@@ -135,7 +132,6 @@ fn relist_a_nft() {
 		));
 		assert_ok!(NftMarketplace::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 100));
 		assert_eq!(NftMarketplace::listed_nfts().len(), 0);
-		let item = Item::<Test>::get(0, 1).unwrap();
 		assert_eq!(NftMarketplace::listed_collection_details(0).unwrap().spv_created, true);
 		assert_ok!(NftMarketplace::list_nft(RuntimeOrigin::signed([1; 32].into()), 0, 100, 100));
 		assert_eq!(NftMarketplace::listed_nfts()[0], (0, 100));
@@ -187,7 +183,6 @@ fn buy_single_nft_works() {
 		assert_eq!(Balances::free_balance(&([0; 32].into())), 20999998);
 		assert_eq!(Balances::free_balance(&([1; 32].into())), 14_000_000);
 		assert_eq!(NftMarketplace::listed_nfts().len(), 0);
-		let item = Item::<Test>::get(0, 1).unwrap();
 		assert_eq!(NftMarketplace::listed_collection_details(0).unwrap().spv_created, true);
 		assert_ok!(NftMarketplace::list_nft(RuntimeOrigin::signed([1; 32].into()), 0, 27, 100));
 		assert_ok!(NftMarketplace::buy_single_nft(RuntimeOrigin::signed([3; 32].into()), 0, 27));
@@ -328,7 +323,6 @@ fn upgrade_object_and_distribute_works() {
 		assert_eq!(Balances::free_balance(&([1; 32].into())), 14_500_000);
 		assert_eq!(Balances::free_balance(&([2; 32].into())), 150_000);
 		assert_eq!(NftMarketplace::listed_nfts().len(), 0);
-		let item = Item::<Test>::get(0, 1).unwrap();
 		assert_eq!(NftMarketplace::listed_collection_details(0).unwrap().spv_created, true);
 		assert_eq!(NftMarketplace::ongoing_nft_details(0, 22).is_some(), false);
 		assert_eq!(NftMarketplace::listed_nfts_of_collection(0).len(), 0);
