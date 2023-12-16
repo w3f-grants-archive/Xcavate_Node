@@ -16,13 +16,17 @@ type DepositBalanceOf<T> = <<T as pallet_nfts::Config>::Currency as Currency<
 use frame_support::assert_ok;
 use frame_support::traits::Hooks;
 use pallet_assets::Pallet as Assets;
+use pallet_whitelist::Pallet as Whitelist;
 
 fn setup_listing<T: Config>(
 	u: u32,
 ) -> (
 	T::AccountId,
 	BoundedNftDonationTypes<T>,
-	BoundedVec<BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>, <T as Config>::MaxNftTypes>,
+	BoundedVec<
+		BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>,
+		<T as Config>::MaxListedNfts,
+	>,
 	u32,
 	BalanceOf<T>,
 	BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>,
@@ -52,6 +56,7 @@ mod benchmarks {
 	fn list_project() {
 		let (caller, project_types, metadatas, duration, value, single_metadata) =
 			setup_listing::<T>(SEED);
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
 		let amount: BalanceOf<T> = 1u32.into();
 		#[extrinsic_call]
 		list_project(
@@ -69,6 +74,7 @@ mod benchmarks {
 	fn buy_nft() {
 		let (caller, project_types, metadatas, duration, value, single_metadata) =
 			setup_listing::<T>(SEED);
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
 		CommunityProjects::<T>::list_project(
 			RawOrigin::Signed(caller).into(),
 			project_types,
@@ -78,6 +84,7 @@ mod benchmarks {
 			single_metadata,
 		);
 		let buyer: T::AccountId = account("buyer", SEED, SEED);
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), buyer.clone());
 		<T as pallet_nfts::Config>::Currency::make_free_balance_be(
 			&buyer,
 			DepositBalanceOf::<T>::max_value(),
@@ -111,6 +118,7 @@ mod benchmarks {
 	fn vote_on_milestone() {
 		let (caller, project_types, metadatas, duration, value, single_metadata) =
 			setup_listing::<T>(SEED);
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
 		CommunityProjects::<T>::list_project(
 			RawOrigin::Signed(caller).into(),
 			project_types,
@@ -120,6 +128,7 @@ mod benchmarks {
 			single_metadata,
 		);
 		let buyer: T::AccountId = account("buyer", SEED, SEED);
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), buyer.clone());
 		<T as pallet_nfts::Config>::Currency::make_free_balance_be(
 			&buyer,
 			DepositBalanceOf::<T>::max_value(),
@@ -172,9 +181,9 @@ fn get_project_nfts<T: Config>(mut n: u32) -> BoundedNftDonationTypes<T> {
 
 fn get_nft_metadata<T: Config>(
 	mut n: u32,
-) -> BoundedVec<BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>, <T as Config>::MaxNftTypes>
+) -> BoundedVec<BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>, <T as Config>::MaxListedNfts>
 {
-	let max = <T as Config>::MaxNftTypes::get();
+	let max = <T as Config>::MaxListedNfts::get();
 	if n > max {
 		n = max
 	}

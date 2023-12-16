@@ -1,7 +1,7 @@
 [package]
-name = "pallet-community-loan-pool"
+name = "pallet-whitelist"
 version = "4.0.0-dev"
-description = "The Xcavate pallet community-loan-pool"
+description = "The Xcavate pallet whitelist"
 authors = ["Xcavate Network"]
 homepage = "https://xcavate.io"
 edition = "2021"
@@ -19,21 +19,9 @@ codec = { package = "parity-scale-codec", version = "3.2.2", default-features = 
 scale-info = { version = "2.1.1", default-features = false, features = [
 	"derive",
 ] }
-serde = { version = "1.0.163", features = ["derive"], optional = true }
 frame-benchmarking = {  default-features = false, optional = true, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
 frame-support = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
 frame-system = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
-sp-std = { default-features = false,  git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
-
-pallet-nfts = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
-pallet-balances = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
-pallet-timestamp = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
-pallet-transaction-payment = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
-pallet-insecure-randomness-collective-flip = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
-enumflags2 = { version = "0.7.7" }
-
-# Local dependencies
-pallet-whitelist = { path = "../whitelist", default-features = false }
 
 [dev-dependencies]
 sp-core = {  git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.1.0" }
@@ -48,13 +36,6 @@ std = [
 	"frame-support/std",
 	"frame-system/std",
 	"scale-info/std",
-	"serde",
-	"pallet-nfts/std",
-	"pallet-balances/std",
-	"pallet-timestamp/std",
-	"pallet-transaction-payment/std",
-	"pallet-insecure-randomness-collective-flip/std",
-	"pallet-whitelist/std",
 ]
 runtime-benchmarks = ["frame-benchmarking/runtime-benchmarks"]
 try-runtime = ["frame-support/try-runtime"]

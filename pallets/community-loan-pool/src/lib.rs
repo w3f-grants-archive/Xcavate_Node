@@ -62,7 +62,7 @@ pub type BalanceOf1<T> = <<T as pallet_nfts::Config>::Currency as Currency<
 	<T as frame_system::Config>::AccountId,
 >>::Balance;
 
-type BoundedProposedMilestones<T> =
+pub type BoundedProposedMilestones<T> =
 	BoundedVec<ProposedMilestone, <T as Config>::MaxMilestonesPerProject>;
 
 pub const BASEINTERESTRATE: u32 = 525;
@@ -177,7 +177,9 @@ pub mod pallet {
 	pub struct Pallet<T>(_);
 
 	#[pallet::config]
-	pub trait Config: frame_system::Config + pallet_nfts::Config {
+	pub trait Config:
+		frame_system::Config + pallet_nfts::Config + pallet_whitelist::Config
+	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
@@ -370,20 +372,41 @@ pub mod pallet {
 	/// Mapping of user who voted for a proposal.
 	#[pallet::storage]
 	#[pallet::getter(fn user_votes)]
-	pub(super) type UserVotes<T: Config> =
-		StorageDoubleMap<_, Blake2_128Concat, ProposalIndex, Blake2_128Concat, AccountIdOf<T>, Vote, OptionQuery>;
+	pub(super) type UserVotes<T: Config> = StorageDoubleMap<
+		_,
+		Blake2_128Concat,
+		ProposalIndex,
+		Blake2_128Concat,
+		AccountIdOf<T>,
+		Vote,
+		OptionQuery,
+	>;
 
 	/// Mapping of user who voted for a milestone proposal.
 	#[pallet::storage]
 	#[pallet::getter(fn user_milestone_votes)]
-	pub(super) type UserMilestoneVotes<T: Config> =
-		StorageDoubleMap<_, Blake2_128Concat, ProposalIndex, Blake2_128Concat, AccountIdOf<T>, Vote, OptionQuery>;
+	pub(super) type UserMilestoneVotes<T: Config> = StorageDoubleMap<
+		_,
+		Blake2_128Concat,
+		ProposalIndex,
+		Blake2_128Concat,
+		AccountIdOf<T>,
+		Vote,
+		OptionQuery,
+	>;
 
 	/// Mapping of user who voted for a deletion proposal.
 	#[pallet::storage]
 	#[pallet::getter(fn user_deletion_votes)]
-	pub(super) type UserDeletionVotes<T: Config> =
-		StorageDoubleMap<_, Blake2_128Concat, ProposalIndex, Blake2_128Concat, AccountIdOf<T>, Vote, OptionQuery>;
+	pub(super) type UserDeletionVotes<T: Config> = StorageDoubleMap<
+		_,
+		Blake2_128Concat,
+		ProposalIndex,
+		Blake2_128Concat,
+		AccountIdOf<T>,
+		Vote,
+		OptionQuery,
+	>;
 
 	/// Stores the project keys and round types ending on a given block.
 	#[pallet::storage]
@@ -481,6 +504,8 @@ pub mod pallet {
 		DivisionError,
 		/// This loan does not exist
 		NoLoanFound,
+		/// User has not passed the kyc.
+		UserNotWhitelisted,
 	}
 
 	#[pallet::event]
@@ -614,6 +639,10 @@ pub mod pallet {
 			loan_term: u64,
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
+			ensure!(
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&origin),
+				Error::<T>::UserNotWhitelisted
+			);
 			let beneficiary = T::Lookup::lookup(beneficiary)?;
 			let reserved_loan_amount = Self::u64_to_balance_option(Self::reserved_loan_amount())?;
 			//let decimal = 1000000000000_u64.saturated_into();
@@ -645,7 +674,8 @@ pub mod pallet {
 				created_at: current_block_number,
 			};
 			let vote_stats = VoteStats { yes_votes: 0, no_votes: 0 };
-			let reserved_value = Self::reserved_loan_amount().saturating_add(Self::balance_to_u64(amount)?);
+			let reserved_value =
+				Self::reserved_loan_amount().saturating_add(Self::balance_to_u64(amount)?);
 			ReservedLoanAmount::<T>::put(reserved_value);
 			OngoingVotes::<T>::insert(proposal_index, vote_stats);
 			Proposals::<T>::insert(proposal_index, proposal);
@@ -667,6 +697,10 @@ pub mod pallet {
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::propose_milestone())]
 		pub fn propose_milestone(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
+			ensure!(
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&origin),
+				Error::<T>::UserNotWhitelisted
+			);
 			let loan = Self::loans(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(loan.milestones.len() > 0, Error::<T>::NoMilestonesLeft);
 			let milestone_proposal_index = Self::milestone_proposal_count() + 1;
@@ -707,6 +741,10 @@ pub mod pallet {
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::propose_deletion())]
 		pub fn propose_deletion(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
 			let origin = ensure_signed(origin.clone())?;
+			ensure!(
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&origin),
+				Error::<T>::UserNotWhitelisted
+			);
 			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(origin == loan.borrower, Error::<T>::InsufficientPermission);
 			ensure!(loan.borrowed_amount.is_zero(), Error::<T>::LoanStillOngoing);
@@ -748,6 +786,10 @@ pub mod pallet {
 			amount: BalanceOf<T>,
 		) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
+			ensure!(
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&signer),
+				Error::<T>::UserNotWhitelisted
+			);
 			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(signer == loan.borrower, Error::<T>::InsufficientPermission);
 			ensure!(amount <= loan.available_amount, Error::<T>::NotEnoughFundsToWithdraw);
@@ -792,6 +834,10 @@ pub mod pallet {
 			amount: BalanceOf<T>,
 		) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
+			ensure!(
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&signer),
+				Error::<T>::UserNotWhitelisted
+			);
 			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(amount <= loan.borrowed_amount, Error::<T>::WantsToRepayTooMuch);
 			let loan_pallet = Self::account_id();
@@ -806,7 +852,7 @@ pub mod pallet {
 				KeepAlive,
 			)?;
 			loan.borrowed_amount = loan.borrowed_amount.saturating_sub(amount);
-			if loan.current_loan_balance >= amount{
+			if loan.current_loan_balance >= amount {
 				loan.current_loan_balance = loan.current_loan_balance.saturating_sub(amount);
 				Loans::<T>::insert(loan_id, loan);
 				let new_value = Self::total_loan_amount()
@@ -823,17 +869,19 @@ pub mod pallet {
 			} else {
 				let loan_amount_part = loan.current_loan_balance;
 				let interests_amount_part = amount.saturating_sub(loan_amount_part);
-				loan.current_loan_balance = loan.current_loan_balance.saturating_sub(loan_amount_part);
-				loan.charged_interests = loan.charged_interests.saturating_sub(interests_amount_part);
+				loan.current_loan_balance =
+					loan.current_loan_balance.saturating_sub(loan_amount_part);
+				loan.charged_interests =
+					loan.charged_interests.saturating_sub(interests_amount_part);
 				Loans::<T>::insert(loan_id, loan);
 				let new_value = Self::total_loan_amount()
 					.checked_sub(Self::balance_to_u64(loan_amount_part)?)
 					.ok_or(Error::<T>::ArithmeticUnderflow)?;
 				TotalLoanAmount::<T>::put(new_value);
-				let new__interests_value = Self::total_loan_interests()
+				let new_interests_value = Self::total_loan_interests()
 					.checked_sub(Self::balance_to_u64(interests_amount_part)?)
 					.ok_or(Error::<T>::ArithmeticUnderflow)?;
-				TotalLoanInterests::<T>::put(new__interests_value);
+				TotalLoanInterests::<T>::put(new_interests_value);
 			}
 			Self::deposit_event(Event::<T>::LoanUpdated { loan_index: loan_id });
 			Ok(())
@@ -857,6 +905,10 @@ pub mod pallet {
 			proposed_milestones: BoundedProposedMilestones<T>,
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
+			ensure!(
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&origin),
+				Error::<T>::UserNotWhitelisted
+			);
 			let current_members = Self::voting_committee();
 			ensure!(current_members.contains(&origin), Error::<T>::InsufficientPermission);
 			let mut proposal =
@@ -905,6 +957,10 @@ pub mod pallet {
 			vote: Vote,
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
+			ensure!(
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&origin),
+				Error::<T>::UserNotWhitelisted
+			);
 			let current_members = Self::voting_committee();
 			ensure!(current_members.contains(&origin), Error::<T>::InsufficientPermission);
 			let mut current_vote =
@@ -946,6 +1002,10 @@ pub mod pallet {
 			vote: Vote,
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
+			ensure!(
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&origin),
+				Error::<T>::UserNotWhitelisted
+			);
 			let current_members = Self::voting_committee();
 			ensure!(current_members.contains(&origin), Error::<T>::InsufficientPermission);
 			let mut current_vote =
@@ -985,6 +1045,10 @@ pub mod pallet {
 			vote: Vote,
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
+			ensure!(
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&origin),
+				Error::<T>::UserNotWhitelisted
+			);
 			let current_members = Self::voting_committee();
 			ensure!(current_members.contains(&origin), Error::<T>::InsufficientPermission);
 			let mut current_vote =
@@ -1154,7 +1218,8 @@ pub mod pallet {
 				let mut loan = <Loans<T>>::take(loan_index).ok_or(Error::<T>::InvalidIndex)?;
 				let current_timestamp = T::TimeProvider::now().as_secs();
 				let time_difference = current_timestamp - loan.last_timestamp;
-				let loan_amount = Self::balance_to_u64(loan.current_loan_balance + loan.charged_interests)?;
+				let loan_amount =
+					Self::balance_to_u64(loan.current_loan_balance + loan.charged_interests)?;
 				let interests =
 					loan_amount * time_difference * loan.loan_apy / 365 / 60 / 60 / 24 / 10000;
 				let interest_balance = Self::u64_to_balance_option(interests)?;
@@ -1220,10 +1285,7 @@ pub mod pallet {
 			let item_id = loan.item_id;
 			pallet_nfts::Pallet::<T>::do_burn(collection_id.into(), item_id.into(), |_| Ok(()))?;
 			let mut loans = Self::ongoing_loans();
-			let index = loans
-				.iter()
-				.position(|x| *x == loan_id)
-				.ok_or(Error::<T>::NoLoanFound)?;
+			let index = loans.iter().position(|x| *x == loan_id).ok_or(Error::<T>::NoLoanFound)?;
 			loans.remove(index);
 			let reserved_loan = Self::reserved_loan_amount()
 				.checked_sub(Self::balance_to_u64(loan.current_loan_balance)?)

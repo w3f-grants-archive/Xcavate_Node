@@ -4945,6 +4945,7 @@ dependencies = [
  "pallet-treasury",
  "pallet-uniques",
  "pallet-utility",
+ "pallet-whitelist",
  "pallet-xcavate-staking",
  "parity-scale-codec",
  "polkadot-primitives",
@@ -5359,6 +5360,7 @@ dependencies = [
  "pallet-nfts",
  "pallet-timestamp",
  "pallet-transaction-payment",
+ "pallet-whitelist",
  "parity-scale-codec",
  "scale-info",
  "serde",
@@ -5380,6 +5382,7 @@ dependencies = [
  "pallet-balances",
  "pallet-nfts",
  "pallet-timestamp",
+ "pallet-whitelist",
  "parity-scale-codec",
  "scale-info",
  "serde",
@@ -5544,6 +5547,7 @@ dependencies = [
  "frame-system",
  "pallet-balances",
  "pallet-nfts",
+ "pallet-whitelist",
  "parity-scale-codec",
  "scale-info",
  "serde",
@@ -5853,6 +5857,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-whitelist"
+version = "4.0.0-dev"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+]
+
+[[package]]
 name = "pallet-xcavate-staking"
 version = "4.0.0-dev"
 dependencies = [
@@ -5865,6 +5883,7 @@ dependencies = [
  "pallet-nfts",
  "pallet-timestamp",
  "pallet-transaction-payment",
+ "pallet-whitelist",
  "parity-scale-codec",
  "scale-info",
  "serde",

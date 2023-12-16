@@ -8,12 +8,6 @@ use sp_runtime::{
 	MultiSignature,
 };
 
-use frame_support::traits::ConstU8;
-
-use frame_support::weights::IdentityFee;
-
-use sp_runtime::traits::One;
-
 use sp_runtime::BuildStorage;
 
 use pallet_nfts::PalletFeatures;
@@ -46,6 +40,7 @@ frame_support::construct_runtime!(
 		Uniques: pallet_nfts::{Pallet, Call, Storage, Event<T>},
 		NftMarketplace: pallet_nft_marketplace,
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
+		Whitelist: pallet_whitelist,
 	}
 );
 
@@ -133,6 +128,17 @@ impl pallet_nfts::Config for Test {
 }
 
 parameter_types! {
+	pub const MaxWhitelistUsers: u32 = 1000000;
+}
+
+impl pallet_whitelist::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_whitelist::weights::SubstrateWeight<Test>;
+	type WhitelistOrigin = frame_system::EnsureRoot<Self::AccountId>;
+	type MaxUsersInWhitelist = MaxWhitelistUsers;
+}
+
+parameter_types! {
 	pub const NftMarketplacePalletId: PalletId = PalletId(*b"py/nftxc");
 	pub const MaxListedNft: u32 = 1000000;
 	pub const MaxNftsInCollection: u32 = 100;
@@ -160,7 +166,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 		balances: vec![
 			([0; 32].into(), 20_000_000),
 			([1; 32].into(), 15_000_000),
-			([2; 32].into(), 150_000),
+			([2; 32].into(), 1_150_000),
 			([3; 32].into(), 5_000),
 			((NftMarketplace::account_id()), 20_000_000),
 		],

@@ -36,6 +36,8 @@ fn get_milestones(mut n: u32) -> BoundedProposedMilestones<Test> {
 fn stake_works() {
 	new_test_ext().execute_with(|| {
 		Timestamp::set_timestamp(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
@@ -64,6 +66,7 @@ fn stake_works() {
 fn queue_works() {
 	new_test_ext().execute_with(|| {
 		Timestamp::set_timestamp(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([0; 32].into()), 100));
 		assert_eq!(XcavateStaking::queue_ledger(1).unwrap().locked, 100);
 		assert_eq!(XcavateStaking::ledger(1), None);
@@ -74,6 +77,8 @@ fn queue_works() {
 fn staking_and_queuing_works() {
 	new_test_ext().execute_with(|| {
 		Timestamp::set_timestamp(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
@@ -99,10 +104,15 @@ fn staking_and_queuing_works() {
 fn withdraw_from_queue() {
 	new_test_ext().execute_with(|| {
 		Timestamp::set_timestamp(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([0; 32].into()), 100));
 		assert_eq!(XcavateStaking::queue_ledger(1).unwrap().locked, 100);
 		assert_eq!(XcavateStaking::ledger(1), None);
-		assert_ok!(XcavateStaking::withdraw_from_queue(RuntimeOrigin::signed([0; 32].into()), 1, 200));
+		assert_ok!(XcavateStaking::withdraw_from_queue(
+			RuntimeOrigin::signed([0; 32].into()),
+			1,
+			200
+		));
 		assert_eq!(XcavateStaking::queue_ledger(1), None);
 	})
 }
@@ -111,10 +121,15 @@ fn withdraw_from_queue() {
 fn withdraw_fails_if_caller_not_staker() {
 	new_test_ext().execute_with(|| {
 		Timestamp::set_timestamp(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [3; 32].into()));
 		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([0; 32].into()), 100));
 		assert_eq!(XcavateStaking::queue_ledger(1).unwrap().locked, 100);
 		assert_eq!(XcavateStaking::ledger(1), None);
-		assert_noop!(XcavateStaking::withdraw_from_queue(RuntimeOrigin::signed([3; 32].into()), 1, 100), Error::<Test>::CallerNotStaker);
+		assert_noop!(
+			XcavateStaking::withdraw_from_queue(RuntimeOrigin::signed([3; 32].into()), 1, 100),
+			Error::<Test>::CallerNotStaker
+		);
 	})
 }
 
@@ -122,6 +137,8 @@ fn withdraw_fails_if_caller_not_staker() {
 fn unstake_if_loan_payed_back() {
 	new_test_ext().execute_with(|| {
 		Timestamp::set_timestamp(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
@@ -156,6 +173,8 @@ fn unstake_if_loan_payed_back() {
 fn stakes_if_loan_increases() {
 	new_test_ext().execute_with(|| {
 		Timestamp::set_timestamp(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
@@ -201,6 +220,9 @@ fn stakes_if_loan_increases() {
 fn stake_with_several_people_works() {
 	new_test_ext().execute_with(|| {
 		Timestamp::set_timestamp(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
@@ -230,6 +252,7 @@ fn stake_with_several_people_works() {
 fn person_cant_stake_0_token() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_noop!(
 			XcavateStaking::stake(RuntimeOrigin::signed([0; 32].into()), 0),
 			Error::<Test>::StakingWithNoValue
@@ -241,6 +264,8 @@ fn person_cant_stake_0_token() {
 fn unstake_works() {
 	new_test_ext().execute_with(|| {
 		Timestamp::set_timestamp(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
@@ -269,6 +294,9 @@ fn unstake_works() {
 fn unstake_fails_if_caller_not_staker() {
 	new_test_ext().execute_with(|| {
 		Timestamp::set_timestamp(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [3; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
@@ -285,7 +313,10 @@ fn unstake_fails_if_caller_not_staker() {
 		run_to_block(21);
 		assert_eq!(CommunityLoanPool::ongoing_loans().len(), 1);
 		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([0; 32].into()), 100));
-		assert_noop!(XcavateStaking::unstake(RuntimeOrigin::signed([3; 32].into()), 1, 100), Error::<Test>::CallerNotStaker);
+		assert_noop!(
+			XcavateStaking::unstake(RuntimeOrigin::signed([3; 32].into()), 1, 100),
+			Error::<Test>::CallerNotStaker
+		);
 	})
 }
 
@@ -293,6 +324,8 @@ fn unstake_fails_if_caller_not_staker() {
 fn unstake_doesnt_work_for_nonstaker() {
 	new_test_ext().execute_with(|| {
 		Timestamp::set_timestamp(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([0; 32].into()), 100));
 		assert_noop!(
 			XcavateStaking::unstake(RuntimeOrigin::signed([1; 32].into()), 1, 100),
@@ -305,6 +338,8 @@ fn unstake_doesnt_work_for_nonstaker() {
 fn claiming_of_rewards_works() {
 	new_test_ext().execute_with(|| {
 		Timestamp::set_timestamp(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::propose(
 			RuntimeOrigin::signed([1; 32].into()),
@@ -338,6 +373,8 @@ fn claiming_of_rewards_works() {
 fn unstake_and_adding_staking_from_queue_works() {
 	new_test_ext().execute_with(|| {
 		Timestamp::set_timestamp(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([0; 32].into()), 400));
 		assert_eq!(XcavateStaking::queue_ledger(1).unwrap().locked, 400);
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
@@ -379,6 +416,8 @@ fn unstake_and_adding_staking_from_queue_works() {
 fn repayment_and_adding_to_queue() {
 	new_test_ext().execute_with(|| {
 		Timestamp::set_timestamp(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([0; 32].into()), 400));
 		assert_eq!(XcavateStaking::queue_ledger(1).unwrap().locked, 400);
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
@@ -421,6 +460,8 @@ fn repayment_and_adding_to_queue() {
 fn testing_issue() {
 	new_test_ext().execute_with(|| {
 		Timestamp::set_timestamp(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(XcavateStaking::stake(RuntimeOrigin::signed([0; 32].into()), 10000000));
 		assert_eq!(XcavateStaking::queue_ledger(1).unwrap().locked, 10000000);
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));

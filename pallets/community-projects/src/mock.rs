@@ -12,13 +12,7 @@ use frame_system::EnsureRoot;
 
 //use pallet_transaction_payment::CurrencyAdapter;
 
-use frame_support::traits::ConstU8;
-
-use frame_support::weights::IdentityFee;
-
 //use pallet_transaction_payment::{ConstFeeMultiplier, Multiplier};
-
-use sp_runtime::traits::One;
 
 use sp_runtime::BuildStorage;
 
@@ -43,7 +37,6 @@ pub const MILLISECS_PER_BLOCK: u64 = 6000;
 pub const MINUTES: BlockNumber = 60_000 / (MILLISECS_PER_BLOCK as BlockNumber);
 pub const HOURS: BlockNumber = MINUTES * 60;
 pub const DAYS: BlockNumber = HOURS * 24;
-pub const SEED: u32 = 0;
 
 //use frame_benchmarking::account;
 
@@ -57,6 +50,7 @@ frame_support::construct_runtime!(
 		CommunityProjects: pallet_community_projects,
 		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
 		Assets: pallet_assets::<Instance1>,
+		Whitelist: pallet_whitelist,
 	}
 );
 
@@ -177,6 +171,17 @@ impl pallet_assets::Config<Instance1> for Test {
 	type CallbackHandle = ();
 	type WeightInfo = ();
 	type RemoveItemsLimit = ConstU32<1000>;
+}
+
+parameter_types! {
+	pub const MaxWhitelistUsers: u32 = 1000000;
+}
+
+impl pallet_whitelist::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_whitelist::weights::SubstrateWeight<Test>;
+	type WhitelistOrigin = frame_system::EnsureRoot<Self::AccountId>;
+	type MaxUsersInWhitelist = MaxWhitelistUsers;
 }
 
 parameter_types! {
