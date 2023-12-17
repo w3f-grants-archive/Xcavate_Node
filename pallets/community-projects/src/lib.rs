@@ -807,17 +807,17 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Nft holder vote on milestone during voting period.
+		/// A user can lock token to a project to raise funds.
 		///
 		/// The origin must be Signed and the sender must have sufficient funds free.
 		///
 		/// Parameters:
 		/// - `collection_id`: The collection for a project that the user wants to vote for.
-		/// - `vote`: Must be either a Yes vote or a No vote.
+		/// - `amount`: Amount of Xcav token to bond.
 		///
-		/// Emits `VotedOnMilestone` event when succesfful
+		/// Emits `TokenBonded` event when succesfful
 		#[pallet::call_index(3)]
-		#[pallet::weight(<T as pallet::Config>::WeightInfo::vote_on_milestone())]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::bond_token())]
 		pub fn bond_token(
 			origin: OriginFor<T>,
 			collection_id: <T as pallet::Config>::CollectionId,
