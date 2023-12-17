@@ -512,6 +512,8 @@ impl pallet_nft_marketplace::Config for Runtime {
 	type Helper = pallet_nft_marketplace::NftHelper;
 	type CollectionId = u32;
 	type ItemId = u32;
+	type TreasuryId = TreasuryPalletId;
+	type CommunityProjectsId = CommunityProjectPalletId;
 }
 
 parameter_types! {
@@ -540,6 +542,7 @@ impl pallet_community_projects::Config for Runtime {
 	type AssetId = u32;
 	type CollectionId = u32;
 	type ItemId = u32;
+	type MinimumRemainingAmount = MinimumRemainingAmount;
 }
 
 parameter_types! {

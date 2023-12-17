@@ -142,6 +142,14 @@ pub mod pallet {
 			+ Copy
 			+ MaxEncodedLen
 			+ Encode;
+
+		/// The Trasury's pallet id, used for deriving its sovereign account ID.
+		#[pallet::constant]
+		type TreasuryId: Get<PalletId>;
+
+		/// The CommunityProjects's pallet id, used for deriving its sovereign account ID.
+		#[pallet::constant]
+		type CommunityProjectsId: Get<PalletId>;
 	}
 
 	pub type CollectionId<T> = <T as Config>::CollectionId;
@@ -519,7 +527,7 @@ pub mod pallet {
 				})?;
 				let price = nft
 					.price
-					.checked_mul(&Self::u64_to_balance_option(1 /* 000000000000 */)?)
+					.checked_mul(&Self::u64_to_balance_option(1/* 000000000000 */)?)
 					.ok_or(Error::<T>::MultiplyError)?;
 				Self::transfer_funds(&origin, &Self::account_id(), price)?;
 				let mut listed_nfts = Self::listed_nfts();
@@ -588,9 +596,29 @@ pub mod pallet {
 				.ok_or(Error::<T>::NftNotForSale)?;
 			let price = nft
 				.price
-				.checked_mul(&Self::u64_to_balance_option(1 /* 000000000000 */)?)
+				.checked_mul(&Self::u64_to_balance_option(1/* 000000000000 */)?)
 				.ok_or(Error::<T>::MultiplyError)?;
-			Self::transfer_funds(&origin, &nft.owner, price)?;
+			let fees = price
+				.checked_div(&Self::u64_to_balance_option(100)?)
+				.ok_or(Error::<T>::MultiplyError)?;
+			let treasury_id = Self::treasury_account_id();
+			let treasury_fees = fees
+				.checked_mul(&Self::u64_to_balance_option(90)?)
+				.ok_or(Error::<T>::MultiplyError)?
+				.checked_div(&Self::u64_to_balance_option(100)?)
+				.ok_or(Error::<T>::DivisionError)?;
+			let community_projects_id = Self::community_account_id();
+			let community_fees = fees
+				.checked_div(&Self::u64_to_balance_option(10)?)
+				.ok_or(Error::<T>::DivisionError)?;
+			let seller_part = price
+				.checked_mul(&Self::u64_to_balance_option(99)?)
+				.ok_or(Error::<T>::MultiplyError)?
+				.checked_div(&Self::u64_to_balance_option(100)?)
+				.ok_or(Error::<T>::DivisionError)?;
+			Self::transfer_funds(&origin, &treasury_id, treasury_fees)?;
+			Self::transfer_funds(&origin, &community_projects_id, community_fees)?;
+			Self::transfer_funds(&origin, &nft.owner, seller_part)?;
 			pallet_nfts::Pallet::<T>::do_transfer(
 				collection_id.into(),
 				item_id.into(),
@@ -774,6 +802,14 @@ pub mod pallet {
 			T::PalletId::get().into_account_truncating()
 		}
 
+		pub fn treasury_account_id() -> AccountIdOf<T> {
+			T::TreasuryId::get().into_account_truncating()
+		}
+
+		pub fn community_account_id() -> AccountIdOf<T> {
+			T::CommunityProjectsId::get().into_account_truncating()
+		}
+
 		/// Sends the nfts to the new owners and the funds to the real estate developer once all 100 Nfts
 		/// of a collection are sold.
 		fn distribute_nfts(collection_id: <T as pallet::Config>::CollectionId) -> DispatchResult {
@@ -787,9 +823,33 @@ pub mod pallet {
 			let nft_details = Self::ongoing_nft_details(collection_id, list[0])
 				.ok_or(Error::<T>::InvalidIndex)?;
 			let price = sum
-				.checked_mul(&Self::u64_to_balance_option(1 /* 000000000000 */)?)
+				.checked_mul(&Self::u64_to_balance_option(1/* 000000000000 */)?)
 				.ok_or(Error::<T>::MultiplyError)?;
-			Self::transfer_funds(&Self::account_id(), &nft_details.real_estate_developer, price)?;
+			let fees = price
+				.checked_div(&Self::u64_to_balance_option(100)?)
+				.ok_or(Error::<T>::MultiplyError)?;
+			let treasury_id = Self::treasury_account_id();
+			let treasury_fees = fees
+				.checked_mul(&Self::u64_to_balance_option(90)?)
+				.ok_or(Error::<T>::MultiplyError)?
+				.checked_div(&Self::u64_to_balance_option(100)?)
+				.ok_or(Error::<T>::DivisionError)?;
+			let community_projects_id = Self::community_account_id();
+			let community_fees = fees
+				.checked_div(&Self::u64_to_balance_option(10)?)
+				.ok_or(Error::<T>::DivisionError)?;
+			let seller_part = price
+				.checked_mul(&Self::u64_to_balance_option(99)?)
+				.ok_or(Error::<T>::MultiplyError)?
+				.checked_div(&Self::u64_to_balance_option(100)?)
+				.ok_or(Error::<T>::DivisionError)?;
+			Self::transfer_funds(&Self::account_id(), &treasury_id, treasury_fees)?;
+			Self::transfer_funds(&Self::account_id(), &community_projects_id, community_fees)?;
+			Self::transfer_funds(
+				&Self::account_id(),
+				&nft_details.real_estate_developer,
+				seller_part,
+			)?;
 			for x in list {
 				let nft_details = <OngoingNftDetails<T>>::take(collection_id, x)
 					.ok_or(Error::<T>::InvalidIndex)?;

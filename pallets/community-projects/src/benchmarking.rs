@@ -115,6 +115,32 @@ mod benchmarks {
 	}
 
 	#[benchmark]
+	fn bond_token() {
+		let (caller, project_types, metadatas, duration, value, single_metadata) =
+			setup_listing::<T>(SEED);
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
+		CommunityProjects::<T>::list_project(
+			RawOrigin::Signed(caller).into(),
+			project_types,
+			metadatas,
+			duration,
+			value,
+			single_metadata,
+		);
+		let user: T::AccountId = account("user", SEED, SEED);
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), user.clone());
+		<T as pallet_nfts::Config>::Currency::make_free_balance_be(
+			&user,
+			DepositBalanceOf::<T>::max_value(),
+		);
+		let amount: BalanceOf2<T> = 10u32.into();
+		#[extrinsic_call]
+		bond_token(RawOrigin::Signed(user), 0.into(), amount);
+
+		assert_eq!(CommunityProjects::<T>::total_bonded(), amount);
+	}
+
+	#[benchmark]
 	fn vote_on_milestone() {
 		let (caller, project_types, metadatas, duration, value, single_metadata) =
 			setup_listing::<T>(SEED);

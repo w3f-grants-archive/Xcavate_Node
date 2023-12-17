@@ -1,10 +1,7 @@
 use super::*;
 
 use crate as pallet_xcavate_staking;
-use frame_support::{
-	parameter_types,
-	traits::AsEnsureOriginWithArg,
-};
+use frame_support::{parameter_types, traits::AsEnsureOriginWithArg};
 use sp_core::ConstU32;
 use sp_runtime::{
 	traits::{AccountIdLookup, BlakeTwo256, IdentifyAccount, Verify},

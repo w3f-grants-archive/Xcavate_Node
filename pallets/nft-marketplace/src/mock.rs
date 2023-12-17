@@ -142,6 +142,8 @@ parameter_types! {
 	pub const NftMarketplacePalletId: PalletId = PalletId(*b"py/nftxc");
 	pub const MaxListedNft: u32 = 1000000;
 	pub const MaxNftsInCollection: u32 = 100;
+	pub const TreasuryPalletId: PalletId = PalletId(*b"py/trsry");
+	pub const CommunityProjectPalletId: PalletId = PalletId(*b"py/cmprj");
 }
 
 /// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
@@ -156,6 +158,8 @@ impl pallet_nft_marketplace::Config for Test {
 	type MaxNftInCollection = MaxNftsInCollection;
 	type CollectionId = u32;
 	type ItemId = u32;
+	type TreasuryId = TreasuryPalletId;
+	type CommunityProjectsId = CommunityProjectPalletId;
 }
 
 // Build genesis storage according to the mock runtime.

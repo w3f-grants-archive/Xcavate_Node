@@ -5,7 +5,7 @@ pub use pallet::*;
 use pallet_assets::Instance1;
 
 use frame_support::{
-	traits::{Currency, Incrementable, ReservableCurrency, UnixTime},
+	traits::{Currency, Incrementable, ReservableCurrency, UnixTime, LockIdentifier, WithdrawReasons, LockableCurrency, ExistenceRequirement::KeepAlive},
 	BoundedVec, PalletId,
 };
 
@@ -41,6 +41,9 @@ type BalanceOf1<T> = <<T as pallet_nfts::Config>::Currency as Currency<
 	<T as frame_system::Config>::AccountId,
 >>::Balance;
 
+type BalanceOf2<T> =
+	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+
 pub type BoundedNftDonationTypes<T> =
 	BoundedVec<NftDonationTypes<BalanceOf<T>>, <T as Config>::MaxNftTypes>;
 
@@ -49,6 +52,8 @@ pub mod pallet {
 	use super::*;
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
+
+	const EXAMPLE_ID: LockIdentifier = *b"stkcmmty";
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
@@ -82,7 +87,7 @@ pub mod pallet {
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
 	#[scale_info(skip_type_params(T))]
-	pub struct ProjectDetails<Balance, T: Config> {
+	pub struct ProjectDetails<Balance, Balance2, T: Config> {
 		pub project_owner: AccountIdOf<T>,
 		// The targeted amount of funds that the projects aims to collect.
 		pub project_price: Balance,
@@ -91,8 +96,11 @@ pub mod pallet {
 		pub remaining_milestones: u32,
 		// The amount of funds that the project collected.
 		pub project_balance: Balance,
+		// The amount of funds that has been collected by bonding.
+		pub project_bonding_balance: Balance2,
 		pub launching_timestamp: BlockNumberFor<T>,
 		pub strikes: u8,
+		pub ongoing: bool,
 	}
 
 	/// Details about a nft.
@@ -150,7 +158,9 @@ pub mod pallet {
 		/// Type representing the weight of this pallet.
 		type WeightInfo: WeightInfo;
 		/// The currency type.
-		type Currency: Currency<AccountIdOf<Self>> + ReservableCurrency<AccountIdOf<Self>>;
+		type Currency: Currency<Self::AccountId>
+			+ LockableCurrency<Self::AccountId, Moment = BlockNumberFor<Self>>
+			+ ReservableCurrency<Self::AccountId>;
 		/// The marketplace's pallet id, used for deriving its sovereign account ID.
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
@@ -201,6 +211,10 @@ pub mod pallet {
 			+ Copy
 			+ MaxEncodedLen
 			+ Encode;
+		
+		/// Serves as a safeguard to prevent users from locking their entire free balance.
+		#[pallet::constant]
+		type MinimumRemainingAmount: Get<BalanceOf2<Self>>;
 	}
 
 	pub type AssetId<T> = <T as Config>::AssetId;
@@ -244,7 +258,7 @@ pub mod pallet {
 		_,
 		Blake2_128Concat,
 		<T as pallet::Config>::CollectionId,
-		ProjectDetails<BalanceOf<T>, T>,
+		ProjectDetails<BalanceOf<T>, BalanceOf2<T>, T>,
 		OptionQuery,
 	>;
 
@@ -312,6 +326,39 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	/// Mapping of a collection to the token bonder.
+	#[pallet::storage]
+	#[pallet::getter(fn token_bonder)]
+	pub(super) type TokenBonder<T: Config> = StorageMap<
+		_,
+		Blake2_128Concat,
+		<T as pallet::Config>::CollectionId,
+		BoundedVec<AccountIdOf<T>, T::MaxNftHolder>,
+		ValueQuery,
+	>;
+
+	/// Mapping of a collection to the token bonder.
+	#[pallet::storage]
+	#[pallet::getter(fn project_bonding)]
+	pub(super) type ProjectBonding<T: Config> = StorageDoubleMap<
+		_,
+		Blake2_128Concat,
+		<T as pallet::Config>::CollectionId,
+		Blake2_128Concat,
+		AccountIdOf<T>,
+		BalanceOf2<T>,
+		OptionQuery,
+	>;
+
+	/// Total Bonded amount.
+	#[pallet::storage]
+	#[pallet::getter(fn total_bonded)]
+	pub(super) type TotalBonded<T: Config> = StorageValue<
+		_,
+		BalanceOf2<T>,
+		ValueQuery
+	>;
+
 	/// Mapping of collection id and account id to the voting power.
 	#[pallet::storage]
 	#[pallet::getter(fn voting_power)]
@@ -360,6 +407,12 @@ pub mod pallet {
 		MilestonePeriodStarted { collection_id: <T as pallet::Config>::CollectionId },
 		/// The project has been deleted.
 		ProjectDeleted { collection_id: <T as pallet::Config>::CollectionId },
+		/// Token got bonded to the project.
+		TokenBonded {
+			collection_index: <T as pallet::Config>::CollectionId,
+			origin: AccountIdOf<T>,
+			amount: BalanceOf2<T>,
+		},
 	}
 
 	#[pallet::error]
@@ -398,6 +451,12 @@ pub mod pallet {
 		PriceCannotBeReached,
 		/// User has not passed the kyc.
 		UserNotWhitelisted,
+		/// Bonding not possible since project is ongoing.
+		ProjectOngoing,
+		/// There are not enough funds available in the bonding pool.
+		NotEnoughBondingFundsAvailable,
+		/// A Project can only be financed by 10 percent bonding.
+		ProjectCanOnlyHave10PercentBonding
 	}
 
 	#[pallet::hooks]
@@ -472,11 +531,7 @@ pub mod pallet {
 				Error::<T>::UserNotWhitelisted
 			);
 
-			ensure!(
-				metadata.len()
-					== nft_types.len(),
-				Error::<T>::WrongAmountOfMetadata
-			);
+			ensure!(metadata.len() == nft_types.len(), Error::<T>::WrongAmountOfMetadata);
 			ensure!(
 				price
 					<= nft_types
@@ -513,11 +568,7 @@ pub mod pallet {
 				collection_id.into(),
 				data.clone(),
 			)?;
-			let milestone = if duration <= 12 {
-				duration
-			} else {
-				12
-			};
+			let milestone = if duration <= 12 { duration } else { 12 };
 			let project = ProjectDetails {
 				project_owner: signer.clone(),
 				project_price: price,
@@ -525,8 +576,10 @@ pub mod pallet {
 				milestones: milestone,
 				remaining_milestones: milestone,
 				project_balance: Default::default(),
+				project_bonding_balance: Default::default(),
 				launching_timestamp: Default::default(),
 				strikes: Default::default(),
+				ongoing: Default::default(),
 			};
 			OngoingProjects::<T>::insert(collection_id, project);
 			let nft_metadata = &metadata;
@@ -615,7 +668,7 @@ pub mod pallet {
 				origin,
 				asset_id.into().into(),
 				user_lookup,
-				nft.price, /* * Self::u64_to_balance_option(1000000000000).unwrap_or_default() */
+				nft.price * Self::u64_to_balance_option(1/* 000000000000 */).unwrap_or_default(),
 			)
 			.map_err(|_| Error::<T>::NotEnoughFunds)?;
 			pallet_nfts::Pallet::<T>::do_transfer(
@@ -712,6 +765,72 @@ pub mod pallet {
 			});
 			Ok(())
 		}
+
+		/// Nft holder vote on milestone during voting period.
+		///
+		/// The origin must be Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `collection_id`: The collection for a project that the user wants to vote for.
+		/// - `vote`: Must be either a Yes vote or a No vote.
+		///
+		/// Emits `VotedOnMilestone` event when succesfful
+		#[pallet::call_index(3)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::vote_on_milestone())]
+		pub fn bond_token(
+			origin: OriginFor<T>,
+			collection_id: <T as pallet::Config>::CollectionId,
+			amount: BalanceOf2<T>,
+		) -> DispatchResult {
+			let origin = ensure_signed(origin)?;
+			ensure!(
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&origin),
+				Error::<T>::UserNotWhitelisted
+			);
+			let mut project =
+				OngoingProjects::<T>::take(collection_id).ok_or(Error::<T>::InvalidIndex)?;
+			ensure!(project.ongoing == false, Error::<T>::ProjectOngoing);
+			let mut total_bonded = Self::total_bonded();
+			let available_balance = <T as pallet::Config>::Currency::free_balance(&origin)
+				.saturating_sub(T::MinimumRemainingAmount::get());
+			let bonding_amount = amount.min(available_balance);
+			ensure!(<T as pallet::Config>::Currency::free_balance(&Self::account_id()) > total_bonded + bonding_amount, Error::<T>::NotEnoughBondingFundsAvailable);
+			project.project_bonding_balance += bonding_amount; 
+			ensure!(project.project_price / Self::u64_to_balance_option(10)? >= Self::u64_to_balance_option(TryInto::<u64>::try_into(project.project_bonding_balance).map_err(|_| Error::<T>::ConversionError)?)? , Error::<T>::ProjectCanOnlyHave10PercentBonding);
+			project.project_balance += Self::u64_to_balance_option(TryInto::<u64>::try_into(bonding_amount).map_err(|_| Error::<T>::ConversionError)?)?; 
+			if project.project_balance >= project.project_price {
+				OngoingProjects::<T>::insert(collection_id, project);
+				Self::launch_project(collection_id)?;
+			} else {
+				OngoingProjects::<T>::insert(collection_id, project);
+			};
+			let token_bonder = Self::token_bonder(collection_id);
+			if !token_bonder.contains(&origin.clone()) {
+				TokenBonder::<T>::try_mutate(collection_id, |keys| {
+					keys.try_push(origin.clone()).map_err(|_| Error::<T>::TooManyVoters)?;
+					Ok::<(), DispatchError>(())
+				})?;
+			}
+
+
+			let mut current_bonding_amount: BalanceOf2<T> = Self::project_bonding(collection_id, origin.clone()).unwrap_or_default();
+			current_bonding_amount += bonding_amount;
+			ProjectBonding::<T>::insert(collection_id, origin.clone(), current_bonding_amount);
+			<T as pallet::Config>::Currency::set_lock(
+				EXAMPLE_ID,
+				&origin,
+				current_bonding_amount,
+				WithdrawReasons::all(),
+			);
+			total_bonded += bonding_amount;
+			TotalBonded::<T>::put(total_bonded);
+			Self::deposit_event(Event::<T>::TokenBonded {
+				collection_index: collection_id,
+				origin,
+				amount: bonding_amount,
+			},);
+			Ok(())
+		}
 	}
 	impl<T: Config> Pallet<T> {
 		/// Get the account id of the pallet.
@@ -740,6 +859,7 @@ pub mod pallet {
 
 			let milestone_period =
 				if project.duration > 12 { project.duration * 10 / 12 } else { 10 };
+			project.ongoing = true;
 			OngoingProjects::<T>::insert(collection_id, project);
 			let expiry_block = current_block_number.saturating_add(
 				milestone_period.try_into().map_err(|_| Error::<T>::ConversionError)?,
@@ -798,14 +918,44 @@ pub mod pallet {
 			let user_lookup = <T::Lookup as StaticLookup>::unlookup(project.project_owner.clone());
 			let origin: OriginFor<T> = RawOrigin::Signed(Self::account_id()).into();
 			let asset_id: AssetId<T> = 1.into();
-			pallet_assets::Pallet::<T, Instance1>::transfer(
-				origin,
-				asset_id.into().into(),
-				user_lookup,
-				project.project_balance / project.milestones.into()
-					/* * Self::u64_to_balance_option(1000000000000).unwrap_or_default() */,
-			)
-			.map_err(|_| Error::<T>::NotEnoughFunds)?;
+			let remaining_funds = project.project_balance / project.milestones.into() * project.remaining_milestones.into();
+			let funds_for_this_round = project.project_balance / project.milestones.into();
+			if funds_for_this_round <= remaining_funds - Self::u64_to_balance_option(TryInto::<u64>::try_into(project.project_bonding_balance).map_err(|_| Error::<T>::ConversionError)?)? {
+				pallet_assets::Pallet::<T, Instance1>::transfer(
+					origin.clone(),
+					asset_id.into().into(),
+					user_lookup.clone(),
+					project.project_balance / project.milestones.into()
+						* Self::u64_to_balance_option(1/* 000000000000 */).unwrap_or_default(),
+				)
+				.map_err(|_| Error::<T>::NotEnoughFunds)?;
+			} else if remaining_funds <= Self::u64_to_balance_option(TryInto::<u64>::try_into(project.project_bonding_balance).map_err(|_| Error::<T>::ConversionError)?)? {
+				<T as pallet::Config>::Currency::transfer(
+					&Self::account_id(),
+					&project.project_owner.clone(),
+					// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
+					Self::balance_xusd_to_balance_native(funds_for_this_round)?/* * 1000000000000 */,
+					KeepAlive,
+				)?;
+			} else {
+				let transfer_xusd_amount = remaining_funds - Self::u64_to_balance_option(TryInto::<u64>::try_into(project.project_bonding_balance).map_err(|_| Error::<T>::ConversionError)?)?;
+				let transfer_native_amount = funds_for_this_round - transfer_xusd_amount;
+				pallet_assets::Pallet::<T, Instance1>::transfer(
+					origin.clone(),
+					asset_id.into().into(),
+					user_lookup.clone(),
+					transfer_xusd_amount
+						* Self::u64_to_balance_option(1/* 000000000000 */).unwrap_or_default(),
+				)
+				.map_err(|_| Error::<T>::NotEnoughFunds)?;
+				<T as pallet::Config>::Currency::transfer(
+					&Self::account_id(),
+					&project.project_owner.clone(),
+					// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
+					Self::balance_xusd_to_balance_native(transfer_native_amount)?/* * 1000000000000 */,
+					KeepAlive,
+				)?; 
+			}
 			project.remaining_milestones -= 1;
 			project.strikes = Default::default();
 			OngoingProjects::<T>::insert(collection_id, project.clone());
@@ -848,17 +998,34 @@ pub mod pallet {
 					origin,
 					asset_id.into().into(),
 					user_lookup,
-					Self::u64_to_balance_option(remaining_funds)?, /* * Self::u64_to_balance_option(1000000000000)? */
+					Self::u64_to_balance_option(remaining_funds)?
+						* Self::u64_to_balance_option(1/* 000000000000 */)?,
 				)
 				.map_err(|_| Error::<T>::NotEnoughFunds)?;
 			}
+			let bonder_list = TokenBonder::<T>::take(collection_id);
+			for user in bonder_list {
+				<T as pallet::Config>::Currency::remove_lock(EXAMPLE_ID, &user);
+				ProjectBonding::<T>::take(collection_id, user);
+			};
+			let mut total_bonded = Self::total_bonded();
+			total_bonded -= project.project_bonding_balance;
+			TotalBonded::<T>::put(total_bonded);
 			Self::deposit_event(Event::<T>::ProjectDeleted { collection_id });
 			Ok(())
 		}
 
 		/// Deletes the projects once all milestones has been reached.
 		fn delete_project(collection_id: <T as pallet::Config>::CollectionId) -> DispatchResult {
-			OngoingProjects::<T>::take(collection_id).ok_or(Error::<T>::InvalidIndex)?;
+			let project = OngoingProjects::<T>::take(collection_id).ok_or(Error::<T>::InvalidIndex)?;
+			let bonder_list = TokenBonder::<T>::take(collection_id);
+			for user in bonder_list {
+				<T as pallet::Config>::Currency::remove_lock(EXAMPLE_ID, &user);
+				ProjectBonding::<T>::take(collection_id, user);
+			};
+			let mut total_bonded = Self::total_bonded();
+			total_bonded -= project.project_bonding_balance;
+			TotalBonded::<T>::put(total_bonded);
 			Self::deposit_event(Event::<T>::ProjectDeleted { collection_id });
 			Ok(())
 		}
@@ -895,6 +1062,15 @@ pub mod pallet {
 
 		pub fn u64_to_balance_option(input: u64) -> Result<BalanceOf<T>, Error<T>> {
 			input.try_into().map_err(|_| Error::<T>::ConversionError)
+		}
+
+		pub fn balance_xusd_to_balance_native(input: BalanceOf<T>) -> Result<BalanceOf2<T>, Error<T>> {
+			let u128_type = TryInto::<u128>::try_into(input).map_err(|_| Error::<T>::ConversionError)?;
+			u128_type.try_into().map_err(|_| Error::<T>::ConversionError)
+		}
+
+		pub fn balance_native_to_u128(input: BalanceOf<T>) -> Result<u128, Error<T>> {
+			TryInto::<u128>::try_into(input).map_err(|_| Error::<T>::ConversionError)
 		}
 	}
 }
