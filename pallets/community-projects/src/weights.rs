@@ -43,7 +43,7 @@ pub trait WeightInfo {
 pub struct SubstrateWeight<T>(PhantomData<T>);
 impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	/// Storage: `Whitelist::WhitelistedAccounts` (r:1 w:0)
-	/// Proof: `Whitelist::WhitelistedAccounts` (`max_values`: Some(1), `max_size`: Some(32000004), added: 32000499, mode: `MaxEncodedLen`)
+	/// Proof: `Whitelist::WhitelistedAccounts` (`max_values`: Some(1), `max_size`: Some(3200004), added: 3200499, mode: `MaxEncodedLen`)
 	/// Storage: `Nfts::NextCollectionId` (r:1 w:1)
 	/// Proof: `Nfts::NextCollectionId` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
 	/// Storage: `Nfts::Collection` (r:1 w:1)
@@ -59,7 +59,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	/// Storage: `Nfts::ItemMetadataOf` (r:10 w:10)
 	/// Proof: `Nfts::ItemMetadataOf` (`max_values`: None, `max_size`: Some(5091), added: 7566, mode: `MaxEncodedLen`)
 	/// Storage: `CommunityProject::ListedNfts` (r:1 w:1)
-	/// Proof: `CommunityProject::ListedNfts` (`max_values`: Some(1), `max_size`: Some(2400004), added: 2400499, mode: `MaxEncodedLen`)
+	/// Proof: `CommunityProject::ListedNfts` (`max_values`: Some(1), `max_size`: Some(240004), added: 240499, mode: `MaxEncodedLen`)
 	/// Storage: `CommunityProject::ListedNftsOfCollection` (r:1 w:1)
 	/// Proof: `CommunityProject::ListedNftsOfCollection` (`max_values`: None, `max_size`: Some(40022), added: 42497, mode: `MaxEncodedLen`)
 	/// Storage: `CommunityProject::ListedNftTypes` (r:0 w:4)
@@ -79,15 +79,15 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	fn list_project() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `316`
-		//  Estimated: `32001489`
-		// Minimum execution time: 633_953_000 picoseconds.
-		Weight::from_parts(695_580_000, 0)
-			.saturating_add(Weight::from_parts(0, 32001489))
+		//  Estimated: `3201489`
+		// Minimum execution time: 628_107_000 picoseconds.
+		Weight::from_parts(703_972_000, 0)
+			.saturating_add(Weight::from_parts(0, 3201489))
 			.saturating_add(T::DbWeight::get().reads(37))
 			.saturating_add(T::DbWeight::get().writes(64))
 	}
 	/// Storage: `Whitelist::WhitelistedAccounts` (r:1 w:0)
-	/// Proof: `Whitelist::WhitelistedAccounts` (`max_values`: Some(1), `max_size`: Some(32000004), added: 32000499, mode: `MaxEncodedLen`)
+	/// Proof: `Whitelist::WhitelistedAccounts` (`max_values`: Some(1), `max_size`: Some(3200004), added: 3200499, mode: `MaxEncodedLen`)
 	/// Storage: `CommunityProject::OngoingProjects` (r:1 w:1)
 	/// Proof: `CommunityProject::OngoingProjects` (`max_values`: None, `max_size`: Some(119), added: 2594, mode: `MaxEncodedLen`)
 	/// Storage: `CommunityProject::ListedNftTypes` (r:4 w:4)
@@ -113,7 +113,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	/// Storage: `CommunityProject::ListedNftsOfCollection` (r:1 w:1)
 	/// Proof: `CommunityProject::ListedNftsOfCollection` (`max_values`: None, `max_size`: Some(40022), added: 42497, mode: `MaxEncodedLen`)
 	/// Storage: `CommunityProject::ListedNfts` (r:1 w:1)
-	/// Proof: `CommunityProject::ListedNfts` (`max_values`: Some(1), `max_size`: Some(2400004), added: 2400499, mode: `MaxEncodedLen`)
+	/// Proof: `CommunityProject::ListedNfts` (`max_values`: Some(1), `max_size`: Some(240004), added: 240499, mode: `MaxEncodedLen`)
 	/// Storage: `CommunityProject::NftHolder` (r:1 w:1)
 	/// Proof: `CommunityProject::NftHolder` (`max_values`: None, `max_size`: Some(320022), added: 322497, mode: `MaxEncodedLen`)
 	/// Storage: `CommunityProject::VotingPower` (r:1 w:1)
@@ -133,15 +133,15 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	fn buy_nft() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `2078850`
-		//  Estimated: `32001489`
-		// Minimum execution time: 19_971_392_000 picoseconds.
-		Weight::from_parts(21_715_314_000, 0)
-			.saturating_add(Weight::from_parts(0, 32001489))
+		//  Estimated: `3201489`
+		// Minimum execution time: 19_386_462_000 picoseconds.
+		Weight::from_parts(20_372_100_000, 0)
+			.saturating_add(Weight::from_parts(0, 3201489))
 			.saturating_add(T::DbWeight::get().reads(1617))
 			.saturating_add(T::DbWeight::get().writes(2814))
 	}
 	/// Storage: `Whitelist::WhitelistedAccounts` (r:1 w:0)
-	/// Proof: `Whitelist::WhitelistedAccounts` (`max_values`: Some(1), `max_size`: Some(32000004), added: 32000499, mode: `MaxEncodedLen`)
+	/// Proof: `Whitelist::WhitelistedAccounts` (`max_values`: Some(1), `max_size`: Some(3200004), added: 3200499, mode: `MaxEncodedLen`)
 	/// Storage: `CommunityProject::OngoingProjects` (r:1 w:1)
 	/// Proof: `CommunityProject::OngoingProjects` (`max_values`: None, `max_size`: Some(119), added: 2594, mode: `MaxEncodedLen`)
 	/// Storage: `CommunityProject::TotalBonded` (r:1 w:1)
@@ -159,15 +159,15 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	fn bond_token() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `791`
-		//  Estimated: `32001489`
-		// Minimum execution time: 74_998_000 picoseconds.
-		Weight::from_parts(79_758_000, 0)
-			.saturating_add(Weight::from_parts(0, 32001489))
+		//  Estimated: `3201489`
+		// Minimum execution time: 70_452_000 picoseconds.
+		Weight::from_parts(75_825_000, 0)
+			.saturating_add(Weight::from_parts(0, 3201489))
 			.saturating_add(T::DbWeight::get().reads(9))
 			.saturating_add(T::DbWeight::get().writes(6))
 	}
 	/// Storage: `Whitelist::WhitelistedAccounts` (r:1 w:0)
-	/// Proof: `Whitelist::WhitelistedAccounts` (`max_values`: Some(1), `max_size`: Some(32000004), added: 32000499, mode: `MaxEncodedLen`)
+	/// Proof: `Whitelist::WhitelistedAccounts` (`max_values`: Some(1), `max_size`: Some(3200004), added: 3200499, mode: `MaxEncodedLen`)
 	/// Storage: `CommunityProject::OngoingVotes` (r:1 w:1)
 	/// Proof: `CommunityProject::OngoingVotes` (`max_values`: None, `max_size`: Some(36), added: 2511, mode: `MaxEncodedLen`)
 	/// Storage: `CommunityProject::NftHolder` (r:1 w:0)
@@ -179,10 +179,10 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	fn vote_on_milestone() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `533`
-		//  Estimated: `32001489`
-		// Minimum execution time: 40_668_000 picoseconds.
-		Weight::from_parts(42_412_000, 0)
-			.saturating_add(Weight::from_parts(0, 32001489))
+		//  Estimated: `3201489`
+		// Minimum execution time: 37_228_000 picoseconds.
+		Weight::from_parts(40_950_000, 0)
+			.saturating_add(Weight::from_parts(0, 3201489))
 			.saturating_add(T::DbWeight::get().reads(5))
 			.saturating_add(T::DbWeight::get().writes(2))
 	}

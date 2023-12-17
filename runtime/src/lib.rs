@@ -446,7 +446,7 @@ impl pallet_sudo::Config for Runtime {
 
 parameter_types! {
 	pub const CommunityLoanPalletId: PalletId = PalletId(*b"py/loana");
-	pub const MaxLoans: u32 = 10000;
+	pub const MaxLoans: u32 = 1000;
 	pub const VotingTime: BlockNumber = 10;
 	pub const MaximumCommitteeMembers: u32 = 10;
 	pub const MaxMilestones: u32 = 10;
@@ -479,7 +479,7 @@ impl pallet_community_loan_pool::Config for Runtime {
 
 parameter_types! {
 	pub const MinimumRemainingAmount: Balance = DOLLARS;
-	pub const MaxStaker: u32 = 10000;
+	pub const MaxStaker: u32 = 5000;
 	pub const RewardsDistributing: BlockNumber = 1;
 }
 
@@ -519,7 +519,7 @@ impl pallet_nft_marketplace::Config for Runtime {
 parameter_types! {
 	pub const CommunityProjectPalletId: PalletId = PalletId(*b"py/cmprj");
 	pub const MaxNftType: u32 = 4;
-	pub const MaxListedNftProject: u32 = 300000;
+	pub const MaxListedNftProject: u32 = 30000;
 	pub const MaxNftsInCollectionProject: u32 = 10000;
 	pub const MaxOngoingProject: u32 = 10000;
 	pub const MaxNftHolders: u32 = 10000;
@@ -546,7 +546,7 @@ impl pallet_community_projects::Config for Runtime {
 }
 
 parameter_types! {
-	pub const MaxWhitelistUsers: u32 = 1000000;
+	pub const MaxWhitelistUsers: u32 = 100000;
 }
 
 /// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
