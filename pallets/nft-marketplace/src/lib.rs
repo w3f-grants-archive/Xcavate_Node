@@ -527,7 +527,7 @@ pub mod pallet {
 				})?;
 				let price = nft
 					.price
-					.checked_mul(&Self::u64_to_balance_option(1/* 000000000000 */)?)
+					.checked_mul(&Self::u64_to_balance_option(1 /* 000000000000 */)?)
 					.ok_or(Error::<T>::MultiplyError)?;
 				Self::transfer_funds(&origin, &Self::account_id(), price)?;
 				let mut listed_nfts = Self::listed_nfts();
@@ -596,7 +596,7 @@ pub mod pallet {
 				.ok_or(Error::<T>::NftNotForSale)?;
 			let price = nft
 				.price
-				.checked_mul(&Self::u64_to_balance_option(1/* 000000000000 */)?)
+				.checked_mul(&Self::u64_to_balance_option(1 /* 000000000000 */)?)
 				.ok_or(Error::<T>::MultiplyError)?;
 			let fees = price
 				.checked_div(&Self::u64_to_balance_option(100)?)
@@ -823,7 +823,7 @@ pub mod pallet {
 			let nft_details = Self::ongoing_nft_details(collection_id, list[0])
 				.ok_or(Error::<T>::InvalidIndex)?;
 			let price = sum
-				.checked_mul(&Self::u64_to_balance_option(1/* 000000000000 */)?)
+				.checked_mul(&Self::u64_to_balance_option(1 /* 000000000000 */)?)
 				.ok_or(Error::<T>::MultiplyError)?;
 			let fees = price
 				.checked_div(&Self::u64_to_balance_option(100)?)
