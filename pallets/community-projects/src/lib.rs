@@ -553,7 +553,7 @@ pub mod pallet {
 				price
 					<= nft_types
 						.iter()
-						.fold(Default::default(), |sum, nft_type| sum + nft_type.price),
+						.fold(Default::default(), |sum, nft_type| sum + nft_type.price * nft_type.amount.into()),
 				Error::<T>::PriceCannotBeReached
 			);
 			ensure!(duration > 0, Error::<T>::DurationMustBeHigherThanZero);
@@ -1002,7 +1002,7 @@ pub mod pallet {
 					&Self::account_id(),
 					&project.project_owner.clone(),
 					// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
-					Self::balance_xusd_to_balance_native(funds_for_this_round)?, /* * 1000000000000 */
+					Self::balance_xusd_to_balance_native(funds_for_this_round)? * 1000000000000_u64.try_into().map_err(|_| Error::<T>::ConversionError)?,
 					KeepAlive,
 				)?;
 			} else {
@@ -1024,7 +1024,7 @@ pub mod pallet {
 					&Self::account_id(),
 					&project.project_owner.clone(),
 					// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
-					Self::balance_xusd_to_balance_native(transfer_native_amount)?, /* * 1000000000000 */
+					Self::balance_xusd_to_balance_native(transfer_native_amount)? * 1000000000000_u64.try_into().map_err(|_| Error::<T>::ConversionError)?,
 					KeepAlive,
 				)?;
 			}

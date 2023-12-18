@@ -100,10 +100,10 @@ fn list_fails_with_price_too_high() {
 		assert_noop!(
 			CommunityProjects::list_project(
 				RuntimeOrigin::signed([0; 32].into()),
-				get_project_nfts(3),
-				get_nft_metadata(3),
+				get_project_nfts(4),
+				get_nft_metadata(4),
 				5,
-				1000,
+				3100,
 				bvec![22, 22]
 			),
 			Error::<Test>::PriceCannotBeReached

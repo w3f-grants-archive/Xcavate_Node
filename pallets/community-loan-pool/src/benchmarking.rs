@@ -161,7 +161,7 @@ mod benchmarks {
 		let _ = Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), beneficiary.clone());
 		let _ = <T as pallet::Config>::Currency::make_free_balance_be(
 			&beneficiary,
-			DepositBalanceOf::<T>::max_value() - withdraw_value,
+			DepositBalanceOf::<T>::max_value() - withdraw_value - withdraw_value,
 		);
 		let loan_account = CommunityLoanPool::<T>::account_id();
 		let _ = <T as pallet::Config>::Currency::make_free_balance_be(
