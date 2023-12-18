@@ -224,7 +224,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 			([2; 32].into(), 150_000),
 			([3; 32].into(), 5_000),
 			([4; 32].into(), 5_000),
-			((CommunityProjects::account_id()), 40),
+			((CommunityProjects::account_id()), 140),
 		],
 	}
 	.assimilate_storage(&mut test)

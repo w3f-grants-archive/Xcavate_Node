@@ -25,6 +25,8 @@ use enumflags2::BitFlags;
 
 use frame_system::RawOrigin;
 
+use frame_support::sp_runtime::traits::Zero;
+
 #[cfg(test)]
 mod mock;
 
@@ -367,6 +369,17 @@ pub mod pallet {
 		OptionQuery,
 	>;
 
+	/// Mapping of a accountid to the total bonded amount of a user.
+	#[pallet::storage]
+	#[pallet::getter(fn user_bonded_amount)]
+	pub(super) type UserBondedAmount<T: Config> = StorageMap<
+		_,
+		Blake2_128Concat,
+		AccountIdOf<T>,
+		BalanceOf2<T>,
+		OptionQuery,
+	>;
+
 	/// Total Bonded amount.
 	#[pallet::storage]
 	#[pallet::getter(fn total_bonded)]
@@ -474,6 +487,8 @@ pub mod pallet {
 		NftTypeNotFound,
 		/// There are not enough nfts of this type available.
 		NotEnoughNftsAvailable,
+		/// The user did not bond any token yet.
+		NoBondingYet,
 	}
 
 	#[pallet::hooks]
@@ -700,8 +715,7 @@ pub mod pallet {
 					origin.clone(),
 					asset_id.into().into(),
 					user_lookup,
-					nft.price
-						* Self::u64_to_balance_option(1 /* 000000000000 */).unwrap_or_default(),
+					nft.price,
 				)
 				.map_err(|_| Error::<T>::NotEnoughFunds)?;
 				pallet_nfts::Pallet::<T>::do_transfer(
@@ -837,7 +851,8 @@ pub mod pallet {
 			let bonding_amount = amount.min(available_balance);
 			ensure!(
 				<T as pallet::Config>::Currency::free_balance(&Self::account_id())
-					> total_bonded + bonding_amount,
+				.saturating_sub(T::MinimumRemainingAmount::get())
+					>= (total_bonded + bonding_amount).saturating_mul(Self::u128_to_balance_native_option(1000000000000)?),
 				Error::<T>::NotEnoughBondingFundsAvailable
 			);
 			project.project_bonding_balance += bonding_amount;
@@ -870,11 +885,20 @@ pub mod pallet {
 			let mut current_bonding_amount: BalanceOf2<T> =
 				Self::project_bonding(collection_id, origin.clone()).unwrap_or_default();
 			current_bonding_amount += bonding_amount;
+			let mut user_total_bonding: BalanceOf2<T> = Default::default();
 			ProjectBonding::<T>::insert(collection_id, origin.clone(), current_bonding_amount);
+			if Self::user_bonded_amount(origin.clone()).is_some() {
+				user_total_bonding = Self::user_bonded_amount(origin.clone()).ok_or(Error::<T>::NoBondingYet)?;
+				user_total_bonding += bonding_amount;
+			} else {
+				user_total_bonding += bonding_amount;
+			};
+			UserBondedAmount::<T>::insert(origin.clone(), user_total_bonding);
+			let locking_amount = Self::balance_native_to_u128(user_total_bonding)?.saturating_mul(1000000000000);
 			<T as pallet::Config>::Currency::set_lock(
 				EXAMPLE_ID,
 				&origin,
-				current_bonding_amount,
+				Self::u128_to_balance_native_option(locking_amount)?,
 				WithdrawReasons::all(),
 			);
 			total_bonded += bonding_amount;
@@ -989,8 +1013,7 @@ pub mod pallet {
 					origin.clone(),
 					asset_id.into().into(),
 					user_lookup.clone(),
-					project.project_balance / project.milestones.into()
-						* Self::u64_to_balance_option(1 /* 000000000000 */).unwrap_or_default(),
+					project.project_balance / project.milestones.into(),
 				)
 				.map_err(|_| Error::<T>::NotEnoughFunds)?;
 			} else if remaining_funds
@@ -1002,33 +1025,33 @@ pub mod pallet {
 					&Self::account_id(),
 					&project.project_owner.clone(),
 					// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
-					Self::balance_xusd_to_balance_native(funds_for_this_round)? * 1000000000000_u64.try_into().map_err(|_| Error::<T>::ConversionError)?,
+					Self::balance_xusd_to_balance_native(funds_for_this_round)?.saturating_mul(Self::u128_to_balance_native_option(1000000000000)?),
 					KeepAlive,
 				)?;
 			} else {
 				let transfer_xusd_amount = remaining_funds
-					- Self::u64_to_balance_option(
+					.saturating_sub(Self::u64_to_balance_option(
 						TryInto::<u64>::try_into(project.project_bonding_balance)
 							.map_err(|_| Error::<T>::ConversionError)?,
-					)?;
-				let transfer_native_amount = funds_for_this_round - transfer_xusd_amount;
+					)?);
+				let transfer_native_amount = funds_for_this_round.saturating_sub(transfer_xusd_amount);
 				pallet_assets::Pallet::<T, Instance1>::transfer(
 					origin.clone(),
 					asset_id.into().into(),
 					user_lookup.clone(),
-					transfer_xusd_amount
-						* Self::u64_to_balance_option(1 /* 000000000000 */).unwrap_or_default(),
+					transfer_xusd_amount,
 				)
 				.map_err(|_| Error::<T>::NotEnoughFunds)?;
 				<T as pallet::Config>::Currency::transfer(
 					&Self::account_id(),
 					&project.project_owner.clone(),
 					// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
-					Self::balance_xusd_to_balance_native(transfer_native_amount)? * 1000000000000_u64.try_into().map_err(|_| Error::<T>::ConversionError)?,
+					Self::balance_xusd_to_balance_native(transfer_native_amount)?
+					.saturating_mul(Self::u128_to_balance_native_option(1000000000000)?),
 					KeepAlive,
 				)?;
 			}
-			project.remaining_milestones -= 1;
+			project.remaining_milestones = project.remaining_milestones.saturating_sub(1);
 			project.strikes = Default::default();
 			OngoingProjects::<T>::insert(collection_id, project.clone());
 			Self::deposit_event(Event::<T>::FundsDestributed {
@@ -1057,12 +1080,12 @@ pub mod pallet {
 		) -> DispatchResult {
 			let project =
 				OngoingProjects::<T>::take(collection_id).ok_or(Error::<T>::InvalidIndex)?;
-			let percentage = project.remaining_milestones * 10000 / project.milestones;
+			let percentage = project.remaining_milestones.saturating_mul(10000).saturating_div(project.milestones);
 			let nft_holders = NftHolder::<T>::take(collection_id);
 			for nft_holder in nft_holders {
 				let voting_power = VotingPower::<T>::take(collection_id, nft_holder.clone())
 					.ok_or(Error::<T>::NoFundsRemaining)?;
-				let remaining_funds = voting_power * percentage as u64 / 10000;
+				let remaining_funds = voting_power.saturating_mul(percentage as u64).saturating_div(10000);
 				let origin: OriginFor<T> = RawOrigin::Signed(Self::account_id()).into();
 				let asset_id: AssetId<T> = 1.into();
 				let user_lookup = <T::Lookup as StaticLookup>::unlookup(nft_holder);
@@ -1070,15 +1093,27 @@ pub mod pallet {
 					origin,
 					asset_id.into().into(),
 					user_lookup,
-					Self::u64_to_balance_option(remaining_funds)?
-						* Self::u64_to_balance_option(1 /* 000000000000 */)?,
+					Self::u64_to_balance_option(remaining_funds)?,
 				)
 				.map_err(|_| Error::<T>::NotEnoughFunds)?;
 			}
 			let bonder_list = TokenBonder::<T>::take(collection_id);
 			for user in bonder_list {
-				<T as pallet::Config>::Currency::remove_lock(EXAMPLE_ID, &user);
-				ProjectBonding::<T>::take(collection_id, user);
+				let user_project_bonding = ProjectBonding::<T>::take(collection_id, user.clone()).ok_or(Error::<T>::NoBondingYet)?;
+				let mut user_total_bonding = UserBondedAmount::<T>::take(user.clone()).ok_or(Error::<T>::NoBondingYet)?;
+				user_total_bonding = user_total_bonding.saturating_sub(user_project_bonding); 
+				if user_total_bonding.is_zero() {
+					<T as pallet::Config>::Currency::remove_lock(EXAMPLE_ID, &user);
+				} else {
+					let locking_amount = Self::balance_native_to_u128(user_total_bonding)?.saturating_mul(1000000000000);
+					<T as pallet::Config>::Currency::set_lock(
+						EXAMPLE_ID,
+						&user,
+						Self::u128_to_balance_native_option(locking_amount)?,
+						WithdrawReasons::all(),
+					);
+					UserBondedAmount::<T>::insert(user, user_total_bonding);
+				}			 
 			}
 			let mut total_bonded = Self::total_bonded();
 			total_bonded -= project.project_bonding_balance;
@@ -1093,8 +1128,21 @@ pub mod pallet {
 				OngoingProjects::<T>::take(collection_id).ok_or(Error::<T>::InvalidIndex)?;
 			let bonder_list = TokenBonder::<T>::take(collection_id);
 			for user in bonder_list {
-				<T as pallet::Config>::Currency::remove_lock(EXAMPLE_ID, &user);
-				ProjectBonding::<T>::take(collection_id, user);
+				let user_project_bonding = ProjectBonding::<T>::take(collection_id, user.clone()).ok_or(Error::<T>::NoBondingYet)?;
+				let mut user_total_bonding = UserBondedAmount::<T>::take(user.clone()).ok_or(Error::<T>::NoBondingYet)?;
+				user_total_bonding = user_total_bonding.saturating_sub(user_project_bonding); 
+				if user_total_bonding.is_zero() {
+					<T as pallet::Config>::Currency::remove_lock(EXAMPLE_ID, &user);
+				} else {
+					let locking_amount = Self::balance_native_to_u128(user_total_bonding)?.saturating_mul(1000000000000);
+					<T as pallet::Config>::Currency::set_lock(
+						EXAMPLE_ID,
+						&user,
+						Self::u128_to_balance_native_option(locking_amount)?,
+						WithdrawReasons::all(),
+					);
+					UserBondedAmount::<T>::insert(user, user_total_bonding);
+				}			 
 			}
 			let mut total_bonded = Self::total_bonded();
 			total_bonded -= project.project_bonding_balance;
@@ -1145,8 +1193,12 @@ pub mod pallet {
 			u128_type.try_into().map_err(|_| Error::<T>::ConversionError)
 		}
 
-		pub fn balance_native_to_u128(input: BalanceOf<T>) -> Result<u128, Error<T>> {
+		pub fn balance_native_to_u128(input: BalanceOf2<T>) -> Result<u128, Error<T>> {
 			TryInto::<u128>::try_into(input).map_err(|_| Error::<T>::ConversionError)
+		}
+
+		pub fn u128_to_balance_native_option(input: u128) -> Result<BalanceOf2<T>, Error<T>> {
+			input.try_into().map_err(|_| Error::<T>::ConversionError)
 		}
 	}
 }

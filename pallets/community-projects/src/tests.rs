@@ -632,11 +632,14 @@ fn bonding_works() {
 			0,
 			crate::Vote::Yes
 		));
+		assert_eq!(CommunityProjects::project_bonding::<u32, AccountId>(0, [1; 32].into()).unwrap(), 30);
+		assert_eq!(CommunityProjects::user_bonded_amount::<AccountId>([1; 32].into()).unwrap(), 30);
 		run_to_block(42);
 		assert_eq!(Assets::balance(1, &[0; 32].into()), 20_000_300);
 		assert_eq!(Balances::free_balance(&[0; 32].into()), 20_000_028);
 		assert_eq!(CommunityProjects::total_bonded(), 0);
 		assert_eq!(CommunityProjects::project_bonding::<u32, AccountId>(0, [1; 32].into()), None);
+		assert_eq!(CommunityProjects::user_bonded_amount::<AccountId>([1; 32].into()), None);
 	})
 }
 

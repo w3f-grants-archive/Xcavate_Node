@@ -243,11 +243,11 @@ fn testnet_genesis(
 			key: Some(root_key.clone()),
 		},
 		transaction_payment: Default::default(),
-		assets: /* AssetsConfig {
+		assets:  AssetsConfig {
 			assets: vec![(1, root_key.clone(), true, 1)], // Genesis assets: id, owner, is_sufficient, min_balance
 			metadata: vec![(1, "XUSD".into(), "XUSD".into(), 0)], // Genesis metadata: id, name, symbol, decimals
-			accounts: endowed_accounts.iter().cloned().map(|x| (1, x.0.clone(), x.1)).collect(),
-		}, */  Default::default(),
+			accounts: endowed_accounts.iter().cloned().map(|x| (1, x.0.clone(), 1_000_000)).collect(),
+		},
 		pool_assets: Default::default(),
 		im_online: Default::default(),
 		council: CouncilConfig { members: vec![], phantom: Default::default() },
