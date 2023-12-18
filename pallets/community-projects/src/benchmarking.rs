@@ -75,9 +75,10 @@ mod benchmarks {
 		let (caller, project_types, metadatas, duration, value, single_metadata) =
 			setup_listing::<T>(SEED);
 		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
+		let many_project_types = get_project_nfts_many::<T>(4);;
 		CommunityProjects::<T>::list_project(
 			RawOrigin::Signed(caller).into(),
-			project_types,
+			many_project_types,
 			metadatas,
 			duration,
 			value,
@@ -109,9 +110,35 @@ mod benchmarks {
 		));
 		assert_eq!(Assets::<T, Instance1>::balance(asset_id, buyer.clone()), amount2);
 		#[extrinsic_call]
-		buy_nft(RawOrigin::Signed(buyer), 0.into(), 1.into());
+		buy_nft(RawOrigin::Signed(buyer), 0.into(), 1, 100);
 
 		//assert_eq!(Something::<T>::get(), Some(101u32));
+	}
+
+	#[benchmark]
+	fn bond_token() {
+		let (caller, project_types, metadatas, duration, value, single_metadata) =
+			setup_listing::<T>(SEED);
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
+		CommunityProjects::<T>::list_project(
+			RawOrigin::Signed(caller).into(),
+			project_types,
+			metadatas,
+			duration,
+			value,
+			single_metadata,
+		);
+		let user: T::AccountId = account("user", SEED, SEED);
+		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), user.clone());
+		<T as pallet_nfts::Config>::Currency::make_free_balance_be(
+			&user,
+			DepositBalanceOf::<T>::max_value(),
+		);
+		let amount: BalanceOf2<T> = 10u32.into();
+		#[extrinsic_call]
+		bond_token(RawOrigin::Signed(user), 0.into(), amount);
+
+		assert_eq!(CommunityProjects::<T>::total_bonded(), amount);
 	}
 
 	#[benchmark]
@@ -155,7 +182,8 @@ mod benchmarks {
 		CommunityProjects::<T>::buy_nft(
 			RawOrigin::Signed(buyer.clone()).into(),
 			0.into(),
-			1.into(),
+			1,
+			1,
 		);
 		run_to_block::<T>(11u32.into());
 		#[extrinsic_call]
@@ -174,6 +202,18 @@ fn get_project_nfts<T: Config>(mut n: u32) -> BoundedNftDonationTypes<T> {
 	}
 	(1..=n)
 		.map(|x| NftDonationTypes::<BalanceOf<T>> { price: (100 * x).into(), amount: x })
+		.collect::<Vec<NftDonationTypes<BalanceOf<T>>>>()
+		.try_into()
+		.expect("bound is ensured; qed")
+}
+
+fn get_project_nfts_many<T: Config>(mut n: u32) -> BoundedNftDonationTypes<T> {
+	let max = <T as Config>::MaxNftTypes::get();
+	if n > max {
+		n = max
+	}
+	(1..=n)
+		.map(|x| NftDonationTypes::<BalanceOf<T>> { price: (100 * x).into(), amount: 100 })
 		.collect::<Vec<NftDonationTypes<BalanceOf<T>>>>()
 		.try_into()
 		.expect("bound is ensured; qed")

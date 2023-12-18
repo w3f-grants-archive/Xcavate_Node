@@ -18,7 +18,7 @@ use frame_support::{
 	pallet_prelude::{DispatchClass, Get},
 	traits::{
 		tokens::nonfungibles_v2::Inspect, AsEnsureOriginWithArg, EitherOfDiverse,
-		EqualPrivilegeOnly,
+		EqualPrivilegeOnly, TrackedStorageKey,
 	},
 	PalletId,
 };
@@ -446,7 +446,7 @@ impl pallet_sudo::Config for Runtime {
 
 parameter_types! {
 	pub const CommunityLoanPalletId: PalletId = PalletId(*b"py/loana");
-	pub const MaxLoans: u32 = 10000;
+	pub const MaxLoans: u32 = 1000;
 	pub const VotingTime: BlockNumber = 10;
 	pub const MaximumCommitteeMembers: u32 = 10;
 	pub const MaxMilestones: u32 = 10;
@@ -479,7 +479,7 @@ impl pallet_community_loan_pool::Config for Runtime {
 
 parameter_types! {
 	pub const MinimumRemainingAmount: Balance = DOLLARS;
-	pub const MaxStaker: u32 = 10000;
+	pub const MaxStaker: u32 = 5000;
 	pub const RewardsDistributing: BlockNumber = 1;
 }
 
@@ -512,15 +512,17 @@ impl pallet_nft_marketplace::Config for Runtime {
 	type Helper = pallet_nft_marketplace::NftHelper;
 	type CollectionId = u32;
 	type ItemId = u32;
+	type TreasuryId = TreasuryPalletId;
+	type CommunityProjectsId = CommunityProjectPalletId;
 }
 
 parameter_types! {
 	pub const CommunityProjectPalletId: PalletId = PalletId(*b"py/cmprj");
 	pub const MaxNftType: u32 = 4;
-	pub const MaxListedNftProject: u32 = 300000;
-	pub const MaxNftsInCollectionProject: u32 = 10000;
-	pub const MaxOngoingProject: u32 = 10000;
-	pub const MaxNftHolders: u32 = 10000;
+	pub const MaxListedNftProject: u32 = 100000;
+	pub const MaxNftsInCollectionProject: u32 = 5000;
+	pub const MaxOngoingProject: u32 = 1000;
+	pub const MaxNftHolders: u32 = 5000;
 }
 
 /// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
@@ -540,10 +542,11 @@ impl pallet_community_projects::Config for Runtime {
 	type AssetId = u32;
 	type CollectionId = u32;
 	type ItemId = u32;
+	type MinimumRemainingAmount = MinimumRemainingAmount;
 }
 
 parameter_types! {
-	pub const MaxWhitelistUsers: u32 = 1000000;
+	pub const MaxWhitelistUsers: u32 = 100000;
 }
 
 /// Configure the pallet-xcavate-staking in pallets/xcavate-staking.

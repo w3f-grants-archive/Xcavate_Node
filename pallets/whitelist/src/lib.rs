@@ -41,7 +41,8 @@ pub mod pallet {
 	/// Mapping of an account to a bool.
 	#[pallet::storage]
 	#[pallet::getter(fn whitelisted_accounts)]
-	pub type WhitelistedAccounts<T: Config> = StorageValue<_,BoundedVec<AccountIdOf<T>, T::MaxUsersInWhitelist>, ValueQuery>;
+	pub type WhitelistedAccounts<T: Config> =
+		StorageValue<_, BoundedVec<AccountIdOf<T>, T::MaxUsersInWhitelist>, ValueQuery>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -76,11 +77,11 @@ pub mod pallet {
 		#[pallet::call_index(0)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::add_to_whitelist())]
 		pub fn add_to_whitelist(origin: OriginFor<T>, user: AccountIdOf<T>) -> DispatchResult {
-
 			T::WhitelistOrigin::ensure_origin(origin)?;
 			let current_whitelist = Self::whitelisted_accounts();
 			ensure!(!current_whitelist.contains(&user), Error::<T>::AccountAlreadyWhitelisted);
-			WhitelistedAccounts::<T>::try_append(user.clone()).map_err(|_| Error::<T>::TooManyUsers)?;
+			WhitelistedAccounts::<T>::try_append(user.clone())
+				.map_err(|_| Error::<T>::TooManyUsers)?;
 			Self::deposit_event(Event::<T>::NewUserWhitelisted { user });
 			Ok(())
 		}

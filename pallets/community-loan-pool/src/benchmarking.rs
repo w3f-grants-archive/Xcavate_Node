@@ -129,7 +129,7 @@ mod benchmarks {
 		let _ = CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), bob);
 		let (caller, value, beneficiary_lookup, developer_experience, loan_term) =
 			setup_proposal::<T>(SEED);
-			let _ = Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
+		let _ = Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
 		let _ = CommunityLoanPool::<T>::propose(
 			RawOrigin::Signed(caller.clone()).into(),
 			value,
@@ -161,7 +161,7 @@ mod benchmarks {
 		let _ = Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), beneficiary.clone());
 		let _ = <T as pallet::Config>::Currency::make_free_balance_be(
 			&beneficiary,
-			DepositBalanceOf::<T>::max_value() - withdraw_value,
+			DepositBalanceOf::<T>::max_value() - withdraw_value - withdraw_value,
 		);
 		let loan_account = CommunityLoanPool::<T>::account_id();
 		let _ = <T as pallet::Config>::Currency::make_free_balance_be(

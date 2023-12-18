@@ -66,7 +66,10 @@ fn distributes_nfts_and_funds() {
 		assert_eq!(NftMarketplace::listed_nfts().len(), 100);
 		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(NftMarketplace::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 100));
-		assert_eq!(Balances::free_balance(&([0; 32].into())), 20999998);
+		assert_eq!(Balances::free_balance(&([0; 32].into())), 20989998);
+		assert_eq!(Balances::free_balance(&NftMarketplace::treasury_account_id()), 9000);
+		assert_eq!(Balances::free_balance(&NftMarketplace::community_account_id()), 1000);
+		assert_eq!(Balances::free_balance(&([0; 32].into())), 20989998);
 		assert_eq!(Balances::free_balance(&([1; 32].into())), 14_000_000);
 		assert_eq!(NftMarketplace::listed_nfts().len(), 0);
 		assert_eq!(NftMarketplace::listed_collection_details(0).unwrap().spv_created, true);
@@ -180,7 +183,9 @@ fn buy_single_nft_works() {
 		));
 		assert_eq!(NftMarketplace::listed_nfts().len(), 100);
 		assert_ok!(NftMarketplace::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 100));
-		assert_eq!(Balances::free_balance(&([0; 32].into())), 20999998);
+		assert_eq!(Balances::free_balance(&([0; 32].into())), 20989998);
+		assert_eq!(Balances::free_balance(&NftMarketplace::treasury_account_id()), 9000);
+		assert_eq!(Balances::free_balance(&NftMarketplace::community_account_id()), 1000);
 		assert_eq!(Balances::free_balance(&([1; 32].into())), 14_000_000);
 		assert_eq!(NftMarketplace::listed_nfts().len(), 0);
 		assert_eq!(NftMarketplace::listed_collection_details(0).unwrap().spv_created, true);
@@ -319,7 +324,9 @@ fn upgrade_object_and_distribute_works() {
 			2_000_000
 		));
 		assert_ok!(NftMarketplace::buy_nft(RuntimeOrigin::signed([2; 32].into()), 0, 50));
-		assert_eq!(Balances::free_balance(&([0; 32].into())), 21499998);
+		assert_eq!(Balances::free_balance(&([0; 32].into())), 21484998);
+		assert_eq!(Balances::free_balance(&NftMarketplace::treasury_account_id()), 13500);
+		assert_eq!(Balances::free_balance(&NftMarketplace::community_account_id()), 1500);
 		assert_eq!(Balances::free_balance(&([1; 32].into())), 14_500_000);
 		assert_eq!(Balances::free_balance(&([2; 32].into())), 150_000);
 		assert_eq!(NftMarketplace::listed_nfts().len(), 0);
