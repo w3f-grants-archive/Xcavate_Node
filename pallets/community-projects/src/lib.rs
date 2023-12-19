@@ -852,7 +852,7 @@ pub mod pallet {
 			ensure!(
 				<T as pallet::Config>::Currency::free_balance(&Self::account_id())
 				.saturating_sub(T::MinimumRemainingAmount::get())
-					>= (total_bonded + bonding_amount).saturating_mul(Self::u128_to_balance_native_option(1000000000000)?),
+					>= (total_bonded + bonding_amount).saturating_mul(Self::u128_to_balance_native_option(1/* 000000000000 */)?),
 				Error::<T>::NotEnoughBondingFundsAvailable
 			);
 			project.project_bonding_balance += bonding_amount;
@@ -894,7 +894,7 @@ pub mod pallet {
 				user_total_bonding += bonding_amount;
 			};
 			UserBondedAmount::<T>::insert(origin.clone(), user_total_bonding);
-			let locking_amount = Self::balance_native_to_u128(user_total_bonding)?.saturating_mul(1000000000000);
+			let locking_amount = Self::balance_native_to_u128(user_total_bonding)?.saturating_mul(1/* 000000000000 */);
 			<T as pallet::Config>::Currency::set_lock(
 				EXAMPLE_ID,
 				&origin,
@@ -1025,7 +1025,7 @@ pub mod pallet {
 					&Self::account_id(),
 					&project.project_owner.clone(),
 					// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
-					Self::balance_xusd_to_balance_native(funds_for_this_round)?.saturating_mul(Self::u128_to_balance_native_option(1000000000000)?),
+					Self::balance_xusd_to_balance_native(funds_for_this_round)?.saturating_mul(Self::u128_to_balance_native_option(1/* 000000000000 */)?),
 					KeepAlive,
 				)?;
 			} else {
@@ -1047,7 +1047,7 @@ pub mod pallet {
 					&project.project_owner.clone(),
 					// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
 					Self::balance_xusd_to_balance_native(transfer_native_amount)?
-					.saturating_mul(Self::u128_to_balance_native_option(1000000000000)?),
+					.saturating_mul(Self::u128_to_balance_native_option(1/* 000000000000 */)?),
 					KeepAlive,
 				)?;
 			}
@@ -1105,7 +1105,7 @@ pub mod pallet {
 				if user_total_bonding.is_zero() {
 					<T as pallet::Config>::Currency::remove_lock(EXAMPLE_ID, &user);
 				} else {
-					let locking_amount = Self::balance_native_to_u128(user_total_bonding)?.saturating_mul(1000000000000);
+					let locking_amount = Self::balance_native_to_u128(user_total_bonding)?.saturating_mul(1/* 000000000000 */);
 					<T as pallet::Config>::Currency::set_lock(
 						EXAMPLE_ID,
 						&user,
@@ -1134,7 +1134,7 @@ pub mod pallet {
 				if user_total_bonding.is_zero() {
 					<T as pallet::Config>::Currency::remove_lock(EXAMPLE_ID, &user);
 				} else {
-					let locking_amount = Self::balance_native_to_u128(user_total_bonding)?.saturating_mul(1000000000000);
+					let locking_amount = Self::balance_native_to_u128(user_total_bonding)?.saturating_mul(1/* 000000000000 */);
 					<T as pallet::Config>::Currency::set_lock(
 						EXAMPLE_ID,
 						&user,
