@@ -124,7 +124,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 				wasm_binary,
 				vec![authority_keys_from_seed("Alice")],
 				vec![],
-				get_root_account(),
+				get_account_id_from_seed::<sr25519::Public>("Alice"),
 				get_endowed_accounts_with_balance(),
 				true,
 			)
@@ -162,7 +162,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 				wasm_binary,
 				vec![authority_keys_from_seed("Alice"), authority_keys_from_seed("Bob")],
 				vec![],
-				get_root_account(),
+				get_account_id_from_seed::<sr25519::Public>("Alice"),
 				get_endowed_accounts_with_balance(),
 				true,
 			)

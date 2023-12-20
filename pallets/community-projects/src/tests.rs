@@ -644,6 +644,55 @@ fn bonding_works() {
 }
 
 #[test]
+fn bonding_on_more_projects_works() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
+		assert_ok!(CommunityProjects::list_project(
+			RuntimeOrigin::signed([0; 32].into()),
+			get_project_nfts(3),
+			get_nft_metadata(3),
+			1,
+			320,
+			bvec![22, 22]
+		));
+		assert_ok!(CommunityProjects::list_project(
+			RuntimeOrigin::signed([0; 32].into()),
+			get_project_nfts(4),
+			get_nft_metadata(4),
+			2,
+			320,
+			bvec![22, 22]
+		));
+		assert_eq!(Balances::free_balance(&[0; 32].into()), 19_999_996);
+		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 2, 1));
+		assert_ok!(CommunityProjects::bond_token(RuntimeOrigin::signed([1; 32].into()), 0, 30));
+		assert_ok!(CommunityProjects::bond_token(RuntimeOrigin::signed([1; 32].into()), 1, 10));
+		assert_eq!(CommunityProjects::total_bonded(), 40);
+		assert_eq!(
+			CommunityProjects::project_bonding::<u32, AccountId>(0, [1; 32].into()).unwrap(),
+			30
+		);
+		assert_eq!(CommunityProjects::token_bonder(0)[0], [1; 32].into());
+		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([2; 32].into()), 0, 1, 1));
+		run_to_block(11);
+		assert_ok!(CommunityProjects::vote_on_milestone(
+			RuntimeOrigin::signed([2; 32].into()),
+			0,
+			crate::Vote::Yes
+		));
+		run_to_block(22);
+		assert_eq!(Assets::balance(1, &[0; 32].into()), 20_000_300);
+		assert_eq!(Balances::free_balance(&[0; 32].into()), 20_000_026);
+		assert_eq!(CommunityProjects::total_bonded(), 10);
+		assert_eq!(CommunityProjects::project_bonding::<u32, AccountId>(0, [1; 32].into()), None);
+		assert_eq!(CommunityProjects::user_bonded_amount::<AccountId>([1; 32].into()).unwrap(), 10);
+	})
+}
+
+#[test]
 fn bonding_fails_not_enough_funds() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
