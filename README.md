@@ -79,6 +79,16 @@ After you start the Xcavate node locally, you can connect it with Polkadot-JS Ap
 
 Before running tests, comment out all multiplications by 1000000000000 in the custom pallets (i.e. \* 000000000000 *\). For simplicity just comment out the zeros and multiply by 1. This is due to the fact that our chain has 12 decimals and for testing these decimals can not be used.
 
+```sh
+cd pallets/community-loan-pool/src/
+```
+open lib.rs file and go to line 804
+
+```rust
+(sending_amount as u128 * 1/* 000000000000 */)
+```
+repeat this with all multiplications by 1000000000000 in this file and repeat this process for communit-projects pallet, nft-marketplace pallet and xcavate-staking pallet
+
 Run the following command for the rust unit tests in the Xcavate node.
 
 ```sh
