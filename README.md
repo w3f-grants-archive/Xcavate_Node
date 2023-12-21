@@ -82,12 +82,12 @@ Before running tests, comment out all multiplications by 1000000000000 in the cu
 ```sh
 cd pallets/community-loan-pool/src/
 ```
-open lib.rs file and go to line 804
+Open lib.rs file and go to line 804.
 
 ```rust
 (sending_amount as u128 * 1/* 000000000000 */)
 ```
-repeat this with all multiplications by 1000000000000 in this file and repeat this process for communit-projects pallet, nft-marketplace pallet and xcavate-staking pallet
+repeat this with all multiplications by 1000000000000 in this file and repeat this process for communit-projects pallet, nft-marketplace pallet and xcavate-staking pallet.
 
 Run the following command for the rust unit tests in the Xcavate node.
 
