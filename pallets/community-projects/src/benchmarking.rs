@@ -25,7 +25,7 @@ fn setup_listing<T: Config>(
 	BoundedNftDonationTypes<T>,
 	BoundedVec<
 		BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>,
-		<T as Config>::MaxListedNfts,
+		<T as Config>::MaxNftTypes,
 	>,
 	u32,
 	BalanceOf<T>,
@@ -67,7 +67,7 @@ mod benchmarks {
 			value,
 			single_metadata,
 		);
-		assert_eq!(CommunityProjects::<T>::listed_nfts().len(), 10);
+		assert_eq!(CommunityProjects::<T>::listed_nft_types::<<T as pallet::Config>::CollectionId, u8>(0.into(), 4).unwrap().len(), 4);
 	}
 
 	#[benchmark]
@@ -75,7 +75,7 @@ mod benchmarks {
 		let (caller, project_types, metadatas, duration, value, single_metadata) =
 			setup_listing::<T>(SEED);
 		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
-		let many_project_types = get_project_nfts_many::<T>(4);;
+		let many_project_types = get_project_nfts_many::<T>(4);
 		CommunityProjects::<T>::list_project(
 			RawOrigin::Signed(caller).into(),
 			many_project_types,
@@ -179,18 +179,13 @@ mod benchmarks {
 			amount2,
 		));
 		assert_eq!(Assets::<T, Instance1>::balance(asset_id, buyer.clone()), amount2);
-		CommunityProjects::<T>::buy_nft(
-			RawOrigin::Signed(buyer.clone()).into(),
-			0.into(),
-			1,
-			1,
-		);
+		CommunityProjects::<T>::buy_nft(RawOrigin::Signed(buyer.clone()).into(), 0.into(), 1, 1);
 		run_to_block::<T>(11u32.into());
 		#[extrinsic_call]
 		vote_on_milestone(RawOrigin::Signed(buyer), 0.into(), crate::Vote::Yes);
 
 		//assert_eq!(Something::<T>::get(), Some(101u32));
-	}
+	} 
 
 	impl_benchmark_test_suite!(CommunityProjects, crate::mock::new_test_ext(), crate::mock::Test);
 }
@@ -221,9 +216,9 @@ fn get_project_nfts_many<T: Config>(mut n: u32) -> BoundedNftDonationTypes<T> {
 
 fn get_nft_metadata<T: Config>(
 	mut n: u32,
-) -> BoundedVec<BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>, <T as Config>::MaxListedNfts>
+) -> BoundedVec<BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>, <T as Config>::MaxNftTypes>
 {
-	let max = <T as Config>::MaxListedNfts::get();
+	let max = <T as Config>::MaxNftTypes::get();
 	if n > max {
 		n = max
 	}

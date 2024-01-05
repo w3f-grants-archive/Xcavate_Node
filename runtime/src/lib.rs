@@ -496,8 +496,8 @@ impl pallet_xcavate_staking::Config for Runtime {
 
 parameter_types! {
 	pub const NftMarketplacePalletId: PalletId = PalletId(*b"py/nftxc");
-	pub const MaxListedNft: u32 = 300000;
-	pub const MaxNftsInCollection: u32 = 100;
+	pub const MaxListedNft: u32 = 300;
+	pub const MaxNftsInCollection: u32 = 250;
 }
 
 /// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
@@ -519,10 +519,8 @@ impl pallet_nft_marketplace::Config for Runtime {
 parameter_types! {
 	pub const CommunityProjectPalletId: PalletId = PalletId(*b"py/cmprj");
 	pub const MaxNftType: u32 = 4;
-	pub const MaxListedNftProject: u32 = 100000;
-	pub const MaxNftsInCollectionProject: u32 = 5000;
-	pub const MaxOngoingProject: u32 = 1000;
-	pub const MaxNftHolders: u32 = 5000;
+	pub const MaxNftsInCollectionProject: u32 = 100;
+	pub const MaxOngoingProject: u32 = 250;
 }
 
 /// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
@@ -532,13 +530,11 @@ impl pallet_community_projects::Config for Runtime {
 	type Currency = Balances;
 	type PalletId = CommunityProjectPalletId;
 	type MaxNftTypes = MaxNftType;
-	type MaxListedNfts = MaxListedNftProject;
 	type MaxNftInCollection = MaxNftsInCollectionProject;
 	#[cfg(feature = "runtime-benchmarks")]
 	type Helper = pallet_community_projects::NftHelper;
 	type TimeProvider = Timestamp;
 	type MaxOngoingProjects = MaxOngoingProject;
-	type MaxNftHolder = MaxNftHolders;
 	type AssetId = u32;
 	type CollectionId = u32;
 	type ItemId = u32;
@@ -546,7 +542,7 @@ impl pallet_community_projects::Config for Runtime {
 }
 
 parameter_types! {
-	pub const MaxWhitelistUsers: u32 = 100000;
+	pub const MaxWhitelistUsers: u32 = 1000;
 }
 
 /// Configure the pallet-xcavate-staking in pallets/xcavate-staking.

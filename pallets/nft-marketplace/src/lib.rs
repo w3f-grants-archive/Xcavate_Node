@@ -155,18 +155,6 @@ pub mod pallet {
 	pub type CollectionId<T> = <T as Config>::CollectionId;
 	pub type ItemId<T> = <T as Config>::ItemId;
 
-	/// Vector with all currently ongoing listings.
-	#[pallet::storage]
-	#[pallet::getter(fn listed_nfts)]
-	pub(super) type ListedNfts<T: Config> = StorageValue<
-		_,
-		BoundedVec<
-			(<T as pallet::Config>::CollectionId, <T as pallet::Config>::ItemId),
-			T::MaxListedNfts,
-		>,
-		ValueQuery,
-	>;
-
 	/// Mapping from the nft to the nft details.
 	#[pallet::storage]
 	#[pallet::getter(fn ongoing_nft_details)]
@@ -215,20 +203,6 @@ pub mod pallet {
 		Blake2_128Concat,
 		<T as pallet::Config>::CollectionId,
 		BoundedVec<<T as pallet::Config>::ItemId, T::MaxNftInCollection>,
-		ValueQuery,
-	>;
-
-	/// Mapping from real estate developer to his listed nfts.
-	#[pallet::storage]
-	#[pallet::getter(fn seller_listings)]
-	pub(super) type SellerListings<T: Config> = StorageMap<
-		_,
-		Blake2_128Concat,
-		AccountIdOf<T>,
-		BoundedVec<
-			(<T as pallet::Config>::CollectionId, <T as pallet::Config>::ItemId),
-			T::MaxListedNfts,
-		>,
 		ValueQuery,
 	>;
 
@@ -334,7 +308,7 @@ pub mod pallet {
 			let signer = ensure_signed(origin.clone())?;
 
 			ensure!(
-				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&signer),
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts(signer.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
 
@@ -400,12 +374,6 @@ pub mod pallet {
 					keys.try_push(item_id).map_err(|_| Error::<T>::TooManyNfts)?;
 					Ok::<(), DispatchError>(())
 				})?;
-				ListedNfts::<T>::try_append((collection_id, item_id))
-					.map_err(|_| Error::<T>::TooManyListedNfts)?;
-				SellerListings::<T>::try_mutate(signer.clone(), |keys| {
-					keys.try_push((collection_id, item_id)).map_err(|_| Error::<T>::TooManyNfts)?;
-					Ok::<(), DispatchError>(())
-				})?;
 			}
 			pallet_nfts::Pallet::<T>::set_team(
 				origin.clone(),
@@ -444,7 +412,7 @@ pub mod pallet {
 			let signer = ensure_signed(origin.clone())?;
 
 			ensure!(
-				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&signer),
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts(signer.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
 
@@ -470,12 +438,6 @@ pub mod pallet {
 			OngoingNftDetails::<T>::insert(collection_id, item_id, nft.clone());
 			ListedNftsOfCollection::<T>::try_mutate(collection_id, |keys| {
 				keys.try_push(item_id).map_err(|_| Error::<T>::TooManyNfts)?;
-				Ok::<(), DispatchError>(())
-			})?;
-			ListedNfts::<T>::try_append((collection_id, item_id))
-				.map_err(|_| Error::<T>::TooManyListedNfts)?;
-			SellerListings::<T>::try_mutate(signer.clone(), |keys| {
-				keys.try_push((collection_id, item_id)).map_err(|_| Error::<T>::TooManyNfts)?;
 				Ok::<(), DispatchError>(())
 			})?;
 			Self::deposit_event(Event::<T>::NftListed {
@@ -504,7 +466,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			ensure!(
-				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&origin),
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts(origin.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
 			ensure!(Self::collection_exists(collection), Error::<T>::CollectionNotFound);
@@ -527,16 +489,9 @@ pub mod pallet {
 				})?;
 				let price = nft
 					.price
-					.checked_mul(&Self::u64_to_balance_option(1000000000000)?)
+					.checked_mul(&Self::u64_to_balance_option(1 /* 000000000000 */)?)
 					.ok_or(Error::<T>::MultiplyError)?;
 				Self::transfer_funds(&origin, &Self::account_id(), price)?;
-				let mut listed_nfts = Self::listed_nfts();
-				let index = listed_nfts
-					.iter()
-					.position(|x| *x == (nft.collection_id, nft.item_id))
-					.unwrap();
-				listed_nfts.remove(index);
-				ListedNfts::<T>::put(listed_nfts);
 				let index = listed_items
 					.iter()
 					.position(|x| *x == nft.item_id)
@@ -549,14 +504,6 @@ pub mod pallet {
 				if Self::sold_nfts_collection(collection).len() == 100 {
 					Self::distribute_nfts(collection)?;
 				}
-				SellerListings::<T>::try_mutate(nft.real_estate_developer.clone(), |keys| {
-					let index = keys
-						.iter()
-						.position(|x| *x == (collection, item))
-						.ok_or(Error::<T>::ItemNotFound)?;
-					keys.remove(index);
-					Ok::<(), DispatchError>(())
-				})?;
 				Self::deposit_event(Event::<T>::NftBought {
 					collection_index: collection,
 					item_index: item,
@@ -585,7 +532,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			ensure!(
-				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&origin),
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts(origin.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
 			ensure!(Self::collection_exists(collection_id), Error::<T>::CollectionNotFound);
@@ -596,7 +543,7 @@ pub mod pallet {
 				.ok_or(Error::<T>::NftNotForSale)?;
 			let price = nft
 				.price
-				.checked_mul(&Self::u64_to_balance_option(1000000000000)?)
+				.checked_mul(&Self::u64_to_balance_option(1 /* 000000000000 */)?)
 				.ok_or(Error::<T>::MultiplyError)?;
 			let fees = price
 				.checked_div(&Self::u64_to_balance_option(100)?)
@@ -625,11 +572,6 @@ pub mod pallet {
 				origin.clone(),
 				|_, _| Ok(()),
 			)?;
-			let mut listed_nfts = Self::listed_nfts();
-			let index =
-				listed_nfts.iter().position(|x| *x == (nft.collection_id, nft.item_id)).unwrap();
-			listed_nfts.remove(index);
-			ListedNfts::<T>::put(listed_nfts);
 			let mut listed_items = Self::listed_nfts_of_collection(collection_id);
 			let index = listed_items
 				.iter()
@@ -637,14 +579,6 @@ pub mod pallet {
 				.ok_or(Error::<T>::ItemNotFound)?;
 			listed_items.remove(index);
 			ListedNftsOfCollection::<T>::insert(collection_id, listed_items);
-			SellerListings::<T>::try_mutate(nft.real_estate_developer.clone(), |keys| {
-				let index = keys
-					.iter()
-					.position(|x| *x == (nft.collection_id, nft.item_id))
-					.ok_or(Error::<T>::ItemNotFound)?;
-				keys.remove(index);
-				Ok::<(), DispatchError>(())
-			})?;
 			Self::deposit_event(Event::<T>::NftBought {
 				collection_index: collection_id,
 				item_index: item_id,
@@ -674,7 +608,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let signer = ensure_signed(origin)?;
 			ensure!(
-				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&signer),
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts(signer.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
 			ensure!(
@@ -712,7 +646,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let signer = ensure_signed(origin)?;
 			ensure!(
-				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&signer),
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts(signer.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
 			ensure!(Self::collection_exists(collection_id), Error::<T>::CollectionNotFound);
@@ -752,7 +686,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let signer = ensure_signed(origin)?;
 			ensure!(
-				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&signer),
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts(signer.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
 			ensure!(
@@ -768,11 +702,6 @@ pub mod pallet {
 				signer.clone(),
 				|_, _| Ok(()),
 			)?;
-			let mut listed_nfts = Self::listed_nfts();
-			let index =
-				listed_nfts.iter().position(|x| *x == (nft.collection_id, nft.item_id)).unwrap();
-			listed_nfts.remove(index);
-			ListedNfts::<T>::put(listed_nfts);
 			let mut listed_items = Self::listed_nfts_of_collection(collection_id);
 			let index = listed_items
 				.iter()
@@ -780,14 +709,6 @@ pub mod pallet {
 				.ok_or(Error::<T>::ItemNotFound)?;
 			listed_items.remove(index);
 			ListedNftsOfCollection::<T>::insert(collection_id, listed_items);
-			SellerListings::<T>::try_mutate(nft.real_estate_developer.clone(), |keys| {
-				let index = keys
-					.iter()
-					.position(|x| *x == (collection_id, item_id))
-					.ok_or(Error::<T>::ItemNotFound)?;
-				keys.remove(index);
-				Ok::<(), DispatchError>(())
-			})?;
 			Self::deposit_event(Event::<T>::NftDelisted {
 				collection_index: collection_id,
 				item_index: item_id,
@@ -823,7 +744,7 @@ pub mod pallet {
 			let nft_details = Self::ongoing_nft_details(collection_id, list[0])
 				.ok_or(Error::<T>::InvalidIndex)?;
 			let price = sum
-				.checked_mul(&Self::u64_to_balance_option(1000000000000)?)
+				.checked_mul(&Self::u64_to_balance_option(1 /* 000000000000 */)?)
 				.ok_or(Error::<T>::MultiplyError)?;
 			let fees = price
 				.checked_div(&Self::u64_to_balance_option(100)?)
