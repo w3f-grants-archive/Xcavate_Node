@@ -510,7 +510,7 @@ pub mod pallet {
 						let _ = Self::delete_project(*item);
 					}
 				}
-				VotedUser::<T>::clear_prefix(item, 2000, None);
+				let _ = VotedUser::<T>::clear_prefix(item, 2000, None);
 			});
 
 			weight
@@ -633,7 +633,7 @@ pub mod pallet {
 						item_id.into(),
 						nft_metadata[nft_metadata_index as usize].clone(),
 					)?;
-					nft_type_vec.try_push(item_id);
+					let _ = nft_type_vec.try_push(item_id);
 					OngoingNftDetails::<T>::insert(collection_id, item_id, nft.clone());
 					nft_id_index += 1;
 				}
@@ -727,7 +727,7 @@ pub mod pallet {
 				let index = list_nft_types.iter().position(|x| *x == item_id).unwrap();
 				list_nft_types.remove(index);
 				ListedNftTypes::<T>::insert(collection_id, nft_type, list_nft_types);
-				if project.project_balance >= project.project_price.clone() {
+				if project.project_balance >= project.project_price {
 					OngoingProjects::<T>::insert(collection_id, project);
 					Self::launch_project(collection_id)?;
 					break;
@@ -803,7 +803,7 @@ pub mod pallet {
 			);
 			let mut project =
 				OngoingProjects::<T>::take(collection_id).ok_or(Error::<T>::InvalidIndex)?;
-			ensure!(project.ongoing == false, Error::<T>::ProjectOngoing);
+			ensure!(!project.ongoing, Error::<T>::ProjectOngoing);
 			let mut total_bonded = Self::total_bonded();
 			let available_balance = <T as pallet::Config>::Currency::free_balance(&origin)
 				.saturating_sub(T::MinimumRemainingAmount::get());
@@ -865,8 +865,16 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::call_index(5)]
-		#[pallet::weight(<T as pallet::Config>::WeightInfo::bond_token())]
+		/// A user can claim his token back after a project failed.
+		///
+		/// The origin must be Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `collection_id`: The collection for a project that the user wants to claim from.
+		///
+		/// Emits `TokenRefunded` event when succesfful
+		#[pallet::call_index(4)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::claim_refunded_token())]
 		pub fn claim_refunded_token(
 			origin: OriginFor<T>,
 			collection_id: <T as pallet::Config>::CollectionId,
@@ -893,6 +901,8 @@ pub mod pallet {
 			ended_project.remaining_balance -= Self::u64_to_balance_option(remaining_funds)?;
 			if ended_project.bonding_balance.is_zero() && ended_project.remaining_balance.is_zero() {
 				EndedProjects::<T>::take(collection_id);
+			} else {
+				EndedProjects::<T>::insert(collection_id, ended_project);	
 			}
 			Self::deposit_event(Event::<T>::TokenRefunded {
 				collection_index: collection_id,
@@ -901,8 +911,16 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::call_index(4)]
-		#[pallet::weight(<T as pallet::Config>::WeightInfo::bond_token())]
+		/// A user can unlock his bonded XCAV token once a project ended.
+		///
+		/// The origin must be Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `collection_id`: The collection for a project that the user wants to claim from.
+		///
+		/// Emits `TokenUnbonded` event when succesfful
+		#[pallet::call_index(5)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::claim_bonding())]
 		pub fn claim_bonding(
 			origin: OriginFor<T>,
 			collection_id: <T as pallet::Config>::CollectionId,
@@ -930,6 +948,8 @@ pub mod pallet {
 			ended_project.bonding_balance -= user_project_bonding;
 			if ended_project.bonding_balance.is_zero() && ended_project.remaining_balance.is_zero() {
 				EndedProjects::<T>::take(collection_id);
+			} else {
+				EndedProjects::<T>::insert(collection_id, ended_project);	
 			}
 			Self::deposit_event(Event::<T>::TokenUnbonded {
 				collection_index: collection_id,
@@ -1133,7 +1153,7 @@ pub mod pallet {
 			EndedProjects::<T>::insert(collection_id, ended_project);		
 			Self::deposit_event(Event::<T>::ProjectDeleted { collection_id });
 			Self::deposit_event(Event::<T>::ProjectDeleted { collection_id });
-			NftHolder::<T>::clear_prefix(collection_id, 2000, None);
+			let _ = NftHolder::<T>::clear_prefix(collection_id, 2000, None);
 			Ok(())
 		}
 
