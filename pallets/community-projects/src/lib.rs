@@ -231,6 +231,13 @@ pub mod pallet {
 	pub type CollectionId<T> = <T as Config>::CollectionId;
 	pub type ItemId<T> = <T as Config>::ItemId;
 
+	pub(super) type NftDetailsType<T> = NftDetails<
+		BalanceOf<T>,
+		<T as pallet::Config>::CollectionId,
+		<T as pallet::Config>::ItemId,
+		T,
+	>;
+
 	/// Mapping from the nft to the nft details.
 	#[pallet::storage]
 	#[pallet::getter(fn ongoing_nft_details)]
@@ -240,12 +247,7 @@ pub mod pallet {
 		<T as pallet::Config>::CollectionId,
 		Blake2_128Concat,
 		<T as pallet::Config>::ItemId,
-		NftDetails<
-			BalanceOf<T>,
-			<T as pallet::Config>::CollectionId,
-			<T as pallet::Config>::ItemId,
-			T,
-		>,
+		NftDetailsType<T>,
 		OptionQuery,
 	>;
 
@@ -604,9 +606,8 @@ pub mod pallet {
 			OngoingProjects::<T>::insert(collection_id, project);
 			let nft_metadata = &metadata;
 			let mut nft_id_index = 0;
-			let mut nft_metadata_index = 0;
 			let mut number_nft_types = 1;
-			for nft_type in nft_types {
+			for (nft_metadata_index, nft_type) in nft_types.into_iter().enumerate() {
 				let mut nft_type_vec: BoundedVec<
 					<T as pallet::Config>::ItemId,
 					T::MaxNftInCollection,
@@ -631,7 +632,7 @@ pub mod pallet {
 						origin.clone(),
 						collection_id.into(),
 						item_id.into(),
-						nft_metadata[nft_metadata_index as usize].clone(),
+						nft_metadata[nft_metadata_index].clone(),
 					)?;
 					let _ = nft_type_vec.try_push(item_id);
 					OngoingNftDetails::<T>::insert(collection_id, item_id, nft.clone());
@@ -639,7 +640,6 @@ pub mod pallet {
 				}
 				ListedNftTypes::<T>::insert(collection_id, number_nft_types, nft_type_vec);
 				number_nft_types += 1;
-				nft_metadata_index += 1;
 			}
 			pallet_nfts::Pallet::<T>::set_team(
 				origin.clone(),

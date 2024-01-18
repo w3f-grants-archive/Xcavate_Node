@@ -155,6 +155,13 @@ pub mod pallet {
 	pub type CollectionId<T> = <T as Config>::CollectionId;
 	pub type ItemId<T> = <T as Config>::ItemId;
 
+	pub(super) type NftDetailsType<T> = NftDetails<
+		BalanceOf<T>,
+		<T as pallet::Config>::CollectionId,
+		<T as pallet::Config>::ItemId,
+		T,
+	>;
+
 	/// Mapping from the nft to the nft details.
 	#[pallet::storage]
 	#[pallet::getter(fn ongoing_nft_details)]
@@ -164,12 +171,7 @@ pub mod pallet {
 		<T as pallet::Config>::CollectionId,
 		Blake2_128Concat,
 		<T as pallet::Config>::ItemId,
-		NftDetails<
-			BalanceOf<T>,
-			<T as pallet::Config>::CollectionId,
-			<T as pallet::Config>::ItemId,
-			T,
-		>,
+		NftDetailsType<T>,
 		OptionQuery,
 	>;
 

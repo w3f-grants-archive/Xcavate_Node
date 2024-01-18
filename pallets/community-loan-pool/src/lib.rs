@@ -254,6 +254,13 @@ pub mod pallet {
 	pub type CollectionId<T> = <T as Config>::CollectionId;
 	pub type ItemId<T> = <T as Config>::ItemId;
 
+	pub(super) type LoanInfoType<T> = LoanInfo<
+		BalanceOf<T>,
+		<T as pallet::Config>::CollectionId,
+		<T as pallet::Config>::ItemId,
+		T,
+	>;
+
 	/// Vec of admins who are able to vote.
 	#[pallet::storage]
 	#[pallet::getter(fn voting_committee)]
@@ -342,12 +349,7 @@ pub mod pallet {
 		_,
 		Blake2_128Concat,
 		LoanIndex,
-		LoanInfo<
-			BalanceOf<T>,
-			<T as pallet::Config>::CollectionId,
-			<T as pallet::Config>::ItemId,
-			T,
-		>,
+		LoanInfoType<T>,
 		OptionQuery,
 	>;
 
@@ -801,7 +803,7 @@ pub mod pallet {
 				&loan_pallet,
 				&signer,
 				// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
-				(sending_amount as u128 * 1000000000000)
+				(sending_amount as u128 * 1/* 000000000000 */)
 					.try_into()
 					.map_err(|_| Error::<T>::ConversionError)?,
 				KeepAlive,
@@ -846,7 +848,7 @@ pub mod pallet {
 				&signer,
 				&loan_pallet,
 				// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
-				(sending_amount as u128 * 1000000000000)
+				(sending_amount as u128 * 1/* 000000000000 */)
 					.try_into()
 					.map_err(|_| Error::<T>::ConversionError)?,
 				KeepAlive,
