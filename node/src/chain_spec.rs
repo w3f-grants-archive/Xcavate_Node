@@ -2,7 +2,7 @@ use node_template_runtime::{
 	constants::currency::DOLLARS, opaque::SessionKeys, AccountId, AssetsConfig, BabeConfig,
 	Balance, BalancesConfig, CouncilConfig, DemocracyConfig, GenesisConfig, MaxNominations,
 	SessionConfig, Signature, StakerStatus, StakingConfig, SudoConfig, SystemConfig,
-	TechnicalCommitteeConfig, BABE_GENESIS_EPOCH_CONFIG, WASM_BINARY,
+	TechnicalCommitteeConfig, BABE_GENESIS_EPOCH_CONFIG, WASM_BINARY, RuntimeGenesisConfig
 };
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use sc_service::{ChainType, Properties};
@@ -14,6 +14,8 @@ use sp_runtime::{
 	traits::{IdentifyAccount, Verify},
 	Perbill,
 };
+use sp_core::crypto::UncheckedInto;
+use hex_literal::hex;
 
 // The URL for the telemetry server.
 // const STAGING_TELEMETRY_URL: &str = "wss://telemetry.polkadot.io/submit/";
@@ -31,16 +33,25 @@ pub fn get_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Pu
 type AccountPublic = <Signature as Verify>::Signer;
 
 /// Generate an account ID from seed.
-pub fn get_account_id_from_seed<TPublic: Public>(seed: &str) -> AccountIdget_account_id_from_seed
+pub fn get_account_id_from_seed<TPublic: Public>(seed: &str) -> AccountId
 where
 	AccountPublic: From<<TPublic::Pair as Pair>::Public>,
 {
 	AccountPublic::from(get_from_seed::<TPublic>(seed)).into_account()
 }
 
-/// Generate an Aura authority key.
-pub fn authority_keys_from_seed(s: &str) -> (AuraId, GrandpaId) {
-	(get_from_seed::<AuraId>(s), get_from_seed::<GrandpaId>(s))
+/// Helper function to generate stash, controller and session key from seed
+pub fn authority_keys_from_seed(
+	seed: &str,
+) -> (AccountId, AccountId, GrandpaId, AuraId, ImOnlineId, AuthorityDiscoveryId) {
+	(
+		get_account_id_from_seed::<sr25519::Public>(&format!("{}//stash", seed)),
+		get_account_id_from_seed::<sr25519::Public>(seed),
+		get_from_seed::<GrandpaId>(seed),
+		get_from_seed::<AuraId>(seed),
+		get_from_seed::<ImOnlineId>(seed),
+		get_from_seed::<AuthorityDiscoveryId>(seed),
+	)
 }
 
 fn session_keys(
@@ -114,6 +125,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 			testnet_genesis(
 				wasm_binary,
 				vec![authority_keys_from_seed("Alice")],
+				vec![],
 				get_account_id_from_seed::<sr25519::Public>("Alice"),
 				get_endowed_accounts_with_balance(),
 				true,
@@ -151,6 +163,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 			testnet_genesis(
 				wasm_binary,
 				vec![authority_keys_from_seed("Alice"), authority_keys_from_seed("Bob")],
+				vec![],
 				get_account_id_from_seed::<sr25519::Public>("Alice"),
 				get_endowed_accounts_with_balance(),
 				true,
@@ -173,12 +186,31 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 /// Configure initial storage state for FRAME modules.
 fn testnet_genesis(
 	wasm_binary: &[u8],
-	initial_authorities: Vec<(AuraId, GrandpaId)>,
+	initial_authorities: Vec<(
+		AccountId,
+		AccountId,
+		GrandpaId,
+		AuraId,
+		ImOnlineId,
+		AuthorityDiscoveryId,
+	)>,
+	initial_nominators: Vec<AccountId>,
 	root_key: AccountId,
-	endowed_accounts: Vec<AccountId>,
+	endowed_accounts: Vec<(AccountId, u128)>,
 	_enable_println: bool,
 ) -> RuntimeGenesisConfig {
+	// endow all authorities and nominators.
+	/* 	initial_authorities
+	.iter()
+	.map(|x| &x.0)
+	.chain(initial_nominators.iter())
+	.for_each(|x, y| {
+		if !endowed_accounts.contains((x,y)) {
+			endowed_accounts.push(x.clone())
+		}
+	}); */
 
+	// stakers: all validators and nominators.
 	let mut rng = rand::thread_rng();
 	let stakers = initial_authorities
 		.iter()
@@ -216,11 +248,7 @@ fn testnet_genesis(
 		assets:  AssetsConfig {
 			assets: vec![(1, root_key.clone(), true, 1)], // Genesis assets: id, owner, is_sufficient, min_balance
 			metadata: vec![(1, "XUSD".into(), "XUSD".into(), 0)], // Genesis metadata: id, name, symbol, decimals
-			accounts: endowed_accounts
-				.iter()
-				.cloned()
-				.map(|x| (1, x.0.clone(), 1_000_000))
-				.collect(),
+			accounts: endowed_accounts.iter().cloned().map(|x| (1, x.0.clone(), 1_000_000)).collect(),
 		},
 		pool_assets: Default::default(),
 		im_online: Default::default(),
@@ -259,5 +287,6 @@ fn testnet_genesis(
 			phantom: Default::default(),
 		},
 		community_loan_pool: Default::default(),
+		nomination_pools: Default::default(),
 	}
 }

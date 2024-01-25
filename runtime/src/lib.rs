@@ -1466,7 +1466,7 @@ construct_runtime!(
 		Staking: pallet_staking::{Pallet, Call, Config<T>, Storage, Event<T>},
 		ElectionProviderMultiPhase: pallet_election_provider_multi_phase::{Pallet, Call, Storage, Event<T>, ValidateUnsigned},
 		BagsList: pallet_bags_list::{Pallet, Call, Storage, Event<T>},
-		NominationPools: pallet_nomination_pools::{Pallet, Call, Storage, Event<T>},
+		NominationPools: pallet_nomination_pools::{Pallet, Call, Storage, Event<T>, Config<T>, FreezeReason},
 		Offences: pallet_offences::{Pallet, Storage, Event},
 		ImOnline: pallet_im_online::{Pallet, Call, Storage, Event<T>, ValidateUnsigned, Config<T>},
 		Council: pallet_collective::<Instance1>,

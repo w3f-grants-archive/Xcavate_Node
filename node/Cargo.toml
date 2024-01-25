@@ -49,6 +49,7 @@ frame-system = {  git = "https://github.com/paritytech/polkadot-sdk", tag = "pol
 pallet-transaction-payment = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.3.0" }
 pallet-im-online = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.3.0" }
 pallet-asset-tx-payment = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.3.0" }
+hex-literal = "0.4.1"
 
 # These dependencies are used for the node template's RPCs
 jsonrpsee = { version = "0.16.2", features = ["server"] }
