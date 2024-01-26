@@ -18,8 +18,8 @@ use frame_support::{
 	ord_parameter_types,
 	pallet_prelude::{DispatchClass, Get},
 	traits::{
-		tokens::{nonfungibles_v2::Inspect, PayFromAccount, UnityAssetBalanceConversion}, AsEnsureOriginWithArg, EitherOfDiverse,
-		EqualPrivilegeOnly, TrackedStorageKey, fungible::HoldConsideration, LinearStoragePrice,
+		tokens::{PayFromAccount, UnityAssetBalanceConversion}, AsEnsureOriginWithArg, EitherOfDiverse,
+		EqualPrivilegeOnly, fungible::HoldConsideration, LinearStoragePrice,
 	},
 	PalletId,
 };
