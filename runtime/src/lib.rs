@@ -76,7 +76,7 @@ pub use frame_support::{
 		},
 		IdentityFee, Weight,
 	},
-	StorageValue,
+	StorageValue, BoundedVec,
 };
 pub use frame_system::Call as SystemCall;
 pub use pallet_balances::Call as BalancesCall;
@@ -609,7 +609,8 @@ impl pallet_nfts::Config for Runtime {
 	type WeightInfo = pallet_nfts::weights::SubstrateWeight<Runtime>;
 	#[cfg(feature = "runtime-benchmarks")]
 	type Helper = ();
-	type CreateOrigin = AsEnsureOriginWithArg<EnsureSignedBy<CollectionCreationOrigin, AccountId>>;
+	//type CreateOrigin = AsEnsureOriginWithArg<EnsureSignedBy<CollectionCreationOrigin, AccountId>>;
+	type CreateOrigin = AsEnsureOriginWithArg<EnsureSigned<AccountId>>;
 	type Locker = ();
 }
 
@@ -1298,6 +1299,34 @@ impl pallet_preimage::Config for Runtime {
 	>;
 }
 
+parameter_types! {
+	pub const NftFractionalizationPalletId: PalletId = PalletId(*b"fraction");
+	pub NewAssetSymbol: BoundedVec<u8, StringLimit> = (*b"FRAC").to_vec().try_into().unwrap();
+	pub NewAssetName: BoundedVec<u8, StringLimit> = (*b"Frac").to_vec().try_into().unwrap();
+	pub const Deposit: Balance = DOLLARS;
+}
+
+
+impl pallet_nft_fractionalization::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type Deposit = Deposit;
+	type Currency = Balances;
+	type NewAssetSymbol = NewAssetSymbol;
+	type NewAssetName = NewAssetName;
+	type NftCollectionId = <Self as pallet_nfts::Config>::CollectionId;
+	type NftId = <Self as pallet_nfts::Config>::ItemId;
+	type AssetBalance = <Self as pallet_balances::Config>::Balance;
+	type AssetId = <Self as pallet_assets::Config<Instance1>>::AssetId;
+	type Assets = Assets;
+	type Nfts = Nfts;
+	type PalletId = NftFractionalizationPalletId;
+	type WeightInfo = ();
+	type StringLimit = StringLimit;
+	#[cfg(feature = "runtime-benchmarks")]
+	type BenchmarkHelper = ();
+	type RuntimeHoldReason = RuntimeHoldReason;
+}
+
 // TODO::
 
 // parameter_types! {
@@ -1477,6 +1506,7 @@ construct_runtime!(
 		Scheduler: pallet_scheduler,
 		Preimage: pallet_preimage,
 		Democracy: pallet_democracy,
+		NftFractionalization: pallet_nft_fractionalization,
 
 		// TODO:
 		// Referenda: pallet_referenda,
@@ -1547,6 +1577,7 @@ mod benches {
 		[pallet_assets, Assets]
 		[pallet_utility, Utility]
 		[pallet_multisig, Multisig]
+		[pallet_nft_fractionalization, NftFractionalization]
 	);
 }
 

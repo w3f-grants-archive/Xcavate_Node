@@ -4621,6 +4621,7 @@ dependencies = [
  "pallet-im-online",
  "pallet-insecure-randomness-collective-flip",
  "pallet-multisig",
+ "pallet-nft-fractionalization",
  "pallet-nft-marketplace",
  "pallet-nfts",
  "pallet-nfts-runtime-api",
@@ -5204,6 +5205,23 @@ dependencies = [
  "parity-scale-codec",
  "scale-info",
  "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
+name = "pallet-nft-fractionalization"
+version = "4.0.0-dev"
+source = "git+https://github.com/paritytech/polkadot-sdk?tag=polkadot-v1.3.0#7c9fd83805cc446983a7698c7a3281677cf655c8"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "log",
+ "pallet-assets",
+ "pallet-nfts",
+ "parity-scale-codec",
+ "scale-info",
  "sp-runtime",
  "sp-std",
 ]
