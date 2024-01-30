@@ -519,6 +519,10 @@ impl pallet_nft_marketplace::Config for Runtime {
 	type ItemId = u32;
 	type TreasuryId = TreasuryPalletId;
 	type CommunityProjectsId = CommunityProjectPalletId;
+	type FractionalizeCollectionId = <Self as pallet_nfts::Config>::CollectionId;
+	type FractionalizeItemId = <Self as pallet_nfts::Config>::ItemId;
+	type AssetId = <Self as pallet_assets::Config<Instance1>>::AssetId;
+	type AssetId2 = u32;
 }
 
 parameter_types! {

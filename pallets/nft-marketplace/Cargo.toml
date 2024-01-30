@@ -25,6 +25,8 @@ frame-system = {  default-features = false, git = "https://github.com/paritytech
 
 pallet-nfts = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.3.0" }
 pallet-balances = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.3.0" }
+pallet-assets = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.3.0" }
+pallet-nft-fractionalization = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.3.0" }
 enumflags2 = { version = "0.7.7" }
 
 # Local dependencies
@@ -47,6 +49,8 @@ std = [
 	"pallet-nfts/std",
 	"pallet-balances/std",
 	"pallet-whitelist/std",
+	"pallet-assets/std",
+	"pallet-nft-fractionalization/std",
 ]
 runtime-benchmarks = ["frame-benchmarking/runtime-benchmarks"]
 try-runtime = ["frame-support/try-runtime"]
