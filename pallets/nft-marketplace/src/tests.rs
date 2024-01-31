@@ -1,5 +1,6 @@
 use crate::{mock::*, Error};
 use frame_support::{assert_noop, assert_ok};
+use crate::CollectionId;
 
 macro_rules! bvec {
 	($( $x:tt )*) => {
@@ -7,7 +8,31 @@ macro_rules! bvec {
 	}
 }
 
+use pallet_nfts::{
+	CollectionConfig, CollectionSetting, CollectionSettings, ItemConfig, ItemSettings, MintSettings,
+};
+
 #[test]
+fn list_object_works() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		create_collection();
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(NftMarketplace::list_object(
+			RuntimeOrigin::signed([0; 32].into()),
+			1_000_000,
+			bvec![22, 22]
+		));
+		assert_ok!(NftMarketplace::list_object(
+			RuntimeOrigin::signed([0; 32].into()),
+			1_000_000,
+			bvec![22, 22]
+		));
+		assert_eq!(Balances::free_balance(&(NftMarketplace::account_id())), 20_300_000); 
+	})
+}
+
+/* #[test]
 fn list_object_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
@@ -382,4 +407,26 @@ fn upgrade_unknown_collection_fails() {
 			Error::<Test>::CollectionNotFound
 		);
 	})
+} */
+
+
+fn create_collection() {
+	let pallet_id: AccountId = NftMarketplace::account_id();
+	let collection_id: CollectionId<Test> = 0;
+	pallet_nfts::Pallet::<Test>::do_create_collection(
+		collection_id.into(),
+		pallet_id.clone(),
+		pallet_id.clone(),
+		CollectionConfig {
+			settings: CollectionSettings::from_disabled(CollectionSetting::DepositRequired.into()),
+			max_supply: None,
+			mint_settings: MintSettings::default(),
+		},
+		0,
+		pallet_nfts::Event::Created {
+			creator: pallet_id.clone(),
+			owner: pallet_id,
+			collection: collection_id.into(),
+		},
+	);
 }

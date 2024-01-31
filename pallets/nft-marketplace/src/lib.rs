@@ -133,6 +133,7 @@ pub mod pallet {
 		type CollectionId: IsType<<Self as pallet_nfts::Config>::CollectionId>
 			+ Parameter
 			+ From<u32>
+			+ Default
 			+ Ord
 			+ Copy
 			+ MaxEncodedLen
@@ -205,6 +206,22 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	#[pallet::storage]
+	#[pallet::getter(fn next_asset_id)]
+	pub(super) type NextAssetId<T: Config> = StorageValue<
+		_,
+		u32,
+		ValueQuery,
+	>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn pallet_collection_id)]
+	pub(super) type PalletCollectionId<T: Config> = StorageValue<
+		_,
+		<T as pallet::Config>::CollectionId,
+		ValueQuery,
+	>;
+
 	/// Mapping from the nft to the nft details.
 	#[pallet::storage]
 	#[pallet::getter(fn ongoing_nft_details)]
@@ -259,6 +276,54 @@ pub mod pallet {
 		u8,
 		OptionQuery,
 	>;
+
+	#[pallet::genesis_config]
+	#[derive(frame_support::DefaultNoBound)]
+	pub struct GenesisConfig<T: Config> {
+		#[serde(skip)]
+		_config: sp_std::marker::PhantomData<T>,
+	}
+
+	#[pallet::genesis_build]
+	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
+		fn build(&self) {
+			if pallet_nfts::NextCollectionId::<T>::get().is_none() {
+				pallet_nfts::NextCollectionId::<T>::set(
+					<T as pallet_nfts::Config>::CollectionId::initial_value(),
+				);
+			};
+			let collection_id =
+				pallet_nfts::NextCollectionId::<T>::get().unwrap();
+			let next_collection_id = collection_id.increment();
+			pallet_nfts::NextCollectionId::<T>::set(next_collection_id);
+			let collection_id: CollectionId<T> = 1.into();
+			PalletCollectionId::<T>::put(collection_id);
+			let pallet_id: AccountIdOf<T> = <T as pallet::Config>::PalletId::get().into_account_truncating();
+			pallet_nfts::Pallet::<T>::do_create_collection(
+				collection_id.into(),
+				pallet_id.clone(),
+				pallet_id.clone(),
+				CollectionConfig {
+					settings: CollectionSettings::from_disabled(CollectionSetting::DepositRequired.into()),
+					max_supply: None,
+					mint_settings: MintSettings::default(),
+				},
+				T::CollectionDeposit::get(),
+				pallet_nfts::Event::Created {
+					creator: pallet_id.clone(),
+					owner: pallet_id,
+					collection: collection_id.into(),
+				},
+			);
+/* 			pallet_nfts::Pallet::<T>::set_team(
+				origin.clone(),
+				collection_id.into(),
+				None,
+				None,
+				None,
+			); */
+		}
+	}
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -359,7 +424,6 @@ pub mod pallet {
 		pub fn list_object(
 			origin: OriginFor<T>,
 			price: BalanceOf<T>,
-			collection_id: <T as pallet::Config>::CollectionId,
 			data: BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>,
 		) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
@@ -368,20 +432,15 @@ pub mod pallet {
 				pallet_whitelist::Pallet::<T>::whitelisted_accounts(signer.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
-
-			if pallet_nfts::NextCollectionId::<T>::get().is_none() {
-				pallet_nfts::NextCollectionId::<T>::set(
-					<T as pallet_nfts::Config>::CollectionId::initial_value(),
-				);
-			};
-			let collection_id =
-				pallet_nfts::NextCollectionId::<T>::get().ok_or(Error::<T>::UnknownCollection)?;
-			let next_collection_id = collection_id.increment();
-			pallet_nfts::NextCollectionId::<T>::set(next_collection_id);
-			let collection_id: CollectionId<T> = collection_id.into();
+			let collection_id: CollectionId<T> = Self::pallet_collection_id();
 
 			let mut next_item_id = Self::next_nft_id();
-			let asset_number = 1;
+			let mut asset_number: u32 = Self::next_asset_id();
+			let mut asset_id: AssetId2<T> = asset_number.into();
+ 			while pallet_assets::Pallet::<T, Instance1>::maybe_total_supply(asset_id.into()).is_some() {
+				asset_number = asset_number.checked_add(1).ok_or(Error::<T>::DivisionError)?;
+				asset_id = asset_number.into();
+			}; 
 			let asset_id: AssetId<T> = asset_number.into();
 			let item_id: ItemId<T> = next_item_id.into();
 			let nft = NftDetails {
@@ -400,8 +459,9 @@ pub mod pallet {
 				Self::default_item_config(),
 				|_, _| Ok(()),
 			)?;
+			let pallet_origin: OriginFor<T> = RawOrigin::Signed(Self::account_id()).into();
 			pallet_nfts::Pallet::<T>::set_metadata(
-				origin.clone(),
+				pallet_origin.clone(),
 				collection_id.into(),
 				item_id.into(),
 				data.clone(),
@@ -414,7 +474,7 @@ pub mod pallet {
 			let fractionalize_collection_id: FractionalizeCollectionId<T> = collection_id.try_into().map_err(|_| Error::<T>::ConversionError)?;
 			let fractionalize_item_id: FractionalizeItemId<T> = next_item_id.try_into().map_err(|_| Error::<T>::ConversionError)?;
 			pallet_nft_fractionalization::Pallet::<T>::fractionalize(
-				origin.clone(),
+				pallet_origin.clone(),
 				fractionalize_collection_id.into(),
 				fractionalize_item_id.into(),
 				asset_id.into(),
@@ -422,7 +482,9 @@ pub mod pallet {
 				nft_balance,
 			)?;
 			next_item_id = next_item_id.checked_add(1).ok_or(Error::<T>::DivisionError)?;
+			asset_number = asset_number.checked_add(1).ok_or(Error::<T>::DivisionError)?;
 			NextNftId::<T>::put(next_item_id);
+			NextAssetId::<T>::put(asset_number);
 
 			Self::deposit_event(Event::<T>::ObjectListed {
 				collection_index: collection_id,
