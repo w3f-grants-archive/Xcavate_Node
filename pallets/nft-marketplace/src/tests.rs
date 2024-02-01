@@ -28,9 +28,53 @@ fn list_object_works() {
 			1_000_000,
 			bvec![22, 22]
 		));
-		assert_eq!(Balances::free_balance(&(NftMarketplace::account_id())), 20_300_000); 
+		assert_eq!(NftMarketplace::listed_token(0).unwrap(), 100);
 	})
 }
+
+#[test]
+fn buy_nft_works() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		create_collection();
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(NftMarketplace::list_object(
+			RuntimeOrigin::signed([0; 32].into()),
+			1_000_000,
+			bvec![22, 22]
+		));
+		assert_ok!(NftMarketplace::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 30));
+		//assert_eq!(NftMarketplace::listed_nfts().len(), 70);
+		assert_eq!(NftMarketplace::sold_token(0), 30);
+		assert_eq!(NftMarketplace::listed_token(0).unwrap(), 70);
+		assert_eq!(Balances::free_balance(&([1; 32].into())), 14_700_000);
+	})
+}
+
+#[test]
+fn distributes_nfts_and_funds() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		create_collection();
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(NftMarketplace::list_object(
+			RuntimeOrigin::signed([0; 32].into()),
+			1_000_000,
+			bvec![22, 22]
+		));
+		assert_ok!(NftMarketplace::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		//assert_eq!(NftMarketplace::listed_nfts().len(), 70);
+		assert_eq!(Balances::free_balance(&([0; 32].into())), 20990000);
+		assert_eq!(Balances::free_balance(&NftMarketplace::treasury_account_id()), 9000);
+		assert_eq!(Balances::free_balance(&NftMarketplace::community_account_id()), 1000);
+		assert_eq!(Balances::free_balance(&([1; 32].into())), 14_000_000);
+		//assert_eq!(NftMarketplace::listed_nfts().len(), 0);
+		assert_eq!(NftMarketplace::ongoing_nft_details(0).unwrap().spv_created, true);
+		assert_eq!(NftMarketplace::listed_token(0), None);
+	})
+} 
 
 /* #[test]
 fn list_object_works() {

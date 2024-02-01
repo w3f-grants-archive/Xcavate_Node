@@ -274,7 +274,7 @@ pub mod pallet {
 		Blake2_128Concat,
 		<T as pallet::Config>::ItemId,
 		u8,
-		OptionQuery,
+		ValueQuery,
 	>;
 
 	#[pallet::genesis_config]
@@ -587,8 +587,11 @@ pub mod pallet {
 				.price
 				.checked_mul(&Self::u64_to_balance_option(amount as u64)?)
 				.ok_or(Error::<T>::MultiplyError)?
-				.checked_mul(&Self::u64_to_balance_option(1 /* 000000000000 */)?)
+				.checked_div(&Self::u64_to_balance_option(100)?)
+				.ok_or(Error::<T>::DivisionError)?
+				.checked_mul(&Self::u64_to_balance_option(1/* 000000000000 */)?)
 				.ok_or(Error::<T>::MultiplyError)?;
+			Self::transfer_funds(&origin, &Self::account_id(), price)?;
 			listed_token = listed_token
 				.checked_sub(amount)
 				.ok_or(Error::<T>::ArithmeticUnderflow)?;
@@ -596,11 +599,15 @@ pub mod pallet {
 				keys.try_push(origin.clone()).map_err(|_| Error::<T>::NotEnoughNftsAvailable)?;
 				Ok::<(), DispatchError>(())
 			})?;
-			let mut token_of_owner = TokenOwner::<T>::take(origin.clone(), item).ok_or(Error::<T>::InvalidIndex)?;
+			let mut token_of_owner = TokenOwner::<T>::take(origin.clone(), item);
 			token_of_owner = token_of_owner.checked_add(amount).ok_or(Error::<T>::ArithmeticOverflow)?;
 			TokenOwner::<T>::insert(origin.clone(), item, token_of_owner);
+			let mut sold_token = Self::sold_token(item);
+			SoldToken::<T>::insert(item, amount);
 			if listed_token == 0 {
 				Self::distribute_nfts(item)?;
+			} else {
+				ListedToken::<T>::insert(item, listed_token);
 			}
 			Ok(())
 		}
@@ -830,7 +837,7 @@ pub mod pallet {
 			let mut nft_details = Self::ongoing_nft_details(item)
 				.ok_or(Error::<T>::InvalidIndex)?;
 			let price = nft_details.price
-				.checked_mul(&Self::u64_to_balance_option(1 /* 000000000000 */)?)
+				.checked_mul(&Self::u64_to_balance_option(1/* 000000000000 */)?)
 				.ok_or(Error::<T>::MultiplyError)?;
 			let fees = price
 				.checked_div(&Self::u64_to_balance_option(100)?)
@@ -860,7 +867,7 @@ pub mod pallet {
 			let origin: OriginFor<T> = RawOrigin::Signed(Self::account_id()).into();
 			for owner in list {
 				let user_lookup = <T::Lookup as StaticLookup>::unlookup(owner.clone());
-				let token: u64 = TokenOwner::<T>::take(owner.clone(), item).ok_or(Error::<T>::InvalidIndex)? as u64;
+				let token: u64 = TokenOwner::<T>::take(owner.clone(), item) as u64;
 				let token_amount = token
 					.try_into().map_err(|_| Error::<T>::ConversionError)?;
 				let asset_id: AssetId2<T> = nft_details.asset_id.into();
@@ -872,6 +879,7 @@ pub mod pallet {
 				)
 				.map_err(|_| Error::<T>::NotEnoughFunds)?;
 			}
+			SoldToken::<T>::take(item);
 			nft_details.spv_created = true;
 			OngoingNftDetails::<T>::insert(item, nft_details); 
 			Ok(())
@@ -915,8 +923,7 @@ pub mod pallet {
 		/// Checks if the collection exists
 		fn collection_exists(item: <T as pallet::Config>::ItemId) -> bool {
 			let listed_nfts_count = ListedToken::<T>::contains_key(item);
-			let sold_nfts_count = SoldToken::<T>::contains_key(item);
-			listed_nfts_count || sold_nfts_count
+			listed_nfts_count
 		}
 
 		fn transfer_funds(
