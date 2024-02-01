@@ -22,7 +22,7 @@ use frame_support::{
 };
 
 use frame_support::sp_runtime::traits::{
-	AccountIdConversion, CheckedDiv, CheckedMul, StaticLookup,
+	AccountIdConversion, CheckedDiv, CheckedMul, StaticLookup, CheckedAdd
 };
 
 use enumflags2::BitFlags;
@@ -82,10 +82,22 @@ pub mod pallet {
 	pub struct NftDetails<Balance, ItemId, T: Config> {
 		pub real_estate_developer: AccountIdOf<T>,
 		pub owner: AccountIdOf<T>,
-		pub price: Balance,
+		pub current_price: Balance,
+		pub collected_funds: Balance,
 		pub asset_id: u32,
 		pub item_id: ItemId,
 		pub spv_created: bool,
+	}
+
+	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
+	#[scale_info(skip_type_params(T))]
+	pub struct TokenListingDetails<Balance, ItemId, T: Config> {
+		pub seller: AccountIdOf<T>,
+		pub price: Balance,
+		pub asset_id: u32,
+		pub item_id: ItemId,
+		pub amount: u8,
 	}
 
 	/// AccountId storage
@@ -198,6 +210,12 @@ pub mod pallet {
 		T,
 	>;
 
+	pub(super) type ListingDetailsType<T> = TokenListingDetails<
+		BalanceOf<T>,
+		<T as pallet::Config>::ItemId,
+		T,
+	>;
+
 	#[pallet::storage]
 	#[pallet::getter(fn next_nft_id)]
 	pub(super) type NextNftId<T: Config> = StorageValue<
@@ -209,6 +227,14 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn next_asset_id)]
 	pub(super) type NextAssetId<T: Config> = StorageValue<
+		_,
+		u32,
+		ValueQuery,
+	>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn next_listing_id)]
+	pub(super) type NextListingId<T: Config> = StorageValue<
 		_,
 		u32,
 		ValueQuery,
@@ -277,6 +303,16 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	#[pallet::storage]
+	#[pallet::getter(fn token_listings)]
+	pub(super) type TokenListings<T: Config> = StorageMap<
+		_,
+		Blake2_128Concat,
+		u32,
+		ListingDetailsType<T>,
+		OptionQuery,
+	>;
+
 	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
 	pub struct GenesisConfig<T: Config> {
@@ -334,29 +370,33 @@ pub mod pallet {
 			price: BalanceOf<T>,
 			seller: AccountIdOf<T>,
 		},
-		/// A nft has been bought.
-		NftBought {
-			collection_index: <T as pallet::Config>::CollectionId,
+		/// A token has been bought.
+		TokenBought {
 			item_index: <T as pallet::Config>::ItemId,
 			buyer: AccountIdOf<T>,
 			price: BalanceOf<T>,
 		},
-		/// A sigle nft has been listed.
-		NftListed {
-			collection_index: <T as pallet::Config>::CollectionId,
+		/// Token from listed object have been bought.
+		TokenBoughtObject {
+			item_index: <T as pallet::Config>::ItemId,
+			buyer: AccountIdOf<T>,
+			amount: u8,
+			price: BalanceOf<T>,
+		},
+		/// Token have been listed.
+		TokenListed {
+			item_index: <T as pallet::Config>::ItemId,
 			price: BalanceOf<T>,
 			seller: AccountIdOf<T>,
 		},
 		/// The price of the nft has been updated.
-		NftUpdated {
-			collection_index: <T as pallet::Config>::CollectionId,
-			item_index: <T as pallet::Config>::ItemId,
+		ListingUpdated {
+			listing_index: u32,
 			new_price: BalanceOf<T>,
 		},
 		/// The nft has been delisted.
-		NftDelisted {
-			collection_index: <T as pallet::Config>::CollectionId,
-			item_index: <T as pallet::Config>::ItemId,
+		ListingDelisted {
+			listing_index: u32,
 		},
 	}
 
@@ -405,18 +445,20 @@ pub mod pallet {
 		UserNotWhitelisted,
 		ArithmeticUnderflow,
 		ArithmeticOverflow,
+		/// The token is not for sale.
+		TokenNotForSale,
 	}
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		/// List a real estate object. A new collection is created and 100 nfts get minted.
-		/// This function calls the nfts-pallet to creates a collection, mint nfts and set the Metadata.
+		/// List a real estate object. A new nft gets minted.
+		/// This function calls the nfts-pallet to mint a new nft and sets the Metadata.
 		///
 		/// The origin must be Signed and the sender must have sufficient funds free.
 		///
 		/// Parameters:
 		/// - `price`: The price of the real estate object that is offered.
-		/// - `data`: The Metadata of the collection and the single nfts.
+		/// - `data`: The Metadata of the nft.
 		///
 		/// Emits `ObjectListed` event when succesfful
 		#[pallet::call_index(0)]
@@ -446,7 +488,8 @@ pub mod pallet {
 			let nft = NftDetails {
 				real_estate_developer: signer.clone(),
 				owner: Self::account_id(),
-				price,
+				current_price: price,
+				collected_funds: Default::default(),
 				asset_id: asset_number,
 				item_id,
 				spv_created: Default::default(),
@@ -494,8 +537,8 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/* /// List a single nft on the marketplace.
-		/// The nft collection must be registered on the marketplace.
+		/// List a single token on the marketplace.
+		/// The nft nft must be registered on the marketplace.
 		///
 		/// The origin must be Signed and the sender must have sufficient funds free.
 		///
@@ -503,15 +546,16 @@ pub mod pallet {
 		/// - `collection_id`: The collection of the nft.
 		/// - `item_id`: The item id of the nft.
 		/// - `price`: The price of the nft that is offered.
+		/// - `amount`: The amount of token of the real estate object that should be listed.
 		///
-		/// Emits `NftListed` event when succesfful
+		/// Emits `TokenListed` event when succesfful
 		#[pallet::call_index(1)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::list_nft())]
-		pub fn list_nft(
+		pub fn list_token(
 			origin: OriginFor<T>,
-			collection_id: <T as pallet::Config>::CollectionId,
 			item_id: <T as pallet::Config>::ItemId,
 			price: BalanceOf<T>,
+			amount: u8,
 		) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
 
@@ -519,46 +563,45 @@ pub mod pallet {
 				pallet_whitelist::Pallet::<T>::whitelisted_accounts(signer.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
-
-			ensure!(
-				Self::listed_collection_details(collection_id).is_some(),
-				Error::<T>::CollectionNotKnown
-			);
+			let nft_details = Self::ongoing_nft_details(item_id).ok_or(Error::<T>::CollectionNotKnown)?;
 			let pallet_lookup = <T::Lookup as StaticLookup>::unlookup(Self::account_id());
-			pallet_nfts::Pallet::<T>::transfer(
+			let asset_id: AssetId2<T> = nft_details.asset_id.into();
+			let token_amount = amount
+				.try_into().map_err(|_| Error::<T>::ConversionError)?;
+			pallet_assets::Pallet::<T, Instance1>::transfer(
 				origin,
-				collection_id.into(),
-				item_id.into(),
+				asset_id.into().into(),
 				pallet_lookup,
-			)?;
-			let nft = NftDetails {
-				real_estate_developer: signer.clone(),
-				owner: signer.clone(),
+				token_amount,
+			)
+			.map_err(|_| Error::<T>::NotEnoughFunds)?;
+			let mut listing_id = Self::next_listing_id();
+			let token_listing = TokenListingDetails {
+				seller: signer.clone(),
 				price,
-				collection_id,
+				asset_id: nft_details.asset_id,
 				item_id,
-				sold: Default::default(),
+				amount,
 			};
-			OngoingNftDetails::<T>::insert(collection_id, item_id, nft.clone());
-			ListedNftsOfCollection::<T>::try_mutate(collection_id, |keys| {
-				keys.try_push(item_id).map_err(|_| Error::<T>::TooManyNfts)?;
-				Ok::<(), DispatchError>(())
-			})?;
-			Self::deposit_event(Event::<T>::NftListed {
-				collection_index: collection_id,
+			TokenListings::<T>::insert(listing_id, token_listing);
+			listing_id = listing_id.checked_add(1).ok_or(Error::<T>::DivisionError)?;
+			NextListingId::<T>::put(listing_id);
+
+			Self::deposit_event(Event::<T>::TokenListed {
+				item_index: item_id,
 				price,
 				seller: signer,
 			});
 			Ok(())
-		} */
+		} 
 
-		/// Buy listed nfts from the marketplace.
+		/// Buy listed token from the marketplace.
 		///
 		/// The origin must be Signed and the sender must have sufficient funds free.
 		///
 		/// Parameters:
-		/// - `collection`: The collection that the investor wants to buy from.
-		/// - `amount`: The amount of nfts that the investor wants to buy.
+		/// - `item`: The real estate nft that the investor wants to buy token from.
+		/// - `amount`: The amount of token that the investor wants to buy.
 		///
 		/// Emits `NftBought` event when succesfful.
 		#[pallet::call_index(2)]
@@ -579,16 +622,17 @@ pub mod pallet {
 				listed_token >= amount,
 				Error::<T>::NotEnoughNftsAvailable
 			);
-			let nft_details =
+			let mut nft_details =
 				Self::ongoing_nft_details(item).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(!nft_details.spv_created, Error::<T>::NftAlreadyRelisted);
 
 			let price = nft_details
-				.price
+				.current_price
 				.checked_mul(&Self::u64_to_balance_option(amount as u64)?)
 				.ok_or(Error::<T>::MultiplyError)?
 				.checked_div(&Self::u64_to_balance_option(100)?)
-				.ok_or(Error::<T>::DivisionError)?
+				.ok_or(Error::<T>::DivisionError)?;
+			let transfer_price = price
 				.checked_mul(&Self::u64_to_balance_option(1/* 000000000000 */)?)
 				.ok_or(Error::<T>::MultiplyError)?;
 			Self::transfer_funds(&origin, &Self::account_id(), price)?;
@@ -601,6 +645,9 @@ pub mod pallet {
 			})?;
 			let mut token_of_owner = TokenOwner::<T>::take(origin.clone(), item);
 			token_of_owner = token_of_owner.checked_add(amount).ok_or(Error::<T>::ArithmeticOverflow)?;
+			nft_details.collected_funds = nft_details.collected_funds
+				.checked_add(&price).ok_or(Error::<T>::ArithmeticOverflow)?;
+			OngoingNftDetails::<T>::insert(item, nft_details);
 			TokenOwner::<T>::insert(origin.clone(), item, token_of_owner);
 			let mut sold_token = Self::sold_token(item);
 			SoldToken::<T>::insert(item, amount);
@@ -609,10 +656,16 @@ pub mod pallet {
 			} else {
 				ListedToken::<T>::insert(item, listed_token);
 			}
+			Self::deposit_event(Event::<T>::TokenBoughtObject {
+				item_index: item,
+				buyer: origin.clone(),
+				amount,
+				price,
+			});
 			Ok(())
 		}
 
-		/* /// Buy single nfts from the marketplace.
+		/// Buy single nfts from the marketplace.
 		///
 		/// The origin must be Signed and the sender must have sufficient funds free.
 		///
@@ -623,23 +676,18 @@ pub mod pallet {
 		/// Emits `NftBought` event when succesfful.
 		#[pallet::call_index(3)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::buy_single_nft())]
-		pub fn buy_single_nft(
+		pub fn buy_single_token(
 			origin: OriginFor<T>,
-			collection_id: <T as pallet::Config>::CollectionId,
-			item_id: <T as pallet::Config>::ItemId,
+			listing_id: u32,
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			ensure!(
 				pallet_whitelist::Pallet::<T>::whitelisted_accounts(origin.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
-			ensure!(Self::collection_exists(collection_id), Error::<T>::CollectionNotFound);
-			let nft_details =
-				Self::nft_details(item_id).ok_or(Error::<T>::InvalidIndex)?;
-			ensure!(collection_details.spv_created, Error::<T>::SpvNotCreated);
-			let nft = <OngoingNftDetails<T>>::take(collection_id, item_id)
-				.ok_or(Error::<T>::NftNotForSale)?;
-			let price = nft
+			let listing_details =
+				TokenListings::<T>::take(listing_id).ok_or(Error::<T>::TokenNotForSale)?;
+			let price = listing_details
 				.price
 				.checked_mul(&Self::u64_to_balance_option(1 /* 000000000000 */)?)
 				.ok_or(Error::<T>::MultiplyError)?;
@@ -663,25 +711,23 @@ pub mod pallet {
 				.ok_or(Error::<T>::DivisionError)?;
 			Self::transfer_funds(&origin, &treasury_id, treasury_fees)?;
 			Self::transfer_funds(&origin, &community_projects_id, community_fees)?;
-			Self::transfer_funds(&origin, &nft.owner, seller_part)?;
-			pallet_nfts::Pallet::<T>::do_transfer(
-				collection_id.into(),
-				item_id.into(),
-				origin.clone(),
-				|_, _| Ok(()),
-			)?;
-			let mut listed_items = Self::listed_nfts_of_collection(collection_id);
-			let index = listed_items
-				.iter()
-				.position(|x| *x == nft.item_id)
-				.ok_or(Error::<T>::ItemNotFound)?;
-			listed_items.remove(index);
-			ListedNftsOfCollection::<T>::insert(collection_id, listed_items);
-			Self::deposit_event(Event::<T>::NftBought {
-				collection_index: collection_id,
-				item_index: item_id,
+			Self::transfer_funds(&origin, &listing_details.seller, seller_part)?;
+			let user_lookup = <T::Lookup as StaticLookup>::unlookup(origin.clone());
+			let asset_id: AssetId2<T> = listing_details.asset_id.into();
+			let token_amount = listing_details.amount
+				.try_into().map_err(|_| Error::<T>::ConversionError)?;
+			let pallet_origin: OriginFor<T> = RawOrigin::Signed(Self::account_id()).into();
+			pallet_assets::Pallet::<T, Instance1>::transfer(
+				pallet_origin,
+				asset_id.into().into(),
+				user_lookup,
+				token_amount,
+			)
+			.map_err(|_| Error::<T>::NotEnoughFunds)?;
+			Self::deposit_event(Event::<T>::TokenBought {
+				item_index: listing_details.item_id,
 				buyer: origin.clone(),
-				price: nft.price,
+				price: listing_details.price,
 			});
 			Ok(())
 		}
@@ -700,8 +746,7 @@ pub mod pallet {
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::upgrade_listing())]
 		pub fn upgrade_listing(
 			origin: OriginFor<T>,
-			collection_id: <T as pallet::Config>::CollectionId,
-			item_id: <T as pallet::Config>::ItemId,
+			listing_id: u32,
 			new_price: BalanceOf<T>,
 		) -> DispatchResult {
 			let signer = ensure_signed(origin)?;
@@ -709,18 +754,13 @@ pub mod pallet {
 				pallet_whitelist::Pallet::<T>::whitelisted_accounts(signer.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
-			ensure!(
-				Self::ongoing_nft_details(collection_id, item_id).is_some(),
-				Error::<T>::NftNotListed
-			);
-			let mut nft = Self::ongoing_nft_details(collection_id, item_id)
-				.ok_or(Error::<T>::InvalidIndex)?;
-			ensure!(nft.owner == signer, Error::<T>::NoPermission);
-			nft.price = new_price;
-			OngoingNftDetails::<T>::insert(collection_id, item_id, nft);
-			Self::deposit_event(Event::<T>::NftUpdated {
-				collection_index: collection_id,
-				item_index: item_id,
+			let mut listing_details =
+				Self::token_listings(listing_id).ok_or(Error::<T>::TokenNotForSale)?;
+			ensure!(listing_details.seller == signer, Error::<T>::NoPermission);
+			listing_details.price = new_price;
+			TokenListings::<T>::insert(listing_id, listing_details);
+			Self::deposit_event(Event::<T>::ListingUpdated {
+				listing_index: listing_id,
 				new_price,
 			});
 			Ok(())
@@ -747,25 +787,16 @@ pub mod pallet {
 				pallet_whitelist::Pallet::<T>::whitelisted_accounts(signer.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
-			ensure!(Self::collection_exists(collection_id), Error::<T>::CollectionNotFound);
-			let nft_details =
-				Self::nft_details(collection_id).ok_or(Error::<T>::InvalidIndex)?;
-			ensure!(!collection_details.spv_created, Error::<T>::NftAlreadyRelisted);
-			let list = Self::listed_nfts_of_collection(collection_id);
-			let new_item_price = new_price
-				.checked_div(&Self::u64_to_balance_option(100)?)
-				.ok_or(Error::<T>::DivisionError)?;
-			for item in list {
-				let mut nft = Self::ongoing_nft_details(collection_id, item)
-					.ok_or(Error::<T>::InvalidIndex)?;
-				ensure!(nft.real_estate_developer == signer, Error::<T>::NoPermission);
-				nft.price = new_item_price;
-				OngoingNftDetails::<T>::insert(collection_id, item, nft);
-			}
+			let mut nft_details =
+				Self::ongoing_nft_details(item_id).ok_or(Error::<T>::InvalidIndex)?;
+			ensure!(!nft_details.spv_created, Error::<T>::NftAlreadyRelisted);
+			ensure!(Self::collection_exists(item_id), Error::<T>::CollectionNotFound);
+			nft_details.current_price = new_price;
+			OngoingNftDetails::<T>::insert(item_id, nft_details);
 			Ok(())
 		}
 
-		/// Delist the choosen nft from the marketplace.
+ 		/// Delist the choosen nft from the marketplace.
 		/// Works only for relisted nfts.
 		///
 		/// The origin must be Signed and the sender must have sufficient funds free.
@@ -777,42 +808,35 @@ pub mod pallet {
 		/// Emits `NftDelisted` event when succesfful.
 		#[pallet::call_index(6)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::delist_nft())]
-		pub fn delist_nft(
+		pub fn delist_token(
 			origin: OriginFor<T>,
-			collection_id: <T as pallet::Config>::CollectionId,
-			item_id: <T as pallet::Config>::ItemId,
+			listing_id: u32,
 		) -> DispatchResult {
 			let signer = ensure_signed(origin)?;
 			ensure!(
 				pallet_whitelist::Pallet::<T>::whitelisted_accounts(signer.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
-			ensure!(
-				Self::ongoing_nft_details(collection_id, item_id).is_some(),
-				Error::<T>::NftNotListed
-			);
-			let nft = <OngoingNftDetails<T>>::take(collection_id, item_id)
-				.ok_or(Error::<T>::InvalidIndex)?;
-			ensure!(nft.owner == signer, Error::<T>::NoPermission);
-			pallet_nfts::Pallet::<T>::do_transfer(
-				collection_id.into(),
-				item_id.into(),
-				signer.clone(),
-				|_, _| Ok(()),
-			)?;
-			let mut listed_items = Self::listed_nfts_of_collection(collection_id);
-			let index = listed_items
-				.iter()
-				.position(|x| *x == nft.item_id)
-				.ok_or(Error::<T>::ItemNotFound)?;
-			listed_items.remove(index);
-			ListedNftsOfCollection::<T>::insert(collection_id, listed_items);
-			Self::deposit_event(Event::<T>::NftDelisted {
-				collection_index: collection_id,
-				item_index: item_id,
+			let mut listing_details =
+				TokenListings::<T>::take(listing_id).ok_or(Error::<T>::TokenNotForSale)?;
+			ensure!(listing_details.seller == signer, Error::<T>::NoPermission);
+			let user_lookup = <T::Lookup as StaticLookup>::unlookup(signer.clone());
+			let asset_id: AssetId2<T> = listing_details.asset_id.into();
+			let token_amount = listing_details.amount
+				.try_into().map_err(|_| Error::<T>::ConversionError)?;
+			let pallet_origin: OriginFor<T> = RawOrigin::Signed(Self::account_id()).into();
+			pallet_assets::Pallet::<T, Instance1>::transfer(
+				pallet_origin,
+				asset_id.into().into(),
+				user_lookup,
+				token_amount,
+			)
+			.map_err(|_| Error::<T>::NotEnoughFunds)?;
+			Self::deposit_event(Event::<T>::ListingDelisted {
+				listing_index: listing_id,
 			});
 			Ok(())
-		} */
+		}  
 	}
 
 	impl<T: Config> Pallet<T> {
@@ -836,7 +860,7 @@ pub mod pallet {
 
 			let mut nft_details = Self::ongoing_nft_details(item)
 				.ok_or(Error::<T>::InvalidIndex)?;
-			let price = nft_details.price
+			let price = nft_details.collected_funds
 				.checked_mul(&Self::u64_to_balance_option(1/* 000000000000 */)?)
 				.ok_or(Error::<T>::MultiplyError)?;
 			let fees = price
