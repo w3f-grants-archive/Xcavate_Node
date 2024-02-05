@@ -41,7 +41,7 @@ frame_support::construct_runtime!(
 		System: frame_system::{Pallet, Call, Config<T>, Storage, Event<T>},
 		Uniques: pallet_nfts::{Pallet, Call, Storage, Event<T>},
 		NftFractionalization: pallet_nft_fractionalization,
-		NftMarketplace: pallet_nft_marketplace,
+		NftMarketplace: pallet_nft_marketplace::{Pallet, Call, Storage, Config<T>, Event<T>},
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
 		Assets: pallet_assets::<Instance1>,
 		Whitelist: pallet_whitelist,
@@ -190,8 +190,6 @@ impl pallet_nft_fractionalization::Config for Test {
 	type PalletId = NftFractionalizationPalletId;
 	type WeightInfo = ();
 	type StringLimit = ConstU32<50>;
-	#[cfg(feature = "runtime-benchmarks")]
-	type BenchmarkHelper = ();
 	type RuntimeHoldReason = RuntimeHoldReason;
 }
 
@@ -227,7 +225,6 @@ impl pallet_nft_marketplace::Config for Test {
 pub fn new_test_ext() -> sp_io::TestExternalities {
 	let mut test = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
 
-	pallet_nft_marketplace::GenesisConfig::<Test>::default().build_storage().unwrap();
 	pallet_balances::GenesisConfig::<Test> {
 		balances: vec![
 			([0; 32].into(), 20_000_000),

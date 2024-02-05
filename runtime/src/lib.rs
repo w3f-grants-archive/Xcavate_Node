@@ -570,8 +570,8 @@ parameter_types! {
 	pub const MaxAttributesPerCall: u32 = 10;
 	pub const CollectionDeposit: Balance = DOLLARS;
 	pub const ItemDeposit: Balance = DOLLARS;
-	pub const MetadataDepositBase: Balance = 10 * DOLLARS;
-	pub const MetadataDepositPerByte: Balance = DOLLARS;
+	pub const MetadataDepositBase: Balance = DOLLARS;
+	pub const MetadataDepositPerByte: Balance = DOLLARS / 100;
 	pub const StringLimit: u32 = 5000;
 	pub const KeyLimit: u32 = 32;
 	pub const ValueLimit: u32 = 256;
@@ -845,6 +845,8 @@ impl pallet_treasury::Config for Runtime {
 	type Paymaster = PayFromAccount<Balances, TreasuryAccount>;
 	type BalanceConverter = UnityAssetBalanceConversion;
 	type PayoutPeriod = PayoutSpendPeriod;
+	#[cfg(feature = "runtime-benchmarks")]
+	type BenchmarkHelper = ();
 }
 
 parameter_types! {
@@ -1305,8 +1307,8 @@ impl pallet_preimage::Config for Runtime {
 
 parameter_types! {
 	pub const NftFractionalizationPalletId: PalletId = PalletId(*b"fraction");
-	pub NewAssetSymbol: BoundedVec<u8, StringLimit> = (*b"FRAC").to_vec().try_into().unwrap();
-	pub NewAssetName: BoundedVec<u8, StringLimit> = (*b"Frac").to_vec().try_into().unwrap();
+	pub NewAssetSymbol: BoundedVec<u8, StringLimit> = (*b"BRIX").to_vec().try_into().unwrap();
+	pub NewAssetName: BoundedVec<u8, StringLimit> = (*b"Brix").to_vec().try_into().unwrap();
 	pub const Deposit: Balance = DOLLARS;
 }
 
