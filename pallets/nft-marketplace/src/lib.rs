@@ -38,11 +38,7 @@ type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
 type BalanceOf<T> =
 	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
-type BalanceOf1<T> = <<T as pallet_nfts::Config>::Currency as Currency<
-	<T as frame_system::Config>::AccountId,
->>::Balance;
-
-type BalanceOf2<T> = <T as pallet_nft_fractionalization::Config>::AssetBalance;
+type BalanceOf1<T> = <T as pallet_nft_fractionalization::Config>::AssetBalance;
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -76,6 +72,7 @@ pub mod pallet {
 		}
 	}
 
+	/// Infos regardint an listed nft of a real estate object on the marketplace.
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
 	#[scale_info(skip_type_params(T))]
@@ -84,6 +81,7 @@ pub mod pallet {
 		pub asset_id: u32,
 	}
 
+	/// Infos regarding the listing of an real estate object.
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
 	#[scale_info(skip_type_params(T))]
@@ -96,6 +94,7 @@ pub mod pallet {
 		pub item_id: ItemId,
 	}
 
+	/// Infos regarding the listing of a token.
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
 	#[scale_info(skip_type_params(T))]
@@ -146,9 +145,7 @@ pub mod pallet {
 		#[pallet::constant]
 		type MaxListedNfts: Get<u32>;
 
-		/// The maximum amount of nfts for a collection.
-		type MaxNftInCollection: Get<u32>;
-
+		/// Collection id type from pallet nfts.
 		type CollectionId: IsType<<Self as pallet_nfts::Config>::CollectionId>
 			+ Parameter
 			+ From<u32>
@@ -158,6 +155,7 @@ pub mod pallet {
 			+ MaxEncodedLen
 			+ Encode;
 
+		/// Item id type from pallet nfts.
 		type ItemId: IsType<<Self as pallet_nfts::Config>::ItemId>
 			+ Parameter
 			+ From<u32>
@@ -166,6 +164,7 @@ pub mod pallet {
 			+ MaxEncodedLen
 			+ Encode;
 
+		/// Collection id type from pallet nft fractionalization.
 		type FractionalizeCollectionId: IsType<<Self as pallet_nft_fractionalization::Config>::NftCollectionId>
 			+ Parameter
 			+ From<CollectionId<Self>>
@@ -174,6 +173,7 @@ pub mod pallet {
 			+ MaxEncodedLen
 			+ Encode;
 
+		/// Item id type from pallet nft fractionalization.
 		type FractionalizeItemId: IsType<<Self as pallet_nft_fractionalization::Config>::NftId>
 			+ Parameter
 			+ From<u32>
@@ -182,6 +182,7 @@ pub mod pallet {
 			+ MaxEncodedLen
 			+ Encode;
 
+		/// Asset id type from pallet nft fractionalization.
 		type AssetId: IsType<<Self as pallet_nft_fractionalization::Config>::AssetId>
 			+ Parameter
 			+ From<u32>
@@ -211,7 +212,7 @@ pub mod pallet {
 	pub type FractionalizeCollectionId<T> = <T as Config>::FractionalizeCollectionId;
 	pub type FractionalizeItemId<T> = <T as Config>::FractionalizeItemId;
 
-	pub(super) type NftDetailsType<T> = NftListingDetails<
+	pub(super) type NftListingDetailsType<T> = NftListingDetails<
 		BalanceOf<T>,
 		<T as pallet::Config>::ItemId,
 		T,
@@ -223,6 +224,7 @@ pub mod pallet {
 		T,
 	>;
 
+	/// Id for the next nft.
 	#[pallet::storage]
 	#[pallet::getter(fn next_nft_id)]
 	pub(super) type NextNftId<T: Config> = StorageValue<
@@ -231,6 +233,8 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	/// Id of the possible next asset that would be used for
+	/// Nft fractionalization.
 	#[pallet::storage]
 	#[pallet::getter(fn next_asset_id)]
 	pub(super) type NextAssetId<T: Config> = StorageValue<
@@ -239,6 +243,7 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	/// The Id for the next token listing.
 	#[pallet::storage]
 	#[pallet::getter(fn next_listing_id)]
 	pub(super) type NextListingId<T: Config> = StorageValue<
@@ -247,6 +252,7 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	/// Storage of the collection id that will be used for all the nfts.
 	#[pallet::storage]
 	#[pallet::getter(fn pallet_collection_id)]
 	pub(super) type PalletCollectionId<T: Config> = StorageValue<
@@ -255,7 +261,7 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
-	/// Mapping from the nft to the nft details.
+	/// Mapping from the Nft to the Nft details.
 	#[pallet::storage]
 	#[pallet::getter(fn registered_nft_details)]
 	pub(super) type RegisteredNftDetails<T: Config> = StorageMap<
@@ -266,18 +272,18 @@ pub mod pallet {
 		OptionQuery,
 	>;
 
-	/// Mapping from the nft to the nft details.
+	/// Mapping from the nft to the ongoing nft listing details.
 	#[pallet::storage]
 	#[pallet::getter(fn ongoing_object_listing)]
 	pub(super) type OngoingObjectListing<T: Config> = StorageMap<
 		_,
 		Blake2_128Concat,
 		<T as pallet::Config>::ItemId,
-		NftDetailsType<T>,
+		NftListingDetailsType<T>,
 		OptionQuery,
 	>;
 
-	/// Mapping of collection to the listed nfts of this collection.
+	/// Mapping of the nft to the amount of listed token.
 	#[pallet::storage]
 	#[pallet::getter(fn listed_token)]
 	pub(super) type ListedToken<T: Config> = StorageMap<
@@ -288,17 +294,7 @@ pub mod pallet {
 		OptionQuery,
 	>;
 
-	/// Mapping of collection to the already sold nfts of this collection.
-	#[pallet::storage]
-	#[pallet::getter(fn sold_token)]
-	pub(super) type SoldToken<T: Config> = StorageMap<
-		_,
-		Blake2_128Concat,
-		<T as pallet::Config>::ItemId,
-		u8,
-		ValueQuery,
-	>;
-
+	/// Mapping of a nft to the buyer of the sold token.
 	#[pallet::storage]
 	#[pallet::getter(fn token_buyer)]
 	pub(super) type TokenBuyer<T: Config> = StorageMap<
@@ -309,6 +305,8 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	/// Double mapping of the account id of the token owner
+	/// and the nft to the amount of token.
 	#[pallet::storage]
 	#[pallet::getter(fn token_owner)]
 	pub(super) type TokenOwner<T: Config> = StorageDoubleMap<
@@ -321,6 +319,7 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	/// Mapping of the listing id to the listing details of a token listing.
 	#[pallet::storage]
 	#[pallet::getter(fn token_listings)]
 	pub(super) type TokenListings<T: Config> = StorageMap<
@@ -353,7 +352,7 @@ pub mod pallet {
 			let collection_id: CollectionId<T> = 1.into();
 			PalletCollectionId::<T>::put(collection_id);
 			let pallet_id: AccountIdOf<T> = <T as pallet::Config>::PalletId::get().into_account_truncating();
-			pallet_nfts::Pallet::<T>::do_create_collection(
+			let _ = pallet_nfts::Pallet::<T>::do_create_collection(
 				collection_id.into(),
 				pallet_id.clone(),
 				pallet_id.clone(),
@@ -407,7 +406,7 @@ pub mod pallet {
 			price: BalanceOf<T>,
 			seller: AccountIdOf<T>,
 		},
-		/// The price of the nft has been updated.
+		/// The price of the token listing has been updated.
 		ListingUpdated {
 			listing_index: u32,
 			new_price: BalanceOf<T>,
@@ -416,49 +415,34 @@ pub mod pallet {
 		ListingDelisted {
 			listing_index: u32,
 		},
+		/// The price of the listed object has been updated.
+		ObjectUpdated {
+			item_index: <T as pallet::Config>::ItemId,
+			new_price: BalanceOf<T>,
+		},
 	}
 
 	// Errors inform users that something went wrong.
 	#[pallet::error]
 	pub enum Error<T> {
-		/// Max amount of listed Nfts reached.
-		TooManyListedNfts,
 		/// This index is not taken.
 		InvalidIndex,
-		/// Too many nfts for this collection.
-		TooManyNfts,
 		/// The buyer doesn't have enough funds.
 		NotEnoughFunds,
 		/// The collection has not been found.
 		CollectionNotFound,
 		/// Not enough nfts available to buy.
 		NotEnoughNftsAvailable,
-		/// Distribution of the nfts failed.
-		DistributionError,
 		/// Error by convertion to balance type.
 		ConversionError,
 		/// Error by dividing a number.
 		DivisionError,
 		/// Error by multiplying a number.
 		MultiplyError,
-		/// There is an issue by calling the next collection id.
-		UnknownCollection,
-		/// The nft has not been found.
-		ItemNotFound,
 		/// No sufficient permission.
 		NoPermission,
-		/// The Nft is not listed on the marketplace.
-		NftNotListed,
-		/// The nft is relisted and can't be bought with this function.
-		NftIsRelisted,
 		/// The nft can't be bought with this function.
 		NftAlreadyRelisted,
-		/// Nft can only be bought through presale.
-		SpvNotCreated,
-		/// The Nft is not listed on the marketplace.
-		NftNotForSale,
-		/// Collection is not known to this pallet.
-		CollectionNotKnown,
 		/// User has not passed the kyc.
 		UserNotWhitelisted,
 		ArithmeticUnderflow,
@@ -532,7 +516,7 @@ pub mod pallet {
 			ListedToken::<T>::insert(item_id, 100);
 			
 			let user_lookup = <T::Lookup as StaticLookup>::unlookup(Self::account_id());
-			let nft_balance: BalanceOf2<T> = 100_u32.into();
+			let nft_balance: BalanceOf1<T> = 100_u32.into();
 			let fractionalize_collection_id: FractionalizeCollectionId<T> = collection_id.try_into().map_err(|_| Error::<T>::ConversionError)?;
 			let fractionalize_item_id: FractionalizeItemId<T> = next_item_id.try_into().map_err(|_| Error::<T>::ConversionError)?;
 			pallet_nft_fractionalization::Pallet::<T>::fractionalize(
@@ -556,15 +540,14 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// List a single token on the marketplace.
-		/// The nft nft must be registered on the marketplace.
+		/// List token on the marketplace.
+		/// The nft must be registered on the marketplace.
 		///
 		/// The origin must be Signed and the sender must have sufficient funds free.
 		///
 		/// Parameters:
-		/// - `collection_id`: The collection of the nft.
 		/// - `item_id`: The item id of the nft.
-		/// - `price`: The price of the nft that is offered.
+		/// - `price`: The price of token that are offered.
 		/// - `amount`: The amount of token of the real estate object that should be listed.
 		///
 		/// Emits `TokenListed` event when succesfful
@@ -582,7 +565,7 @@ pub mod pallet {
 				pallet_whitelist::Pallet::<T>::whitelisted_accounts(signer.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
-			let nft_details = Self::registered_nft_details(item_id).ok_or(Error::<T>::CollectionNotKnown)?;
+			let nft_details = Self::registered_nft_details(item_id).ok_or(Error::<T>::CollectionNotFound)?;
 			let pallet_lookup = <T::Lookup as StaticLookup>::unlookup(Self::account_id());
 			let asset_id: AssetId2<T> = nft_details.asset_id.into();
 			let token_amount = amount
@@ -622,7 +605,7 @@ pub mod pallet {
 		/// - `item`: The real estate nft that the investor wants to buy token from.
 		/// - `amount`: The amount of token that the investor wants to buy.
 		///
-		/// Emits `NftBought` event when succesfful.
+		/// Emits `TokenBoughtObject` event when succesfful.
 		#[pallet::call_index(2)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::buy_token())]
 		pub fn buy_token(
@@ -668,8 +651,6 @@ pub mod pallet {
 				.checked_add(&price).ok_or(Error::<T>::ArithmeticOverflow)?;
 			OngoingObjectListing::<T>::insert(item, nft_details);
 			TokenOwner::<T>::insert(origin.clone(), item, token_of_owner);
-			let mut sold_token = Self::sold_token(item);
-			SoldToken::<T>::insert(item, amount);
 			if listed_token == 0 {
 				Self::distribute_nfts(item)?;
 			} else {
@@ -812,6 +793,10 @@ pub mod pallet {
 			ensure!(Self::collection_exists(item_id), Error::<T>::CollectionNotFound);
 			nft_details.current_price = new_price;
 			OngoingObjectListing::<T>::insert(item_id, nft_details);
+			Self::deposit_event(Event::<T>::ObjectUpdated {
+				item_index: item_id,
+				new_price,
+			});
 			Ok(())
 		}
 
@@ -836,7 +821,7 @@ pub mod pallet {
 				pallet_whitelist::Pallet::<T>::whitelisted_accounts(signer.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
-			let mut listing_details =
+			let listing_details =
 				TokenListings::<T>::take(listing_id).ok_or(Error::<T>::TokenNotForSale)?;
 			ensure!(listing_details.seller == signer, Error::<T>::NoPermission);
 			let user_lookup = <T::Lookup as StaticLookup>::unlookup(signer.clone());
@@ -922,7 +907,6 @@ pub mod pallet {
 				)
 				.map_err(|_| Error::<T>::NotEnoughFunds)?;
 			}
-			SoldToken::<T>::take(item);
 			let mut registered_nft_details = Self::registered_nft_details(item).ok_or(Error::<T>::InvalidIndex)?;
 			registered_nft_details.spv_created = true;
 			RegisteredNftDetails::<T>::insert(item, registered_nft_details); 
