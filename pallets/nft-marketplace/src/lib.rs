@@ -568,8 +568,7 @@ pub mod pallet {
 			let nft_details = Self::registered_nft_details(item_id).ok_or(Error::<T>::CollectionNotFound)?;
 			let pallet_lookup = <T::Lookup as StaticLookup>::unlookup(Self::account_id());
 			let asset_id: AssetId2<T> = nft_details.asset_id.into();
-			let token_amount = amount
-				.try_into().map_err(|_| Error::<T>::ConversionError)?;
+			let token_amount = amount.into();
 			pallet_assets::Pallet::<T, Instance1>::transfer(
 				origin,
 				asset_id.into().into(),
@@ -665,15 +664,14 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Buy single nfts from the marketplace.
+		/// Buy token from the marketplace.
 		///
 		/// The origin must be Signed and the sender must have sufficient funds free.
 		///
 		/// Parameters:
-		/// - `collection_id`: The collection that the investor wants to buy from.
-		/// - `item_id`: The Item from the collection that the investor wants to buy from.
+		/// - `listing_id`: The listing that the investor wants to buy from.
 		///
-		/// Emits `NftBought` event when succesfful.
+		/// Emits `TokenBought` event when succesfful.
 		#[pallet::call_index(3)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::buy_single_nft())]
 		pub fn buy_relisted_token(
@@ -714,8 +712,7 @@ pub mod pallet {
 			Self::transfer_funds(&origin, &listing_details.seller, seller_part)?;
 			let user_lookup = <T::Lookup as StaticLookup>::unlookup(origin.clone());
 			let asset_id: AssetId2<T> = listing_details.asset_id.into();
-			let token_amount = listing_details.amount
-				.try_into().map_err(|_| Error::<T>::ConversionError)?;
+			let token_amount = listing_details.amount.into();
 			let pallet_origin: OriginFor<T> = RawOrigin::Signed(Self::account_id()).into();
 			pallet_assets::Pallet::<T, Instance1>::transfer(
 				pallet_origin,
@@ -732,16 +729,15 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Upgrade the price from a listed nft.
+		/// Upgrade the price from a listing.
 		///
 		/// The origin must be Signed and the sender must have sufficient funds free.
 		///
 		/// Parameters:
-		/// - `collection_id`: The collection that the seller wants to upgrade.
-		/// - `item_id`: The Item from the collection that the seller wants to update.
+		/// - `listing_id`: The listing that the seller wants to update.
 		/// - `new_price`: The new price of the nft.
 		///
-		/// Emits `NftUpdated` event when succesfful.
+		/// Emits `ListingUpdated` event when succesfful.
 		#[pallet::call_index(4)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::upgrade_listing())]
 		pub fn upgrade_listing(
@@ -771,10 +767,10 @@ pub mod pallet {
 		/// The origin must be Signed and the sender must have sufficient funds free.
 		///
 		/// Parameters:
-		/// - `collection_id`: The collection that the investor wants to buy from.
-		/// - `new_price`: The new price of the nft.
+		/// - `item_id`: The real estate nft that the investor wants to buy token from.
+		/// - `new_price`: The new price of the object.
 		///
-		/// Emits `NftUpdated` event when succesfful.
+		/// Emits `ObjectUpdated` event when succesfful.
 		#[pallet::call_index(5)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::upgrade_object())]
 		pub fn upgrade_object(
@@ -800,16 +796,15 @@ pub mod pallet {
 			Ok(())
 		}
 
- 		/// Delist the choosen nft from the marketplace.
-		/// Works only for relisted nfts.
+ 		/// Delist the choosen listing from the marketplace.
+		/// Works only for relisted token.
 		///
 		/// The origin must be Signed and the sender must have sufficient funds free.
 		///
 		/// Parameters:
-		/// - `collection_id`: The collection that the investor wants to buy from.
-		/// - `item_id`: The Item from the collection that the investor wants to buy from.
+		/// - `listing_id`: The listing that the seller wants to delist.
 		///
-		/// Emits `NftDelisted` event when succesfful.
+		/// Emits `ListingDelisted` event when succesfful.
 		#[pallet::call_index(6)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::delist_token())]
 		pub fn delist_token(
@@ -826,8 +821,7 @@ pub mod pallet {
 			ensure!(listing_details.seller == signer, Error::<T>::NoPermission);
 			let user_lookup = <T::Lookup as StaticLookup>::unlookup(signer.clone());
 			let asset_id: AssetId2<T> = listing_details.asset_id.into();
-			let token_amount = listing_details.amount
-				.try_into().map_err(|_| Error::<T>::ConversionError)?;
+			let token_amount = listing_details.amount.into();
 			let pallet_origin: OriginFor<T> = RawOrigin::Signed(Self::account_id()).into();
 			pallet_assets::Pallet::<T, Instance1>::transfer(
 				pallet_origin,
@@ -914,7 +908,7 @@ pub mod pallet {
 		}
 
 		/// Set the default collection configuration for creating a collection.
-		fn default_collection_config() -> CollectionConfig<
+/* 		fn default_collection_config() -> CollectionConfig<
 			BalanceOf1<T>,
 			BlockNumberFor<T>,
 			<T as pallet_nfts::Config>::CollectionId,
@@ -936,7 +930,7 @@ pub mod pallet {
 				max_supply: None,
 				mint_settings: MintSettings::default(),
 			}
-		}
+		} */
 
 		/// Set the default item configuration for minting a nft.
 		fn default_item_config() -> ItemConfig {
@@ -950,8 +944,7 @@ pub mod pallet {
 
 		/// Checks if the collection exists
 		fn collection_exists(item: <T as pallet::Config>::ItemId) -> bool {
-			let listed_nfts_count = ListedToken::<T>::contains_key(item);
-			listed_nfts_count
+			ListedToken::<T>::contains_key(item)
 		}
 
 		fn transfer_funds(

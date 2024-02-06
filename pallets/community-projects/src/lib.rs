@@ -983,7 +983,7 @@ pub mod pallet {
 			project.ongoing = true;
 			OngoingProjects::<T>::insert(collection_id, project);
 			let expiry_block = current_block_number.saturating_add(
-				milestone_period.try_into().map_err(|_| Error::<T>::ConversionError)?,
+				milestone_period.into(),
 			);
 			MilestonePeriodExpiring::<T>::try_mutate(expiry_block, |keys| {
 				keys.try_push(collection_id).map_err(|_| Error::<T>::TooManyProjects)?;
@@ -1022,7 +1022,7 @@ pub mod pallet {
 			let milestone_period =
 				if project.duration > 12 { project.duration * 10 / 12 } else { 10 };
 			let expiry_block = current_block_number.saturating_add(
-				milestone_period.try_into().map_err(|_| Error::<T>::ConversionError)?,
+				milestone_period.into(),
 			);
 			MilestonePeriodExpiring::<T>::try_mutate(expiry_block, |keys| {
 				keys.try_push(collection_id).map_err(|_| Error::<T>::TooManyProjects)?;
