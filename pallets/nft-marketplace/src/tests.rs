@@ -23,12 +23,11 @@ fn list_object_works() {
 			1_000_000,
 			bvec![22, 22]
 		));
-		assert_ok!(NftMarketplace::list_object(
-			RuntimeOrigin::signed([0; 32].into()),
-			1_000_000,
-			bvec![22, 22]
-		));
 		assert_eq!(NftMarketplace::listed_token(0).unwrap(), 100);
+		assert_eq!(NftMarketplace::next_nft_id(), 1);
+		assert_eq!(NftMarketplace::next_asset_id(), 1);
+		assert_eq!(NftMarketplace::ongoing_object_listing(0).is_some(), true);
+		assert_eq!(NftMarketplace::registered_nft_details(0).is_some(), true);
 	})
 }
 
@@ -83,7 +82,7 @@ fn buy_token_doesnt_work() {
 		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_noop!(
 			NftMarketplace::buy_token(RuntimeOrigin::signed([0; 32].into()), 1, 1),
-			Error::<Test>::CollectionNotFound
+			Error::<Test>::TokenNotForSale
 		);
 	})
 }
@@ -383,7 +382,7 @@ fn upgrade_object_for_relisted_nft_fails() {
 		assert_ok!(NftMarketplace::list_token(RuntimeOrigin::signed([0; 32].into()), 0, 1000, 1));
 		assert_noop!(
 			NftMarketplace::upgrade_object(RuntimeOrigin::signed([0; 32].into()), 0, 300),
-			Error::<Test>::NftAlreadyRelisted
+			Error::<Test>::SpvAlreadyCrated
 		);
 	})
 }
