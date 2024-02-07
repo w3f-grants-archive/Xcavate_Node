@@ -47,6 +47,7 @@ pub mod pallet {
 	use frame_system::pallet_prelude::*;
 
 	pub type ListedNftIndex = u32;
+	pub type LocationId = u32;
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
@@ -144,6 +145,9 @@ pub mod pallet {
 		/// The maximum amount of nfts that can be listed at the same time.
 		#[pallet::constant]
 		type MaxListedNfts: Get<u32>;
+
+		/// Origin who can unlock new locations.
+		type LocationOrigin: EnsureOrigin<Self::RuntimeOrigin>;
 
 		/// Collection id type from pallet nfts.
 		type CollectionId: IsType<<Self as pallet_nfts::Config>::CollectionId>
@@ -243,6 +247,14 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	#[pallet::storage]
+	#[pallet::getter(fn next_location_id)]
+	pub(super) type NextLocationId<T: Config> = StorageValue<
+		_,
+		LocationId,
+		ValueQuery,
+	>;
+
 	/// The Id for the next token listing.
 	#[pallet::storage]
 	#[pallet::getter(fn next_listing_id)]
@@ -252,13 +264,14 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
-	/// Storage of the collection id that will be used for all the nfts.
 	#[pallet::storage]
-	#[pallet::getter(fn pallet_collection_id)]
-	pub(super) type PalletCollectionId<T: Config> = StorageValue<
+	#[pallet::getter(fn location_collections)]
+	pub(super) type LocationCollections<T: Config> = StorageMap<
 		_,
+		Blake2_128Concat,
+		LocationId,
 		<T as pallet::Config>::CollectionId,
-		ValueQuery,
+		OptionQuery,
 	>;
 
 	/// Mapping from the Nft to the Nft details.
@@ -329,54 +342,6 @@ pub mod pallet {
 		ListingDetailsType<T>,
 		OptionQuery,
 	>;
-
-	#[pallet::genesis_config]
-	#[derive(frame_support::DefaultNoBound)]
-	pub struct GenesisConfig<T: Config> {
-		#[serde(skip)]
-		_config: sp_std::marker::PhantomData<T>,
-	}
-
-	#[pallet::genesis_build]
-	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
-		fn build(&self) {
-			if pallet_nfts::NextCollectionId::<T>::get().is_none() {
-				pallet_nfts::NextCollectionId::<T>::set(
-					<T as pallet_nfts::Config>::CollectionId::initial_value(),
-				);
-			};
-			let collection_id =
-				pallet_nfts::NextCollectionId::<T>::get().unwrap();
-			let next_collection_id = collection_id.increment();
-			pallet_nfts::NextCollectionId::<T>::set(next_collection_id);
-			let collection_id: CollectionId<T> = 1.into();
-			PalletCollectionId::<T>::put(collection_id);
-			let pallet_id: AccountIdOf<T> = <T as pallet::Config>::PalletId::get().into_account_truncating();
-			let _ = pallet_nfts::Pallet::<T>::do_create_collection(
-				collection_id.into(),
-				pallet_id.clone(),
-				pallet_id.clone(),
-				CollectionConfig {
-					settings: CollectionSettings::from_disabled(CollectionSetting::DepositRequired.into()),
-					max_supply: None,
-					mint_settings: MintSettings::default(),
-				},
-				T::CollectionDeposit::get(),
-				pallet_nfts::Event::Created {
-					creator: pallet_id.clone(),
-					owner: pallet_id,
-					collection: collection_id.into(),
-				},
-			);
-/* 			pallet_nfts::Pallet::<T>::set_team(
-				origin.clone(),
-				collection_id.into(),
-				None,
-				None,
-				None,
-			); */
-		}
-	}
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -453,6 +418,8 @@ pub mod pallet {
 		NftNotFound,
 		/// There are already too many token buyer.
 		TooManyTokenBuyer,
+		/// This ID has no used.
+		LocationUnknown,
 	}
 
 	#[pallet::call]
@@ -471,6 +438,7 @@ pub mod pallet {
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::list_object())]
 		pub fn list_object(
 			origin: OriginFor<T>,
+			location: LocationId,
 			price: BalanceOf<T>,
 			data: BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>,
 		) -> DispatchResult {
@@ -480,7 +448,7 @@ pub mod pallet {
 				pallet_whitelist::Pallet::<T>::whitelisted_accounts(signer.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
-			let collection_id: CollectionId<T> = Self::pallet_collection_id();
+			let collection_id: CollectionId<T> = Self::location_collections(location).ok_or(Error::<T>::LocationUnknown)?;
 
 			let mut next_item_id = Self::next_nft_id();
 			let mut asset_number: u32 = Self::next_asset_id();
@@ -818,6 +786,46 @@ pub mod pallet {
 			});
 			Ok(())
 		}  
+
+		#[pallet::call_index(7)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::delist_token())]
+		pub fn create_new_location(
+			origin: OriginFor<T>,
+		) -> DispatchResult {
+			T::LocationOrigin::ensure_origin(origin)?;
+			if pallet_nfts::NextCollectionId::<T>::get().is_none() {
+				pallet_nfts::NextCollectionId::<T>::set(
+					<T as pallet_nfts::Config>::CollectionId::initial_value(),
+				);
+			};
+			let collection_id =
+				pallet_nfts::NextCollectionId::<T>::get().unwrap();
+			let next_collection_id = collection_id.increment();
+			pallet_nfts::NextCollectionId::<T>::set(next_collection_id);
+			let collection_id: CollectionId<T> = collection_id.into();
+			let pallet_id: AccountIdOf<T> = <T as pallet::Config>::PalletId::get().into_account_truncating();
+			let _ = pallet_nfts::Pallet::<T>::do_create_collection(
+				collection_id.into(),
+				pallet_id.clone(),
+				pallet_id.clone(),
+				CollectionConfig {
+					settings: CollectionSettings::from_disabled(CollectionSetting::DepositRequired.into()),
+					max_supply: None,
+					mint_settings: MintSettings::default(),
+				},
+				T::CollectionDeposit::get(),
+				pallet_nfts::Event::Created {
+					creator: pallet_id.clone(),
+					owner: pallet_id,
+					collection: collection_id.into(),
+				},
+			)?;
+			let mut location_id = Self::next_location_id();
+			LocationCollections::<T>::insert(location_id, collection_id);
+			location_id = location_id.checked_add(1).ok_or(Error::<T>::ArithmeticOverflow)?;
+			NextLocationId::<T>::put(location_id);
+			Ok(())
+		}
 	}
 
 	impl<T: Config> Pallet<T> {

@@ -41,7 +41,7 @@ frame_support::construct_runtime!(
 		System: frame_system::{Pallet, Call, Config<T>, Storage, Event<T>},
 		Uniques: pallet_nfts::{Pallet, Call, Storage, Event<T>},
 		NftFractionalization: pallet_nft_fractionalization,
-		NftMarketplace: pallet_nft_marketplace::{Pallet, Call, Storage, Config<T>, Event<T>},
+		NftMarketplace: pallet_nft_marketplace,
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
 		Assets: pallet_assets::<Instance1>,
 		Whitelist: pallet_whitelist,
@@ -207,6 +207,7 @@ impl pallet_nft_marketplace::Config for Test {
 	type WeightInfo = weights::SubstrateWeight<Test>;
 	type Currency = Balances;
 	type PalletId = NftMarketplacePalletId;
+	type LocationOrigin = EnsureRoot<Self::AccountId>;
 	#[cfg(feature = "runtime-benchmarks")]
 	type Helper = NftHelper;
 	type MaxListedNfts = MaxListedNft;

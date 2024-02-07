@@ -511,6 +511,7 @@ impl pallet_nft_marketplace::Config for Runtime {
 	type Currency = Balances;
 	type PalletId = NftMarketplacePalletId;
 	type MaxListedNfts = MaxListedNft;
+	type LocationOrigin = EnsureRoot<Self::AccountId>;
 	#[cfg(feature = "runtime-benchmarks")]
 	type Helper = pallet_nft_marketplace::NftHelper;
 	type CollectionId = u32;

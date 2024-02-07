@@ -286,6 +286,5 @@ fn testnet_genesis(
 		},
 		community_loan_pool: Default::default(),
 		nomination_pools: Default::default(),
-		nft_marketplace: Default::default(),
 	}
 }
