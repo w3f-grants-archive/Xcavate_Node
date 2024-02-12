@@ -7,7 +7,7 @@ fn add_to_whitelist_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), 1));
-		assert_eq!(Whitelist::whitelisted_accounts()[0], 1);
+		assert_eq!(Whitelist::whitelisted_accounts(1), true);
 	});
 }
 
@@ -37,7 +37,7 @@ fn remove_from_whitelist_works() {
 		System::set_block_number(1);
 		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), 1));
 		assert_ok!(Whitelist::remove_from_whitelist(RuntimeOrigin::root(), 1));
-		assert_eq!(Whitelist::whitelisted_accounts().len(), 0);
+		assert_eq!(Whitelist::whitelisted_accounts(1), false);
 	});
 }
 

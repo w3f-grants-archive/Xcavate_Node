@@ -42,7 +42,7 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn whitelisted_accounts)]
 	pub type WhitelistedAccounts<T: Config> =
-		StorageValue<_, BoundedVec<AccountIdOf<T>, T::MaxUsersInWhitelist>, ValueQuery>;
+		StorageMap<_, Blake2_128Concat, AccountIdOf<T>, bool, ValueQuery>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -78,10 +78,8 @@ pub mod pallet {
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::add_to_whitelist())]
 		pub fn add_to_whitelist(origin: OriginFor<T>, user: AccountIdOf<T>) -> DispatchResult {
 			T::WhitelistOrigin::ensure_origin(origin)?;
-			let current_whitelist = Self::whitelisted_accounts();
-			ensure!(!current_whitelist.contains(&user), Error::<T>::AccountAlreadyWhitelisted);
-			WhitelistedAccounts::<T>::try_append(user.clone())
-				.map_err(|_| Error::<T>::TooManyUsers)?;
+			ensure!(!Self::whitelisted_accounts(user.clone()), Error::<T>::AccountAlreadyWhitelisted);
+			WhitelistedAccounts::<T>::insert(user.clone(), true);
 			Self::deposit_event(Event::<T>::NewUserWhitelisted { user });
 			Ok(())
 		}
@@ -98,14 +96,8 @@ pub mod pallet {
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::remove_from_whitelist())]
 		pub fn remove_from_whitelist(origin: OriginFor<T>, user: AccountIdOf<T>) -> DispatchResult {
 			T::WhitelistOrigin::ensure_origin(origin)?;
-			let mut current_whitelist = Self::whitelisted_accounts();
-			ensure!(current_whitelist.contains(&user), Error::<T>::UserNotInWhitelist);
-			let index = current_whitelist
-				.iter()
-				.position(|x| *x == user)
-				.ok_or(Error::<T>::UserNotInWhitelist)?;
-			current_whitelist.remove(index);
-			WhitelistedAccounts::<T>::put(current_whitelist);
+			ensure!(Self::whitelisted_accounts(user.clone()), Error::<T>::UserNotInWhitelist);
+			WhitelistedAccounts::<T>::take(user.clone());
 			Self::deposit_event(Event::<T>::UserRemoved { user });
 			Ok(())
 		}

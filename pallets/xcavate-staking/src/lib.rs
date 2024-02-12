@@ -234,7 +234,7 @@ pub mod pallet {
 			let staker = ensure_signed(origin)?;
 
 			ensure!(
-				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&staker),
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts(staker.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
 
@@ -286,7 +286,7 @@ pub mod pallet {
 			let staker = ensure_signed(origin)?;
 
 			ensure!(
-				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&staker),
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts(staker.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
 
@@ -344,7 +344,7 @@ pub mod pallet {
 			let staker = ensure_signed(origin)?;
 
 			ensure!(
-				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&staker),
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts(staker.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
 

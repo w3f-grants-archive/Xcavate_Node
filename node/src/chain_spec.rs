@@ -1,8 +1,8 @@
 use node_template_runtime::{
 	constants::currency::DOLLARS, opaque::SessionKeys, AccountId, AssetsConfig, BabeConfig,
-	Balance, BalancesConfig, CouncilConfig, DemocracyConfig, GenesisConfig, MaxNominations,
+	Balance, BalancesConfig, CouncilConfig, DemocracyConfig, MaxNominations,
 	SessionConfig, Signature, StakerStatus, StakingConfig, SudoConfig, SystemConfig,
-	TechnicalCommitteeConfig, BABE_GENESIS_EPOCH_CONFIG, WASM_BINARY,
+	TechnicalCommitteeConfig, BABE_GENESIS_EPOCH_CONFIG, WASM_BINARY, RuntimeGenesisConfig
 };
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use sc_service::{ChainType, Properties};
@@ -19,7 +19,7 @@ use sp_runtime::{
 // const STAGING_TELEMETRY_URL: &str = "wss://telemetry.polkadot.io/submit/";
 
 /// Specialized `ChainSpec`. This is a specialization of the general Substrate ChainSpec type.
-pub type ChainSpec = sc_service::GenericChainSpec<GenesisConfig>;
+pub type ChainSpec = sc_service::GenericChainSpec<RuntimeGenesisConfig>;
 
 /// Generate a crypto pair from seed.
 pub fn get_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Public {
@@ -61,6 +61,14 @@ fn session_keys(
 	SessionKeys { grandpa, aura, im_online, authority_discovery }
 }
 
+pub fn get_root_account() -> AccountId {
+	let json_data = &include_bytes!("../../seed/balances.json")[..];
+	let additional_accounts_with_balance: Vec<(AccountId, u128)> =
+		serde_json::from_slice(json_data).unwrap_or_default();
+
+	additional_accounts_with_balance[0].0.clone()
+}
+
 pub fn get_endowed_accounts_with_balance() -> Vec<(AccountId, u128)> {
 	let accounts: Vec<AccountId> = vec![
 		get_account_id_from_seed::<sr25519::Public>("Alice"),
@@ -96,14 +104,6 @@ pub fn get_endowed_accounts_with_balance() -> Vec<(AccountId, u128)> {
 	accounts
 }
 
-pub fn get_root_account() -> AccountId {
-	let json_data = &include_bytes!("../../seed/balances.json")[..];
-	let additional_accounts_with_balance: Vec<(AccountId, u128)> =
-		serde_json::from_slice(json_data).unwrap_or_default();
-
-	additional_accounts_with_balance[0].0.clone()
-}
-
 pub fn development_config() -> Result<ChainSpec, String> {
 	let wasm_binary = WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?;
 
@@ -124,7 +124,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 				wasm_binary,
 				vec![authority_keys_from_seed("Alice")],
 				vec![],
-				get_account_id_from_seed::<sr25519::Public>("Alice"),
+				get_root_account(),
 				get_endowed_accounts_with_balance(),
 				true,
 			)
@@ -162,7 +162,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 				wasm_binary,
 				vec![authority_keys_from_seed("Alice"), authority_keys_from_seed("Bob")],
 				vec![],
-				get_account_id_from_seed::<sr25519::Public>("Alice"),
+				get_root_account(),
 				get_endowed_accounts_with_balance(),
 				true,
 			)
@@ -196,7 +196,7 @@ fn testnet_genesis(
 	root_key: AccountId,
 	endowed_accounts: Vec<(AccountId, u128)>,
 	_enable_println: bool,
-) -> GenesisConfig {
+) -> RuntimeGenesisConfig {
 	// endow all authorities and nominators.
 	/* 	initial_authorities
 	.iter()
@@ -231,7 +231,7 @@ fn testnet_genesis(
 	const ENDOWMENT: Balance = 10_000_000 * DOLLARS;
 	const STASH: Balance = ENDOWMENT / 1000;
 
-	GenesisConfig {
+	RuntimeGenesisConfig {
 		system: SystemConfig { code: wasm_binary.to_vec(), ..Default::default() },
 		balances: BalancesConfig {
 			balances: endowed_accounts.iter().cloned().map(|x| (x.0.clone(), x.1)).collect(),
@@ -285,5 +285,6 @@ fn testnet_genesis(
 			phantom: Default::default(),
 		},
 		community_loan_pool: Default::default(),
+		nomination_pools: Default::default(),
 	}
 }

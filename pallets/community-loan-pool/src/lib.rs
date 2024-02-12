@@ -27,7 +27,6 @@ use frame_support::sp_runtime::Percent;
 use frame_support::{
 	//	inherent::Vec,
 	pallet_prelude::*,
-	sp_runtime,
 	traits::{
 		Currency, ExistenceRequirement::KeepAlive, Get, Incrementable, OnUnbalanced,
 		ReservableCurrency, UnixTime,
@@ -254,11 +253,18 @@ pub mod pallet {
 	pub type CollectionId<T> = <T as Config>::CollectionId;
 	pub type ItemId<T> = <T as Config>::ItemId;
 
+	pub(super) type LoanInfoType<T> = LoanInfo<
+		BalanceOf<T>,
+		<T as pallet::Config>::CollectionId,
+		<T as pallet::Config>::ItemId,
+		T,
+	>;
+
 	/// Vec of admins who are able to vote.
 	#[pallet::storage]
 	#[pallet::getter(fn voting_committee)]
 	pub(super) type VotingCommittee<T: Config> =
-		StorageValue<_, BoundedVec<AccountIdOf<T>, T::MaxOngoingLoans>, ValueQuery>;
+		StorageValue<_, BoundedVec<AccountIdOf<T>, T::MaxCommitteeMembers>, ValueQuery>;
 
 	/// Number of loans that have been made.
 	#[pallet::storage]
@@ -342,12 +348,7 @@ pub mod pallet {
 		_,
 		Blake2_128Concat,
 		LoanIndex,
-		LoanInfo<
-			BalanceOf<T>,
-			<T as pallet::Config>::CollectionId,
-			<T as pallet::Config>::ItemId,
-			T,
-		>,
+		LoanInfoType<T>,
 		OptionQuery,
 	>;
 
@@ -640,7 +641,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			ensure!(
-				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&origin),
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts(origin.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
 			let beneficiary = T::Lookup::lookup(beneficiary)?;
@@ -698,7 +699,7 @@ pub mod pallet {
 		pub fn propose_milestone(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			ensure!(
-				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&origin),
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts(origin.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
 			let loan = Self::loans(loan_id).ok_or(Error::<T>::InvalidIndex)?;
@@ -742,7 +743,7 @@ pub mod pallet {
 		pub fn propose_deletion(origin: OriginFor<T>, loan_id: LoanIndex) -> DispatchResult {
 			let origin = ensure_signed(origin.clone())?;
 			ensure!(
-				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&origin),
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts(origin.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
 			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
@@ -787,7 +788,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
 			ensure!(
-				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&signer),
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts(signer.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
 			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
@@ -835,7 +836,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
 			ensure!(
-				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&signer),
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts(signer.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
 			let mut loan = <Loans<T>>::take(loan_id).ok_or(Error::<T>::InvalidIndex)?;
@@ -906,7 +907,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			ensure!(
-				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&origin),
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts(origin.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
 			let current_members = Self::voting_committee();
@@ -958,7 +959,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			ensure!(
-				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&origin),
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts(origin.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
 			let current_members = Self::voting_committee();
@@ -1003,7 +1004,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			ensure!(
-				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&origin),
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts(origin.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
 			let current_members = Self::voting_committee();
@@ -1046,7 +1047,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			ensure!(
-				pallet_whitelist::Pallet::<T>::whitelisted_accounts().contains(&origin),
+				pallet_whitelist::Pallet::<T>::whitelisted_accounts(origin.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
 			let current_members = Self::voting_committee();

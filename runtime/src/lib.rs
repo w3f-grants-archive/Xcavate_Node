@@ -12,13 +12,14 @@ use codec::Decode;
 mod voter_bags;
 use constants::{currency::*, time::*};
 use frame_election_provider_support::{onchain, ExtendedBalance, SequentialPhragmen, VoteWeight};
+use frame_support::genesis_builder_helper::{build_config, create_default_config};
 use frame_support::{
 	instances::{Instance1, Instance2},
 	ord_parameter_types,
 	pallet_prelude::{DispatchClass, Get},
 	traits::{
-		tokens::nonfungibles_v2::Inspect, AsEnsureOriginWithArg, EitherOfDiverse,
-		EqualPrivilegeOnly, TrackedStorageKey,
+		tokens::{PayFromAccount, UnityAssetBalanceConversion}, AsEnsureOriginWithArg, EitherOfDiverse,
+		EqualPrivilegeOnly, fungible::HoldConsideration, LinearStoragePrice,
 	},
 	PalletId,
 };
@@ -65,7 +66,7 @@ use impls::CreditToBlockAuthor;
 // A few exports that help ease life for downstream crates.
 use frame_election_provider_support::bounds::{ElectionBounds, ElectionBoundsBuilder};
 pub use frame_support::{
-	construct_runtime, parameter_types,
+	construct_runtime, derive_impl, parameter_types,
 	traits::{
 		ConstU128, ConstU32, ConstU64, ConstU8, KeyOwnerProofSystem, Randomness, StorageInfo,
 	},
@@ -75,11 +76,11 @@ pub use frame_support::{
 		},
 		IdentityFee, Weight,
 	},
-	StorageValue,
+	StorageValue, BoundedVec,
 };
 pub use frame_system::Call as SystemCall;
 pub use pallet_balances::Call as BalancesCall;
-use pallet_election_provider_multi_phase::SolutionAccuracyOf;
+use pallet_election_provider_multi_phase::{SolutionAccuracyOf, GeometricDepositBase};
 /// Import the nft pallet
 use pallet_nfts::PalletFeatures;
 #[cfg(any(feature = "std", test))]
@@ -89,6 +90,7 @@ use pallet_transaction_payment::{ConstFeeMultiplier, CurrencyAdapter, Multiplier
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
+use sp_runtime::traits::IdentityLookup;
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -252,6 +254,8 @@ parameter_types! {
 impl frame_system::Config for Runtime {
 	/// The basic call filter to use in dispatchable.
 	type BaseCallFilter = frame_support::traits::Everything;
+	/// The block type for the runtime.
+	type Block = Block;
 	/// Block & extrinsics weights: base values and limits.
 	type BlockWeights = BlockWeights;
 	/// The maximum length of a block (in bytes).
@@ -260,10 +264,10 @@ impl frame_system::Config for Runtime {
 	type AccountId = AccountId;
 	/// The aggregated dispatch type that is available for extrinsics.
 	type RuntimeCall = RuntimeCall;
-	type Nonce = Nonce;
-	type Block = Block;
 	/// The lookup mechanism to get account ID from whatever is passed in dispatchers.
 	type Lookup = AccountIdLookup<AccountId, ()>;
+	/// The type for storing how many extrinsics an account has signed.
+	type Nonce = Nonce;
 	/// The type for hashing blocks and tries.
 	type Hash = Hash;
 	/// The hashing algorithm used.
@@ -371,9 +375,10 @@ impl pallet_balances::Config for Runtime {
 	type AccountStore = System;
 	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type FreezeIdentifier = (); // FIXME
-	type MaxHolds = ConstU32<50>; // FIXME
-	type MaxFreezes = ConstU32<50>; // FIXME
+	type RuntimeFreezeReason = RuntimeFreezeReason;
+	type FreezeIdentifier = RuntimeFreezeReason;
+	type MaxFreezes = ConstU32<1>;
+	type MaxHolds = ConstU32<1>;
 }
 
 parameter_types! {
@@ -496,8 +501,7 @@ impl pallet_xcavate_staking::Config for Runtime {
 
 parameter_types! {
 	pub const NftMarketplacePalletId: PalletId = PalletId(*b"py/nftxc");
-	pub const MaxListedNft: u32 = 300000;
-	pub const MaxNftsInCollection: u32 = 100;
+	pub const MaxListedNft: u32 = 100;
 }
 
 /// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
@@ -507,22 +511,24 @@ impl pallet_nft_marketplace::Config for Runtime {
 	type Currency = Balances;
 	type PalletId = NftMarketplacePalletId;
 	type MaxListedNfts = MaxListedNft;
-	type MaxNftInCollection = MaxNftsInCollection;
+	type LocationOrigin = EnsureRoot<Self::AccountId>;
 	#[cfg(feature = "runtime-benchmarks")]
 	type Helper = pallet_nft_marketplace::NftHelper;
 	type CollectionId = u32;
 	type ItemId = u32;
 	type TreasuryId = TreasuryPalletId;
 	type CommunityProjectsId = CommunityProjectPalletId;
+	type FractionalizeCollectionId = <Self as pallet_nfts::Config>::CollectionId;
+	type FractionalizeItemId = <Self as pallet_nfts::Config>::ItemId;
+	type AssetId = <Self as pallet_assets::Config<Instance1>>::AssetId;
+	type AssetId2 = u32;
 }
 
 parameter_types! {
 	pub const CommunityProjectPalletId: PalletId = PalletId(*b"py/cmprj");
 	pub const MaxNftType: u32 = 4;
-	pub const MaxListedNftProject: u32 = 100000;
-	pub const MaxNftsInCollectionProject: u32 = 5000;
-	pub const MaxOngoingProject: u32 = 1000;
-	pub const MaxNftHolders: u32 = 5000;
+	pub const MaxNftsInCollectionProject: u32 = 100;
+	pub const MaxOngoingProject: u32 = 250;
 }
 
 /// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
@@ -532,13 +538,11 @@ impl pallet_community_projects::Config for Runtime {
 	type Currency = Balances;
 	type PalletId = CommunityProjectPalletId;
 	type MaxNftTypes = MaxNftType;
-	type MaxListedNfts = MaxListedNftProject;
 	type MaxNftInCollection = MaxNftsInCollectionProject;
 	#[cfg(feature = "runtime-benchmarks")]
 	type Helper = pallet_community_projects::NftHelper;
 	type TimeProvider = Timestamp;
 	type MaxOngoingProjects = MaxOngoingProject;
-	type MaxNftHolder = MaxNftHolders;
 	type AssetId = u32;
 	type CollectionId = u32;
 	type ItemId = u32;
@@ -546,7 +550,7 @@ impl pallet_community_projects::Config for Runtime {
 }
 
 parameter_types! {
-	pub const MaxWhitelistUsers: u32 = 100000;
+	pub const MaxWhitelistUsers: u32 = 1000;
 }
 
 /// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
@@ -565,8 +569,8 @@ parameter_types! {
 	pub const MaxAttributesPerCall: u32 = 10;
 	pub const CollectionDeposit: Balance = DOLLARS;
 	pub const ItemDeposit: Balance = DOLLARS;
-	pub const MetadataDepositBase: Balance = 10 * DOLLARS;
-	pub const MetadataDepositPerByte: Balance = DOLLARS;
+	pub const MetadataDepositBase: Balance = DOLLARS;
+	pub const MetadataDepositPerByte: Balance = DOLLARS / 100;
 	pub const StringLimit: u32 = 5000;
 	pub const KeyLimit: u32 = 32;
 	pub const ValueLimit: u32 = 256;
@@ -608,7 +612,8 @@ impl pallet_nfts::Config for Runtime {
 	type WeightInfo = pallet_nfts::weights::SubstrateWeight<Runtime>;
 	#[cfg(feature = "runtime-benchmarks")]
 	type Helper = ();
-	type CreateOrigin = AsEnsureOriginWithArg<EnsureSignedBy<CollectionCreationOrigin, AccountId>>;
+	//type CreateOrigin = AsEnsureOriginWithArg<EnsureSignedBy<CollectionCreationOrigin, AccountId>>;
+	type CreateOrigin = AsEnsureOriginWithArg<EnsureSigned<AccountId>>;
 	type Locker = ();
 }
 
@@ -801,6 +806,8 @@ parameter_types! {
 	pub const MaximumReasonLength: u32 = 300;
 	pub const MaxApprovals: u32 = 100;
 	pub const MaxBalance: Balance = Balance::max_value();
+	pub TreasuryAccount: AccountId = Treasury::account_id();
+	pub const PayoutSpendPeriod: BlockNumber = 30 * DAYS;
 }
 
 impl pallet_treasury::Config for Runtime {
@@ -831,6 +838,14 @@ impl pallet_treasury::Config for Runtime {
 	type WeightInfo = pallet_treasury::weights::SubstrateWeight<Runtime>;
 	type MaxApprovals = MaxApprovals;
 	type SpendOrigin = EnsureWithSuccess<EnsureRoot<AccountId>, AccountId, MaxBalance>;
+	type AssetKind = ();
+	type Beneficiary = Self::AccountId;
+	type BeneficiaryLookup = IdentityLookup<Self::AccountId>;
+	type Paymaster = PayFromAccount<Balances, TreasuryAccount>;
+	type BalanceConverter = UnityAssetBalanceConversion;
+	type PayoutPeriod = PayoutSpendPeriod;
+	#[cfg(feature = "runtime-benchmarks")]
+	type BenchmarkHelper = ();
 }
 
 parameter_types! {
@@ -1085,6 +1100,11 @@ impl pallet_election_provider_multi_phase::MinerConfig for SubmitMinerConfig {
 	}
 }
 
+parameter_types! {
+	pub const SignedFixedDeposit: Balance = deposit(2, 0);
+	pub const SignedDepositIncreaseFactor: Percent = Percent::from_percent(10);
+}
+
 impl pallet_election_provider_multi_phase::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = Balances;
@@ -1098,7 +1118,7 @@ impl pallet_election_provider_multi_phase::Config for Runtime {
 	type MinerTxPriority = MultiPhaseUnsignedPriority;
 	type SignedMaxSubmissions = ConstU32<10>;
 	type SignedRewardBase = SignedRewardBase;
-	type SignedDepositBase = SignedDepositBase;
+	type SignedDepositBase = GeometricDepositBase<Balance, SignedFixedDeposit, SignedDepositIncreaseFactor>;
 	type SignedDepositByte = SignedDepositByte;
 	type SignedMaxRefunds = ConstU32<3>;
 	type SignedDepositWeight = ();
@@ -1151,6 +1171,7 @@ impl pallet_nomination_pools::Config for Runtime {
 	type WeightInfo = ();
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = Balances;
+	type RuntimeFreezeReason = RuntimeFreezeReason;
 	type RewardCounter = FixedU128;
 	type BalanceToU256 = BalanceToU256;
 	type U256ToBalance = U256ToBalance;
@@ -1264,10 +1285,10 @@ impl pallet_scheduler::Config for Runtime {
 }
 
 parameter_types! {
-	pub const PreimageMaxSize: u32 = 4096 * 1024;
 	pub const PreimageBaseDeposit: Balance = DOLLARS;
 	// One cent: $10,000 / MB
 	pub const PreimageByteDeposit: Balance = CENTS;
+	pub const PreimageHoldReason: RuntimeHoldReason = RuntimeHoldReason::Preimage(pallet_preimage::HoldReason::Preimage);
 }
 
 impl pallet_preimage::Config for Runtime {
@@ -1275,8 +1296,40 @@ impl pallet_preimage::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = Balances;
 	type ManagerOrigin = EnsureRoot<AccountId>;
-	type BaseDeposit = PreimageBaseDeposit;
-	type ByteDeposit = PreimageByteDeposit;
+	type Consideration = HoldConsideration<
+		AccountId,
+		Balances,
+		PreimageHoldReason,
+		LinearStoragePrice<PreimageBaseDeposit, PreimageByteDeposit, Balance>,
+	>;
+}
+
+parameter_types! {
+	pub const NftFractionalizationPalletId: PalletId = PalletId(*b"fraction");
+	pub NewAssetSymbol: BoundedVec<u8, StringLimit> = (*b"BRIX").to_vec().try_into().unwrap();
+	pub NewAssetName: BoundedVec<u8, StringLimit> = (*b"Brix").to_vec().try_into().unwrap();
+	pub const Deposit: Balance = DOLLARS;
+}
+
+
+impl pallet_nft_fractionalization::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type Deposit = Deposit;
+	type Currency = Balances;
+	type NewAssetSymbol = NewAssetSymbol;
+	type NewAssetName = NewAssetName;
+	type NftCollectionId = <Self as pallet_nfts::Config>::CollectionId;
+	type NftId = <Self as pallet_nfts::Config>::ItemId;
+	type AssetBalance = <Self as pallet_balances::Config>::Balance;
+	type AssetId = <Self as pallet_assets::Config<Instance1>>::AssetId;
+	type Assets = Assets;
+	type Nfts = Nfts;
+	type PalletId = NftFractionalizationPalletId;
+	type WeightInfo = ();
+	type StringLimit = StringLimit;
+	#[cfg(feature = "runtime-benchmarks")]
+	type BenchmarkHelper = ();
+	type RuntimeHoldReason = RuntimeHoldReason;
 }
 
 // TODO::
@@ -1447,7 +1500,7 @@ construct_runtime!(
 		Staking: pallet_staking::{Pallet, Call, Config<T>, Storage, Event<T>},
 		ElectionProviderMultiPhase: pallet_election_provider_multi_phase::{Pallet, Call, Storage, Event<T>, ValidateUnsigned},
 		BagsList: pallet_bags_list::{Pallet, Call, Storage, Event<T>},
-		NominationPools: pallet_nomination_pools::{Pallet, Call, Storage, Event<T>},
+		NominationPools: pallet_nomination_pools::{Pallet, Call, Storage, Event<T>, Config<T>, FreezeReason},
 		Offences: pallet_offences::{Pallet, Storage, Event},
 		ImOnline: pallet_im_online::{Pallet, Call, Storage, Event<T>, ValidateUnsigned, Config<T>},
 		Council: pallet_collective::<Instance1>,
@@ -1458,6 +1511,7 @@ construct_runtime!(
 		Scheduler: pallet_scheduler,
 		Preimage: pallet_preimage,
 		Democracy: pallet_democracy,
+		NftFractionalization: pallet_nft_fractionalization,
 
 		// TODO:
 		// Referenda: pallet_referenda,
@@ -1528,54 +1582,11 @@ mod benches {
 		[pallet_assets, Assets]
 		[pallet_utility, Utility]
 		[pallet_multisig, Multisig]
+		[pallet_nft_fractionalization, NftFractionalization]
 	);
 }
 
 impl_runtime_apis! {
-	impl pallet_nfts_runtime_api::NftsApi<Block, AccountId, u32, u32> for Runtime {
-		fn owner(collection: u32, item: u32) -> Option<AccountId> {
-			<Nfts as Inspect<AccountId>>::owner(&collection, &item)
-		}
-
-		fn collection_owner(collection: u32) -> Option<AccountId> {
-			<Nfts as Inspect<AccountId>>::collection_owner(&collection)
-		}
-
-		fn attribute(
-			collection: u32,
-			item: u32,
-			key: Vec<u8>,
-		) -> Option<Vec<u8>> {
-			<Nfts as Inspect<AccountId>>::attribute(&collection, &item, &key)
-		}
-
-		fn custom_attribute(
-			account: AccountId,
-			collection: u32,
-			item: u32,
-			key: Vec<u8>,
-		) -> Option<Vec<u8>> {
-			<Nfts as Inspect<AccountId>>::custom_attribute(
-				&account,
-				&collection,
-				&item,
-				&key,
-			)
-		}
-
-		fn system_attribute(
-			collection: u32,
-			item: u32,
-			key: Vec<u8>,
-		) -> Option<Vec<u8>> {
-			<Nfts as Inspect<AccountId>>::system_attribute(&collection, &item, &key)
-		}
-
-		fn collection_attribute(collection: u32, key: Vec<u8>) -> Option<Vec<u8>> {
-			<Nfts as Inspect<AccountId>>::collection_attribute(&collection, &key)
-		}
-	}
-
 	impl sp_api::Core<Block> for Runtime {
 		fn version() -> RuntimeVersion {
 			VERSION
@@ -1594,6 +1605,7 @@ impl_runtime_apis! {
 		fn metadata() -> OpaqueMetadata {
 			OpaqueMetadata::new(Runtime::metadata().into())
 		}
+
 		fn metadata_at_version(version: u32) -> Option<OpaqueMetadata> {
 			Runtime::metadata_at_version(version)
 		}
@@ -1650,59 +1662,6 @@ impl_runtime_apis! {
 		}
 	}
 
-	// impl sp_consensus_babe::BabeApi<Block> for Runtime {
-	// 	fn configuration() -> sp_consensus_babe::BabeConfiguration {
-	// 		// The choice of `c` parameter (where `1 - c` represents the
-	// 		// probability of a slot being empty), is done in accordance to the
-	// 		// slot duration and expected target block time, for safely
-	// 		// resisting network delays of maximum two seconds.
-	// 		// <https://research.web3.foundation/en/latest/polkadot/BABE/Babe/#6-practical-results>
-	// 		sp_consensus_babe::BabeConfiguration {
-	// 			slot_duration: Babe::slot_duration(),
-	// 			epoch_length: EpochDuration::get(),
-	// 			c: BABE_GENESIS_EPOCH_CONFIG.c,
-	// 			authorities: Babe::authorities().to_vec(),
-	// 			randomness: Babe::randomness(),
-	// 			allowed_slots: BABE_GENESIS_EPOCH_CONFIG.allowed_slots,
-	// 		}
-	// 	}
-
-	// 	fn current_epoch_start() -> sp_consensus_babe::Slot {
-	// 		Babe::current_epoch_start()
-	// 	}
-
-	// 	fn current_epoch() -> sp_consensus_babe::Epoch {
-	// 		Babe::current_epoch()
-	// 	}
-
-	// 	fn next_epoch() -> sp_consensus_babe::Epoch {
-	// 		Babe::next_epoch()
-	// 	}
-
-	// 	fn generate_key_ownership_proof(
-	// 		_slot: sp_consensus_babe::Slot,
-	// 		authority_id: sp_consensus_babe::AuthorityId,
-	// 	) -> Option<sp_consensus_babe::OpaqueKeyOwnershipProof> {
-	// 		use codec::Encode;
-
-	// 		Historical::prove((sp_consensus_babe::KEY_TYPE, authority_id))
-	// 			.map(|p| p.encode())
-	// 			.map(sp_consensus_babe::OpaqueKeyOwnershipProof::new)
-	// 	}
-
-	// 	fn submit_report_equivocation_unsigned_extrinsic(
-	// 		equivocation_proof: sp_consensus_babe::EquivocationProof<<Block as BlockT>::Header>,
-	// 		key_owner_proof: sp_consensus_babe::OpaqueKeyOwnershipProof,
-	// 	) -> Option<()> {
-	// 		let key_owner_proof = key_owner_proof.decode()?;
-
-	// 		Babe::submit_unsigned_equivocation_report(
-	// 			equivocation_proof,
-	// 			key_owner_proof,
-	// 		)
-	// 	}
-	// }
-
 	impl sp_session::SessionKeys<Block> for Runtime {
 		fn generate_session_keys(seed: Option<Vec<u8>>) -> Vec<u8> {
 			opaque::SessionKeys::generate(seed)
@@ -1745,8 +1704,8 @@ impl_runtime_apis! {
 		}
 	}
 
-	impl frame_system_rpc_runtime_api::AccountNonceApi<Block, AccountId, Index> for Runtime {
-		fn account_nonce(account: AccountId) -> Index {
+	impl frame_system_rpc_runtime_api::AccountNonceApi<Block, AccountId, Nonce> for Runtime {
+		fn account_nonce(account: AccountId) -> Nonce {
 			System::account_nonce(account)
 		}
 	}
@@ -1818,7 +1777,7 @@ impl_runtime_apis! {
 			config: frame_benchmarking::BenchmarkConfig
 		) -> Result<Vec<frame_benchmarking::BenchmarkBatch>, sp_runtime::RuntimeString> {
 			use frame_benchmarking::{baseline, Benchmarking, BenchmarkBatch};
-
+			use sp_storage::TrackedStorageKey;
 			use frame_system_benchmarking::Pallet as SystemBench;
 			use baseline::Pallet as BaselineBench;
 
@@ -1857,8 +1816,18 @@ impl_runtime_apis! {
 			Executive::try_execute_block(block, state_root_check, signature_check, select).expect("execute-block failed")
 		}
 	}
-}
 
+	impl sp_genesis_builder::GenesisBuilder<Block> for Runtime {
+		fn create_default_config() -> Vec<u8> {
+			create_default_config::<RuntimeGenesisConfig>()
+		}
+
+		fn build_config(config: Vec<u8>) -> sp_genesis_builder::Result {
+			build_config::<RuntimeGenesisConfig>(config)
+		}
+	}
+}
+ 
 #[cfg(test)]
 mod tests {
 	use super::*;

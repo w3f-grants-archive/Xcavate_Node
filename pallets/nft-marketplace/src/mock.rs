@@ -1,12 +1,14 @@
 use super::*;
 
 use crate as pallet_nft_marketplace;
-use frame_support::{parameter_types, traits::AsEnsureOriginWithArg};
+use frame_support::{parameter_types, traits::AsEnsureOriginWithArg, BoundedVec};
 use sp_core::ConstU32;
 use sp_runtime::{
 	traits::{AccountIdLookup, BlakeTwo256, IdentifyAccount, Verify},
 	MultiSignature,
 };
+
+use frame_system::EnsureRoot;
 
 use sp_runtime::BuildStorage;
 
@@ -38,8 +40,10 @@ frame_support::construct_runtime!(
 	{
 		System: frame_system::{Pallet, Call, Config<T>, Storage, Event<T>},
 		Uniques: pallet_nfts::{Pallet, Call, Storage, Event<T>},
+		NftFractionalization: pallet_nft_fractionalization,
 		NftMarketplace: pallet_nft_marketplace,
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
+		Assets: pallet_assets::<Instance1>,
 		Whitelist: pallet_whitelist,
 	}
 );
@@ -84,7 +88,8 @@ impl pallet_balances::Config for Test {
 	type MaxLocks = ();
 	type MaxReserves = ConstU32<50>;
 	type ReserveIdentifier = [u8; 8];
-	type RuntimeHoldReason = ();
+	type RuntimeHoldReason = RuntimeHoldReason;
+	type RuntimeFreezeReason = RuntimeFreezeReason;
 	type FreezeIdentifier = ();
 	// Holds are used with COLLATOR_LOCK_ID and DELEGATOR_LOCK_ID
 	type MaxHolds = ConstU32<2>;
@@ -139,6 +144,56 @@ impl pallet_whitelist::Config for Test {
 }
 
 parameter_types! {
+	pub const AssetConversionPalletId: PalletId = PalletId(*b"py/ascon");
+
+}
+
+impl pallet_assets::Config<Instance1> for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type Balance = u32;
+	type AssetId = u32;
+	type AssetIdParameter = codec::Compact<u32>;
+	type Currency = Balances;
+	type CreateOrigin = AsEnsureOriginWithArg<frame_system::EnsureSigned<Self::AccountId>>;
+	type ForceOrigin = EnsureRoot<AccountId>;
+	type AssetDeposit = ConstU32<1>;
+	type AssetAccountDeposit = ConstU32<1>;
+	type MetadataDepositBase = ConstU32<1>;
+	type MetadataDepositPerByte = ConstU32<1>;
+	type ApprovalDeposit = ConstU32<1>;
+	type StringLimit = ConstU32<50>;
+	type Freezer = ();
+	type Extra = ();
+	type CallbackHandle = ();
+	type WeightInfo = ();
+	type RemoveItemsLimit = ConstU32<1000>;
+}
+
+parameter_types! {
+	pub const NftFractionalizationPalletId: PalletId = PalletId(*b"fraction");
+	pub NewAssetSymbol: BoundedVec<u8, ConstU32<50>> = (*b"FRAC").to_vec().try_into().unwrap();
+	pub NewAssetName: BoundedVec<u8, ConstU32<50>> = (*b"Frac").to_vec().try_into().unwrap();
+}
+
+impl pallet_nft_fractionalization::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type Deposit = ConstU32<1>;
+	type Currency = Balances;
+	type NewAssetSymbol = NewAssetSymbol;
+	type NewAssetName = NewAssetName;
+	type NftCollectionId = <Self as pallet_nfts::Config>::CollectionId;
+	type NftId = <Self as pallet_nfts::Config>::ItemId;
+	type AssetBalance = <Self as pallet_balances::Config>::Balance;
+	type AssetId = <Self as pallet_assets::Config<Instance1>>::AssetId;
+	type Assets = Assets;
+	type Nfts = Uniques;
+	type PalletId = NftFractionalizationPalletId;
+	type WeightInfo = ();
+	type StringLimit = ConstU32<50>;
+	type RuntimeHoldReason = RuntimeHoldReason;
+}
+
+parameter_types! {
 	pub const NftMarketplacePalletId: PalletId = PalletId(*b"py/nftxc");
 	pub const MaxListedNft: u32 = 1000000;
 	pub const MaxNftsInCollection: u32 = 100;
@@ -152,14 +207,18 @@ impl pallet_nft_marketplace::Config for Test {
 	type WeightInfo = weights::SubstrateWeight<Test>;
 	type Currency = Balances;
 	type PalletId = NftMarketplacePalletId;
+	type LocationOrigin = EnsureRoot<Self::AccountId>;
 	#[cfg(feature = "runtime-benchmarks")]
 	type Helper = NftHelper;
 	type MaxListedNfts = MaxListedNft;
-	type MaxNftInCollection = MaxNftsInCollection;
 	type CollectionId = u32;
 	type ItemId = u32;
 	type TreasuryId = TreasuryPalletId;
 	type CommunityProjectsId = CommunityProjectPalletId;
+	type FractionalizeCollectionId = <Self as pallet_nfts::Config>::CollectionId;
+	type FractionalizeItemId = <Self as pallet_nfts::Config>::ItemId;
+	type AssetId = <Self as pallet_assets::Config<Instance1>>::AssetId;
+	type AssetId2 = u32;
 }
 
 // Build genesis storage according to the mock runtime.
