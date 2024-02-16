@@ -344,13 +344,8 @@ pub mod pallet {
 	/// Mapping of ongoing loans.
 	#[pallet::storage]
 	#[pallet::getter(fn loans)]
-	pub(super) type Loans<T: Config> = StorageMap<
-		_,
-		Blake2_128Concat,
-		LoanIndex,
-		LoanInfoType<T>,
-		OptionQuery,
-	>;
+	pub(super) type Loans<T: Config> =
+		StorageMap<_, Blake2_128Concat, LoanIndex, LoanInfoType<T>, OptionQuery>;
 
 	/// Mapping of ongoing votes.
 	#[pallet::storage]

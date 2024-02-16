@@ -217,6 +217,7 @@ impl pallet_xcavate_staking::Config for Test {
 	type TimeProvider = Timestamp;
 	type WeightInfo = weights::SubstrateWeight<Test>;
 	type RewardsDistributingTime = RewardsDistributing;
+	type Slash = ();
 }
 
 // Build genesis storage according to the mock runtime.

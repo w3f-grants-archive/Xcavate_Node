@@ -18,8 +18,9 @@ use frame_support::{
 	ord_parameter_types,
 	pallet_prelude::{DispatchClass, Get},
 	traits::{
-		tokens::{PayFromAccount, UnityAssetBalanceConversion}, AsEnsureOriginWithArg, EitherOfDiverse,
-		EqualPrivilegeOnly, fungible::HoldConsideration, LinearStoragePrice,
+		fungible::HoldConsideration,
+		tokens::{PayFromAccount, UnityAssetBalanceConversion},
+		AsEnsureOriginWithArg, EitherOfDiverse, EqualPrivilegeOnly, LinearStoragePrice,
 	},
 	PalletId,
 };
@@ -76,21 +77,21 @@ pub use frame_support::{
 		},
 		IdentityFee, Weight,
 	},
-	StorageValue, BoundedVec,
+	BoundedVec, StorageValue,
 };
 pub use frame_system::Call as SystemCall;
 pub use pallet_balances::Call as BalancesCall;
-use pallet_election_provider_multi_phase::{SolutionAccuracyOf, GeometricDepositBase};
+use pallet_election_provider_multi_phase::{GeometricDepositBase, SolutionAccuracyOf};
 /// Import the nft pallet
 use pallet_nfts::PalletFeatures;
 #[cfg(any(feature = "std", test))]
 pub use pallet_staking::StakerStatus;
 pub use pallet_timestamp::Call as TimestampCall;
 use pallet_transaction_payment::{ConstFeeMultiplier, CurrencyAdapter, Multiplier};
+use sp_runtime::traits::IdentityLookup;
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
-use sp_runtime::traits::IdentityLookup;
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -562,6 +563,26 @@ impl pallet_whitelist::Config for Runtime {
 		pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>,
 	>;
 	type MaxUsersInWhitelist = MaxWhitelistUsers;
+}
+
+parameter_types! {
+	pub const MinimumStakingAmount: Balance = 10 * DOLLARS;
+	pub const PropertyManagementPalletId: PalletId = PalletId(*b"py/ppmmt");
+	pub const MaxPropertie: u32 = 100;
+}
+
+/// Configure the pallet-property-management in pallets/property-management.
+impl pallet_property_management::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type Currency = Balances;
+	type PalletId = PropertyManagementPalletId;
+	type MinimumRemainingAmount = MinimumRemainingAmount;
+	type AgentOrigin = EnsureRoot<Self::AccountId>;
+	type MinStakingAmount = MinimumStakingAmount;
+ 	type CollectionId = u32;
+	type ItemId = u32; 
+	type Slash = ();
+	type MaxProperties = MaxPropertie;
 }
 
 parameter_types! {
@@ -1118,7 +1139,8 @@ impl pallet_election_provider_multi_phase::Config for Runtime {
 	type MinerTxPriority = MultiPhaseUnsignedPriority;
 	type SignedMaxSubmissions = ConstU32<10>;
 	type SignedRewardBase = SignedRewardBase;
-	type SignedDepositBase = GeometricDepositBase<Balance, SignedFixedDeposit, SignedDepositIncreaseFactor>;
+	type SignedDepositBase =
+		GeometricDepositBase<Balance, SignedFixedDeposit, SignedDepositIncreaseFactor>;
 	type SignedDepositByte = SignedDepositByte;
 	type SignedMaxRefunds = ConstU32<3>;
 	type SignedDepositWeight = ();
@@ -1311,7 +1333,6 @@ parameter_types! {
 	pub const Deposit: Balance = DOLLARS;
 }
 
-
 impl pallet_nft_fractionalization::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type Deposit = Deposit;
@@ -1481,6 +1502,7 @@ construct_runtime!(
 		NftMarketplace: pallet_nft_marketplace,
 		CommunityProject: pallet_community_projects,
 		Whitelist: pallet_whitelist,
+		ProjectManagement: pallet_property_management,
 		Nfts: pallet_nfts,
 		Uniques: pallet_uniques, //10
 		RandomnessCollectiveFlip: pallet_insecure_randomness_collective_flip,
@@ -1827,7 +1849,7 @@ impl_runtime_apis! {
 		}
 	}
 }
- 
+
 #[cfg(test)]
 mod tests {
 	use super::*;

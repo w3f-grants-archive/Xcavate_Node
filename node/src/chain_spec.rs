@@ -1,8 +1,8 @@
 use node_template_runtime::{
 	constants::currency::DOLLARS, opaque::SessionKeys, AccountId, AssetsConfig, BabeConfig,
-	Balance, BalancesConfig, CouncilConfig, DemocracyConfig, MaxNominations,
+	Balance, BalancesConfig, CouncilConfig, DemocracyConfig, MaxNominations, RuntimeGenesisConfig,
 	SessionConfig, Signature, StakerStatus, StakingConfig, SudoConfig, SystemConfig,
-	TechnicalCommitteeConfig, BABE_GENESIS_EPOCH_CONFIG, WASM_BINARY, RuntimeGenesisConfig
+	TechnicalCommitteeConfig, BABE_GENESIS_EPOCH_CONFIG, WASM_BINARY,
 };
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use sc_service::{ChainType, Properties};
@@ -243,10 +243,14 @@ fn testnet_genesis(
 			key: Some(root_key.clone()),
 		},
 		transaction_payment: Default::default(),
-		assets:  AssetsConfig {
+		assets: AssetsConfig {
 			assets: vec![(1, root_key.clone(), true, 1)], // Genesis assets: id, owner, is_sufficient, min_balance
 			metadata: vec![(1, "XUSD".into(), "XUSD".into(), 0)], // Genesis metadata: id, name, symbol, decimals
-			accounts: endowed_accounts.iter().cloned().map(|x| (1, x.0.clone(), 1_000_000)).collect(),
+			accounts: endowed_accounts
+				.iter()
+				.cloned()
+				.map(|x| (1, x.0.clone(), 1_000_000))
+				.collect(),
 		},
 		pool_assets: Default::default(),
 		im_online: Default::default(),

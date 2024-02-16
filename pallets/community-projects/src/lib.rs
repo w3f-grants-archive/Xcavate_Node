@@ -325,7 +325,7 @@ pub mod pallet {
 		Blake2_128Concat,
 		<T as pallet::Config>::CollectionId,
 		Blake2_128Concat,
-		AccountIdOf<T>, 
+		AccountIdOf<T>,
 		bool,
 		ValueQuery,
 	>;
@@ -424,11 +424,11 @@ pub mod pallet {
 		TokenRefunded {
 			collection_index: <T as pallet::Config>::CollectionId,
 			user: AccountIdOf<T>,
-		}, 
+		},
 		TokenUnbonded {
 			collection_index: <T as pallet::Config>::CollectionId,
 			user: AccountIdOf<T>,
-		}, 
+		},
 	}
 
 	#[pallet::error]
@@ -754,14 +754,17 @@ pub mod pallet {
 			collection_id: <T as pallet::Config>::CollectionId,
 			vote: Vote,
 		) -> DispatchResult {
-			let origin = ensure_signed(origin)?;		
+			let origin = ensure_signed(origin)?;
 			ensure!(
 				pallet_whitelist::Pallet::<T>::whitelisted_accounts(origin.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
 			let mut current_vote =
 				OngoingVotes::<T>::take(collection_id).ok_or(Error::<T>::NoOngoingVotingPeriod)?;
-			ensure!(Self::nft_holder(collection_id, origin.clone()), Error::<T>::InsufficientPermission);
+			ensure!(
+				Self::nft_holder(collection_id, origin.clone()),
+				Error::<T>::InsufficientPermission
+			);
 			ensure!(!Self::voted_user(collection_id, origin.clone()), Error::<T>::AlreadyVoted);
 			let voting_power =
 				Self::voting_power(collection_id, origin.clone()).unwrap_or_default();
@@ -812,7 +815,7 @@ pub mod pallet {
 				<T as pallet::Config>::Currency::free_balance(&Self::account_id())
 					.saturating_sub(T::MinimumRemainingAmount::get())
 					>= (total_bonded + bonding_amount)
-						.saturating_mul(Self::u128_to_balance_native_option(1/* 000000000000 */)?),
+						.saturating_mul(Self::u128_to_balance_native_option(1 /* 000000000000 */)?),
 				Error::<T>::NotEnoughBondingFundsAvailable
 			);
 			project.project_bonding_balance += bonding_amount;
@@ -847,8 +850,8 @@ pub mod pallet {
 				user_total_bonding += bonding_amount;
 			};
 			UserBondedAmount::<T>::insert(origin.clone(), user_total_bonding);
-			let locking_amount =
-				Self::balance_native_to_u128(user_total_bonding)?.saturating_mul(1/* 000000000000 */);
+			let locking_amount = Self::balance_native_to_u128(user_total_bonding)?
+				.saturating_mul(1 /* 000000000000 */);
 			<T as pallet::Config>::Currency::set_lock(
 				EXAMPLE_ID,
 				&origin,
@@ -880,8 +883,12 @@ pub mod pallet {
 			collection_id: <T as pallet::Config>::CollectionId,
 		) -> DispatchResult {
 			let nft_holder = ensure_signed(origin)?;
-			let mut ended_project = Self::ended_projects(collection_id).ok_or(Error::<T>::InvalidIndex)?;
-			ensure!(Self::nft_holder(collection_id, nft_holder.clone()), Error::<T>::InsufficientPermission);
+			let mut ended_project =
+				Self::ended_projects(collection_id).ok_or(Error::<T>::InvalidIndex)?;
+			ensure!(
+				Self::nft_holder(collection_id, nft_holder.clone()),
+				Error::<T>::InsufficientPermission
+			);
 			NftHolder::<T>::take(collection_id, nft_holder.clone());
 			let voting_power = VotingPower::<T>::take(collection_id, nft_holder.clone())
 				.ok_or(Error::<T>::NoFundsRemaining)?;
@@ -899,10 +906,11 @@ pub mod pallet {
 			)
 			.map_err(|_| Error::<T>::NotEnoughFunds)?;
 			ended_project.remaining_balance -= Self::u64_to_balance_option(remaining_funds)?;
-			if ended_project.bonding_balance.is_zero() && ended_project.remaining_balance.is_zero() {
+			if ended_project.bonding_balance.is_zero() && ended_project.remaining_balance.is_zero()
+			{
 				EndedProjects::<T>::take(collection_id);
 			} else {
-				EndedProjects::<T>::insert(collection_id, ended_project);	
+				EndedProjects::<T>::insert(collection_id, ended_project);
 			}
 			Self::deposit_event(Event::<T>::TokenRefunded {
 				collection_index: collection_id,
@@ -926,14 +934,18 @@ pub mod pallet {
 			collection_id: <T as pallet::Config>::CollectionId,
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
-			let mut ended_project = Self::ended_projects(collection_id).ok_or(Error::<T>::InvalidIndex)?;
-			let user_project_bonding = ProjectBonding::<T>::take(collection_id, origin.clone()).ok_or(Error::<T>::NoBondingYet)?;
-			let mut user_total_bonding = UserBondedAmount::<T>::take(origin.clone()).ok_or(Error::<T>::NoBondingYet)?;
-			user_total_bonding = user_total_bonding.saturating_sub(user_project_bonding); 
+			let mut ended_project =
+				Self::ended_projects(collection_id).ok_or(Error::<T>::InvalidIndex)?;
+			let user_project_bonding = ProjectBonding::<T>::take(collection_id, origin.clone())
+				.ok_or(Error::<T>::NoBondingYet)?;
+			let mut user_total_bonding =
+				UserBondedAmount::<T>::take(origin.clone()).ok_or(Error::<T>::NoBondingYet)?;
+			user_total_bonding = user_total_bonding.saturating_sub(user_project_bonding);
 			if user_total_bonding.is_zero() {
 				<T as pallet::Config>::Currency::remove_lock(EXAMPLE_ID, &origin);
 			} else {
-				let locking_amount = Self::balance_native_to_u128(user_total_bonding)?.saturating_mul(1/* 000000000000 */);
+				let locking_amount = Self::balance_native_to_u128(user_total_bonding)?
+					.saturating_mul(1 /* 000000000000 */);
 				<T as pallet::Config>::Currency::set_lock(
 					EXAMPLE_ID,
 					&origin,
@@ -944,12 +956,13 @@ pub mod pallet {
 			}
 			let mut total_bonded = Self::total_bonded();
 			total_bonded -= user_project_bonding;
-			TotalBonded::<T>::put(total_bonded); 
+			TotalBonded::<T>::put(total_bonded);
 			ended_project.bonding_balance -= user_project_bonding;
-			if ended_project.bonding_balance.is_zero() && ended_project.remaining_balance.is_zero() {
+			if ended_project.bonding_balance.is_zero() && ended_project.remaining_balance.is_zero()
+			{
 				EndedProjects::<T>::take(collection_id);
 			} else {
-				EndedProjects::<T>::insert(collection_id, ended_project);	
+				EndedProjects::<T>::insert(collection_id, ended_project);
 			}
 			Self::deposit_event(Event::<T>::TokenUnbonded {
 				collection_index: collection_id,
@@ -969,10 +982,13 @@ pub mod pallet {
 			let mut project =
 				Self::ongoing_projects(collection_id).ok_or(Error::<T>::InvalidIndex)?;
 			for nft_type in 1..=project.nft_types {
-				let remaining_nfts = ListedNftTypes::<T>::take(collection_id, nft_type).ok_or(Error::<T>::InvalidIndex)?;
-  				for item in remaining_nfts {
-					pallet_nfts::Pallet::<T>::do_burn(collection_id.into(), item.into(), |_| Ok(()))?;
-				}  
+				let remaining_nfts = ListedNftTypes::<T>::take(collection_id, nft_type)
+					.ok_or(Error::<T>::InvalidIndex)?;
+				for item in remaining_nfts {
+					pallet_nfts::Pallet::<T>::do_burn(collection_id.into(), item.into(), |_| {
+						Ok(())
+					})?;
+				}
 			}
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
 			project.launching_timestamp = current_block_number;
@@ -982,14 +998,12 @@ pub mod pallet {
 				if project.duration > 12 { project.duration * 10 / 12 } else { 10 };
 			project.ongoing = true;
 			OngoingProjects::<T>::insert(collection_id, project);
-			let expiry_block = current_block_number.saturating_add(
-				milestone_period.into(),
-			);
+			let expiry_block = current_block_number.saturating_add(milestone_period.into());
 			MilestonePeriodExpiring::<T>::try_mutate(expiry_block, |keys| {
 				keys.try_push(collection_id).map_err(|_| Error::<T>::TooManyProjects)?;
 				Ok::<(), DispatchError>(())
-			})?; 
-			Self::deposit_event(Event::<T>::ProjectLaunched { collection_index: collection_id }); 
+			})?;
+			Self::deposit_event(Event::<T>::ProjectLaunched { collection_index: collection_id });
 			Ok(())
 		}
 
@@ -1021,9 +1035,7 @@ pub mod pallet {
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
 			let milestone_period =
 				if project.duration > 12 { project.duration * 10 / 12 } else { 10 };
-			let expiry_block = current_block_number.saturating_add(
-				milestone_period.into(),
-			);
+			let expiry_block = current_block_number.saturating_add(milestone_period.into());
 			MilestonePeriodExpiring::<T>::try_mutate(expiry_block, |keys| {
 				keys.try_push(collection_id).map_err(|_| Error::<T>::TooManyProjects)?;
 				Ok::<(), DispatchError>(())
@@ -1064,8 +1076,9 @@ pub mod pallet {
 					&Self::account_id(),
 					&project.project_owner.clone(),
 					// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
-					Self::balance_xusd_to_balance_native(funds_for_this_round)?
-						.saturating_mul(Self::u128_to_balance_native_option(1/* 000000000000 */)?),
+					Self::balance_xusd_to_balance_native(funds_for_this_round)?.saturating_mul(
+						Self::u128_to_balance_native_option(1 /* 000000000000 */)?,
+					),
 					KeepAlive,
 				)?;
 			} else {
@@ -1087,8 +1100,9 @@ pub mod pallet {
 					&Self::account_id(),
 					&project.project_owner.clone(),
 					// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
-					Self::balance_xusd_to_balance_native(transfer_native_amount)?
-						.saturating_mul(Self::u128_to_balance_native_option(1/* 000000000000 */)?),
+					Self::balance_xusd_to_balance_native(transfer_native_amount)?.saturating_mul(
+						Self::u128_to_balance_native_option(1 /* 000000000000 */)?,
+					),
 					KeepAlive,
 				)?;
 			}
@@ -1135,7 +1149,7 @@ pub mod pallet {
 				bonding_balance: project.project_bonding_balance,
 				remaining_percentage: percentage,
 			};
-			EndedProjects::<T>::insert(collection_id, ended_project);		
+			EndedProjects::<T>::insert(collection_id, ended_project);
 			Self::deposit_event(Event::<T>::ProjectDeleted { collection_id });
 			Ok(())
 		}
@@ -1150,7 +1164,7 @@ pub mod pallet {
 				bonding_balance: project.project_bonding_balance,
 				remaining_percentage: Default::default(),
 			};
-			EndedProjects::<T>::insert(collection_id, ended_project);		
+			EndedProjects::<T>::insert(collection_id, ended_project);
 			Self::deposit_event(Event::<T>::ProjectDeleted { collection_id });
 			Self::deposit_event(Event::<T>::ProjectDeleted { collection_id });
 			let _ = NftHolder::<T>::clear_prefix(collection_id, 2000, None);

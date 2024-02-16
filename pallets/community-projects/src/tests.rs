@@ -790,7 +790,7 @@ fn bonding_fails_user_not_enough_funds() {
 }
 
 #[test]
-fn claim_refunded_token_works()  {
+fn claim_refunded_token_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
@@ -819,13 +819,16 @@ fn claim_refunded_token_works()  {
 		assert_eq!(Assets::balance(1, &[2; 32].into()), 149_800);
 		run_to_block(100);
 		assert_eq!(CommunityProjects::ended_projects(0).unwrap().project_success, false);
-		assert_ok!(CommunityProjects::claim_refunded_token(RuntimeOrigin::signed([2; 32].into()), 0));
+		assert_ok!(CommunityProjects::claim_refunded_token(
+			RuntimeOrigin::signed([2; 32].into()),
+			0
+		));
 		assert_eq!(Assets::balance(1, &[2; 32].into()), 149_933);
 	})
 }
 
 #[test]
-fn claim_refunded_token_fails()  {
+fn claim_refunded_token_fails() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
@@ -851,15 +854,21 @@ fn claim_refunded_token_fails()  {
 		assert_eq!(Assets::balance(1, &[0; 32].into()), 20_000_100);
 		assert_eq!(Assets::balance(1, &CommunityProjects::account_id()), 200);
 		assert_eq!(Assets::balance(1, &[2; 32].into()), 149_800);
-		assert_noop!(CommunityProjects::claim_refunded_token(RuntimeOrigin::signed([2; 32].into()), 0), Error::<Test>::InvalidIndex);
+		assert_noop!(
+			CommunityProjects::claim_refunded_token(RuntimeOrigin::signed([2; 32].into()), 0),
+			Error::<Test>::InvalidIndex
+		);
 		run_to_block(100);
 		assert_eq!(CommunityProjects::ended_projects(0).unwrap().project_success, false);
-		assert_noop!(CommunityProjects::claim_refunded_token(RuntimeOrigin::signed([3; 32].into()), 0), Error::<Test>::InsufficientPermission);
+		assert_noop!(
+			CommunityProjects::claim_refunded_token(RuntimeOrigin::signed([3; 32].into()), 0),
+			Error::<Test>::InsufficientPermission
+		);
 	})
 }
 
 #[test]
-fn claim_bonding_for_failed_project_works()  {
+fn claim_bonding_for_failed_project_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
@@ -896,7 +905,7 @@ fn claim_bonding_for_failed_project_works()  {
 }
 
 #[test]
-fn claim_bonding_for_succeed_project_works()  {
+fn claim_bonding_for_succeed_project_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
@@ -933,7 +942,7 @@ fn claim_bonding_for_succeed_project_works()  {
 }
 
 #[test]
-fn claim_bonding_for_failed_project_fails()  {
+fn claim_bonding_for_failed_project_fails() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
@@ -962,10 +971,15 @@ fn claim_bonding_for_failed_project_fails()  {
 			0,
 			crate::Vote::Yes
 		));
-		assert_noop!(CommunityProjects::claim_bonding(RuntimeOrigin::signed([1; 32].into()), 0), Error::<Test>::InvalidIndex);
+		assert_noop!(
+			CommunityProjects::claim_bonding(RuntimeOrigin::signed([1; 32].into()), 0),
+			Error::<Test>::InvalidIndex
+		);
 		run_to_block(100);
 		assert_eq!(CommunityProjects::ended_projects(0).unwrap().project_success, false);
-		assert_noop!(CommunityProjects::claim_bonding(RuntimeOrigin::signed([2; 32].into()), 0), Error::<Test>::NoBondingYet);
+		assert_noop!(
+			CommunityProjects::claim_bonding(RuntimeOrigin::signed([2; 32].into()), 0),
+			Error::<Test>::NoBondingYet
+		);
 	})
 }
-

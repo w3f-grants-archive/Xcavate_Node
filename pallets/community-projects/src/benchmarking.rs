@@ -23,10 +23,7 @@ fn setup_listing<T: Config>(
 ) -> (
 	T::AccountId,
 	BoundedNftDonationTypes<T>,
-	BoundedVec<
-		BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>,
-		<T as Config>::MaxNftTypes,
-	>,
+	BoundedVec<BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>, <T as Config>::MaxNftTypes>,
 	u32,
 	BalanceOf<T>,
 	BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>,
@@ -67,7 +64,15 @@ mod benchmarks {
 			value,
 			single_metadata,
 		);
-		assert_eq!(CommunityProjects::<T>::listed_nft_types::<<T as pallet::Config>::CollectionId, u8>(0.into(), 4).unwrap().len(), 4);
+		assert_eq!(
+			CommunityProjects::<T>::listed_nft_types::<<T as pallet::Config>::CollectionId, u8>(
+				0.into(),
+				4
+			)
+			.unwrap()
+			.len(),
+			4
+		);
 	}
 
 	#[benchmark]
@@ -185,7 +190,7 @@ mod benchmarks {
 		vote_on_milestone(RawOrigin::Signed(buyer), 0.into(), crate::Vote::Yes);
 
 		//assert_eq!(Something::<T>::get(), Some(101u32));
-	} 
+	}
 
 	#[benchmark]
 	fn claim_refunded_token() {
@@ -227,12 +232,24 @@ mod benchmarks {
 		assert_eq!(Assets::<T, Instance1>::balance(asset_id, buyer.clone()), amount2);
 		CommunityProjects::<T>::buy_nft(RawOrigin::Signed(buyer.clone()).into(), 0.into(), 1, 1);
 		run_to_block::<T>(100u32.into());
-		assert_eq!(CommunityProjects::<T>::ended_projects::<<T as pallet::Config>::CollectionId>(0_u32.into()).unwrap().project_success, false);
+		assert_eq!(
+			CommunityProjects::<T>::ended_projects::<<T as pallet::Config>::CollectionId>(
+				0_u32.into()
+			)
+			.unwrap()
+			.project_success,
+			false
+		);
 		#[extrinsic_call]
 		claim_refunded_token(RawOrigin::Signed(buyer), 0.into());
 
-		assert_eq!(CommunityProjects::<T>::ended_projects::<<T as pallet::Config>::CollectionId>(0_u32.into()), None);
-	} 	
+		assert_eq!(
+			CommunityProjects::<T>::ended_projects::<<T as pallet::Config>::CollectionId>(
+				0_u32.into()
+			),
+			None
+		);
+	}
 
 	#[benchmark]
 	fn claim_bonding() {
@@ -279,20 +296,58 @@ mod benchmarks {
 			DepositBalanceOf::<T>::max_value(),
 		);
 		let amount: BalanceOf2<T> = 10u32.into();
-		CommunityProjects::<T>::bond_token(RawOrigin::Signed(user.clone()).into(), 0.into(), amount);
+		CommunityProjects::<T>::bond_token(
+			RawOrigin::Signed(user.clone()).into(),
+			0.into(),
+			amount,
+		);
 		CommunityProjects::<T>::buy_nft(RawOrigin::Signed(buyer.clone()).into(), 0.into(), 1, 1);
 		run_to_block::<T>(100u32.into());
-		assert_eq!(CommunityProjects::<T>::ended_projects::<<T as pallet::Config>::CollectionId>(0_u32.into()).unwrap().project_success, false);
+		assert_eq!(
+			CommunityProjects::<T>::ended_projects::<<T as pallet::Config>::CollectionId>(
+				0_u32.into()
+			)
+			.unwrap()
+			.project_success,
+			false
+		);
 		run_to_block::<T>(100u32.into());
-		assert_eq!(CommunityProjects::<T>::ended_projects::<<T as pallet::Config>::CollectionId>(0_u32.into()).unwrap().project_success, false);
-		assert_eq!(CommunityProjects::<T>::project_bonding::<<T as pallet::Config>::CollectionId, AccountIdOf<T>>(0_u32.into(), user.clone()).unwrap(), 10_u32.try_into().map_err(|_| Error::<T>::ConversionError).unwrap());
-		assert_eq!(CommunityProjects::<T>::ended_projects::<<T as pallet::Config>::CollectionId>(0_u32.into()).unwrap().bonding_balance, 10_u32.try_into().map_err(|_| Error::<T>::ConversionError).unwrap());
+		assert_eq!(
+			CommunityProjects::<T>::ended_projects::<<T as pallet::Config>::CollectionId>(
+				0_u32.into()
+			)
+			.unwrap()
+			.project_success,
+			false
+		);
+		assert_eq!(
+			CommunityProjects::<T>::project_bonding::<
+				<T as pallet::Config>::CollectionId,
+				AccountIdOf<T>,
+			>(0_u32.into(), user.clone())
+			.unwrap(),
+			10_u32.try_into().map_err(|_| Error::<T>::ConversionError).unwrap()
+		);
+		assert_eq!(
+			CommunityProjects::<T>::ended_projects::<<T as pallet::Config>::CollectionId>(
+				0_u32.into()
+			)
+			.unwrap()
+			.bonding_balance,
+			10_u32.try_into().map_err(|_| Error::<T>::ConversionError).unwrap()
+		);
 		#[extrinsic_call]
 		claim_bonding(RawOrigin::Signed(user.clone()), 0.into());
 
-		assert_eq!(CommunityProjects::<T>::ended_projects::<<T as pallet::Config>::CollectionId>(0_u32.into()).unwrap().bonding_balance, 0_u32.try_into().map_err(|_| Error::<T>::ConversionError).unwrap());
-	} 	
-
+		assert_eq!(
+			CommunityProjects::<T>::ended_projects::<<T as pallet::Config>::CollectionId>(
+				0_u32.into()
+			)
+			.unwrap()
+			.bonding_balance,
+			0_u32.try_into().map_err(|_| Error::<T>::ConversionError).unwrap()
+		);
+	}
 
 	impl_benchmark_test_suite!(CommunityProjects, crate::mock::new_test_ext(), crate::mock::Test);
 }
