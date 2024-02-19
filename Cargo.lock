@@ -4628,6 +4628,7 @@ dependencies = [
  "pallet-nomination-pools",
  "pallet-offences",
  "pallet-preimage",
+ "pallet-property-governance",
  "pallet-property-management",
  "pallet-referenda",
  "pallet-scheduler",
@@ -5329,6 +5330,27 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std",
+]
+
+[[package]]
+name = "pallet-property-governance"
+version = "4.0.0-dev"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "pallet-assets",
+ "pallet-balances",
+ "pallet-nft-fractionalization",
+ "pallet-nft-marketplace",
+ "pallet-nfts",
+ "pallet-whitelist",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
 ]
 
 [[package]]

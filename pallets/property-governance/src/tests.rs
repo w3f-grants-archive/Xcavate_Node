@@ -1,27 +1,100 @@
 use crate::{mock::*, Error, Event};
 use frame_support::{assert_noop, assert_ok};
 
+macro_rules! bvec {
+	($( $x:tt )*) => {
+		vec![$( $x )*].try_into().unwrap()
+	}
+}
+
 #[test]
-fn it_works_for_default_value() {
+fn propose_works() {
 	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
 		System::set_block_number(1);
-		// Dispatch a signed extrinsic.
-		assert_ok!(TemplateModule::do_something(RuntimeOrigin::signed(1), 42));
-		// Read pallet storage and assert an expected result.
-		assert_eq!(TemplateModule::something(), Some(42));
-		// Assert that the correct event was deposited
-		System::assert_last_event(Event::SomethingStored { something: 42, who: 1 }.into());
+		assert_ok!(NftMarketplace::create_new_location(RuntimeOrigin::root()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(NftMarketplace::list_object(
+			RuntimeOrigin::signed([0; 32].into()),
+			0,
+			1_000_000,
+			bvec![22, 22]
+		));
+		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_ok!(PropertyGovernance::propose(RuntimeOrigin::signed([1; 32].into()), 0));
 	});
 }
 
 #[test]
-fn correct_error_for_none_value() {
+fn propose_fails() {
 	new_test_ext().execute_with(|| {
-		// Ensure the expected error is thrown when no value is present.
-		assert_noop!(
-			TemplateModule::cause_error(RuntimeOrigin::signed(1)),
-			Error::<Test>::NoneValue
-		);
+		System::set_block_number(1);
+		assert_ok!(NftMarketplace::create_new_location(RuntimeOrigin::root()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(NftMarketplace::list_object(
+			RuntimeOrigin::signed([0; 32].into()),
+			0,
+			1_000_000,
+			bvec![22, 22]
+		));
+		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_noop!(PropertyGovernance::propose(RuntimeOrigin::signed([2; 32].into()), 0), Error::<Test>::NoPermission);
+	});
+}
+
+#[test]
+fn inquery_agains_letting_agent_works() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(NftMarketplace::create_new_location(RuntimeOrigin::root()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(NftMarketplace::list_object(
+			RuntimeOrigin::signed([0; 32].into()),
+			0,
+			1_000_000,
+			bvec![22, 22]
+		));
+		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_ok!(PropertyGovernance::inquery_agains_letting_agent(RuntimeOrigin::signed([1; 32].into()), 0));
+	});
+}
+
+#[test]
+fn vote_on_proposal_works() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(NftMarketplace::create_new_location(RuntimeOrigin::root()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(NftMarketplace::list_object(
+			RuntimeOrigin::signed([0; 32].into()),
+			0,
+			1_000_000,
+			bvec![22, 22]
+		));
+		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_ok!(PropertyGovernance::propose(RuntimeOrigin::signed([1; 32].into()), 0));
+		assert_ok!(PropertyGovernance::vote_on_proposal(RuntimeOrigin::signed([1; 32].into()), 1, crate::Vote::Yes));
+	});
+}
+
+#[test]
+fn vote_on_inquery_works() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(NftMarketplace::create_new_location(RuntimeOrigin::root()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(NftMarketplace::list_object(
+			RuntimeOrigin::signed([0; 32].into()),
+			0,
+			1_000_000,
+			bvec![22, 22]
+		));
+		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_ok!(PropertyGovernance::inquery_agains_letting_agent(RuntimeOrigin::signed([1; 32].into()), 0));
+		assert_ok!(PropertyGovernance::vote_on_letting_agent_inquery(RuntimeOrigin::signed([1; 32].into()), 1, crate::Vote::Yes));
 	});
 }

@@ -586,6 +586,18 @@ impl pallet_property_management::Config for Runtime {
 }
 
 parameter_types! {
+	pub const PropertyVotingTime: BlockNumber = 30;
+	pub const MaxVoteForBlock: u32 = 100;
+}
+
+/// Configure the pallet-property-governance in pallets/property-governance.
+impl pallet_property_governance::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type VotingTime = PropertyVotingTime;
+	type MaxVotesForBlock =  MaxVoteForBlock;
+}
+
+parameter_types! {
 	pub Features: PalletFeatures = PalletFeatures::all_enabled();
 	pub const MaxAttributesPerCall: u32 = 10;
 	pub const CollectionDeposit: Balance = DOLLARS;
@@ -1503,6 +1515,7 @@ construct_runtime!(
 		CommunityProject: pallet_community_projects,
 		Whitelist: pallet_whitelist,
 		ProjectManagement: pallet_property_management,
+		ProjectGovernance: pallet_property_governance,
 		Nfts: pallet_nfts,
 		Uniques: pallet_uniques, //10
 		RandomnessCollectiveFlip: pallet_insecure_randomness_collective_flip,

@@ -101,6 +101,7 @@ pallet-nft-marketplace = {  default-features = false, path = "../pallets/nft-mar
 pallet-community-projects = {  default-features = false, path = "../pallets/community-projects" }
 pallet-whitelist = {  default-features = false, path = "../pallets/whitelist" }
 pallet-property-management = {  default-features = false, path = "../pallets/property-management" }
+pallet-property-governance = {  default-features = false, path = "../pallets/property-governance" }
 
 
 [build-dependencies]
@@ -132,6 +133,7 @@ std = [
 	"pallet-community-projects/std",
 	"pallet-whitelist/std",
 	"pallet-property-management/std",
+	"pallet-property-governance/std",
 	"pallet-timestamp/std",
 	"pallet-transaction-payment-rpc-runtime-api/std",
 	"pallet-transaction-payment/std",
