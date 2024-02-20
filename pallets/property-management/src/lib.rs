@@ -18,7 +18,7 @@ pub use weights::*;
 
 use frame_support::{
 	traits::{
-	Currency, LockIdentifier, LockableCurrency, WithdrawReasons, ReservableCurrency, 
+	Currency, LockIdentifier, ReservableCurrency, 
 	ExistenceRequirement::KeepAlive, OnUnbalanced
 	},
 	PalletId,
@@ -26,9 +26,8 @@ use frame_support::{
 
 use frame_support::sp_runtime::{
 	traits::{
-	AccountIdConversion, CheckedDiv, CheckedMul, StaticLookup, CheckedAdd, Zero,
+	AccountIdConversion, CheckedMul, CheckedAdd, Zero,
 	},
-	Saturating,
 };
 
 type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
@@ -46,7 +45,16 @@ pub mod pallet {
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 
-	const LETTING_ID: LockIdentifier = *b"stklttgg";
+	/// Proposal with the proposal Details.
+	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
+	#[scale_info(skip_type_params(T))]
+	pub struct LettingAgentInfo<T: Config> {
+		pub account: AccountIdOf<T>,
+		pub location: u32,
+		pub assigned_properties: BoundedVec<u32, T::MaxProperties>,
+		pub deposited: bool,
+	}	
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
@@ -59,9 +67,8 @@ pub mod pallet {
 	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-		/// The lockable currency type.
+		/// The reservable currency type.
 		type Currency: Currency<Self::AccountId>
-			+ LockableCurrency<Self::AccountId, Moment = BlockNumberFor<Self>>
 			+ ReservableCurrency<Self::AccountId>;
 		/// The property management's pallet id, used for deriving its sovereign account ID.
 		#[pallet::constant]
@@ -98,6 +105,9 @@ pub mod pallet {
 		/// The maximum amount of properties that can be assigned to a letting agent.
 		#[pallet::constant]
 		type MaxProperties: Get<u32>;
+		/// The maximum amount of letting agents in a location.
+		#[pallet::constant]
+		type MaxLettingAgents: Get<u32>;
 	}
 
 	pub type CollectionId<T> = <T as Config>::CollectionId;
@@ -125,14 +135,20 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	/// Mapping from account to letting agent info
+	#[pallet::storage]
+	#[pallet::getter(fn letting_info)]
+	pub type LettingInfo<T: Config> = 
+		StorageMap<_, Blake2_128Concat, AccountIdOf<T>, LettingAgentInfo<T>, OptionQuery>;
+
 	/// Mapping from letting agent to the properties.
 	#[pallet::storage]
-	#[pallet::getter(fn letting_agent_properties)]
-	pub type LettingAgentPropoerties<T: Config> = StorageMap<
+	#[pallet::getter(fn letting_agent_locations)]
+	pub type LettingAgentLocations<T: Config> = StorageMap<
 		_,
 		Blake2_128Concat,
-		AccountIdOf<T>,
-		BoundedVec<u32, T::MaxProperties>,
+		u32,
+		BoundedVec<AccountIdOf<T>, T::MaxLettingAgents>,
 		ValueQuery,
 	>;
 
@@ -142,9 +158,10 @@ pub mod pallet {
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
 		/// A new letting agent got set.
-		LettingAgentSet { 
-			property_index: u32,
-			who: T::AccountId },
+		LettingAgentAdded { 
+			location: u32,
+			who: T::AccountId 
+		},
 	}
 
 	// Errors inform users that something went wrong.
@@ -167,6 +184,14 @@ pub mod pallet {
 		NotEnoughFunds,
 		/// The letting agent already has too many assigned properties.
 		TooManyAssignedProperties,
+		/// No letting agent could be selected.
+		NoLettingAgentFound,
+		/// The location is not registered.
+		LocationUnknown,
+		/// The location has already the maximum amount of letting agents.
+		TooManyLettingAgents,
+		/// The user is not a property owner and has no permission to deposit.
+		NoPermission,
 	}
 
 	#[pallet::call]
@@ -176,20 +201,22 @@ pub mod pallet {
 		/// - Parameter are origin, collection id, nft id and account id.
 		#[pallet::call_index(0)]
 		#[pallet::weight(0)]
-		pub fn assign_to_letting_agent(
+		pub fn add_letting_agent(
 			origin: OriginFor<T>, 
-			property_id: u32,
+			location: u32,
 			letting_agent: AccountIdOf<T>,
 		) -> DispatchResult {
 			T::AgentOrigin::ensure_origin(origin)?;
-			LettingStorage::<T>::insert(property_id, letting_agent.clone());
-			LettingAgentPropoerties::<T>::try_mutate(letting_agent.clone(), |keys| {
-				keys.try_push(property_id).map_err(|_| Error::<T>::TooManyAssignedProperties)?;
-				Ok::<(), DispatchError>(())
-			})?;
-
- 			Self::deposit_event(Event::<T>::LettingAgentSet {
-				property_index: property_id,
+			ensure!(pallet_nft_marketplace::Pallet::<T>::location_collections(location).is_some(), Error::<T>::LocationUnknown);
+			let letting_info = LettingAgentInfo {
+				account: letting_agent.clone(),
+				location,
+				assigned_properties: Default::default(),
+				deposited: Default::default(),
+			};	
+			LettingInfo::<T>::insert(letting_agent.clone(), letting_info);
+ 			Self::deposit_event(Event::<T>::LettingAgentAdded {
+				location,
 				who: letting_agent,
 			}); 
 			Ok(())
@@ -202,17 +229,13 @@ pub mod pallet {
 		pub fn letting_agent_deposit(origin: OriginFor<T>) -> DispatchResult {
 			let staker = ensure_signed(origin)?;
 			<T as pallet::Config>::Currency::reserve(&staker, <T as Config>::MinStakingAmount::get())?;
-			Ok(())
-		}
-
-		/// Lets someone slashing the letting agent.
-		/// todo!
-		#[pallet::call_index(3)]
-		#[pallet::weight(0)]
-		pub fn slash_letting_agent(origin: OriginFor<T>, amount: BalanceOf<T>, letting_agent: AccountIdOf<T>) -> DispatchResult {
-			let staker = ensure_signed(origin)?;
-			<T as pallet::Config>::Currency::remove_lock(LETTING_ID, &letting_agent);
-			<T as pallet::Config>::Slash::on_unbalanced(<T as pallet::Config>::Currency::slash_reserved(&letting_agent, amount).0);
+			let mut letting_info = Self::letting_info(staker.clone()).ok_or(Error::<T>::NoPermission)?;
+			letting_info.deposited = true;
+			LettingAgentLocations::<T>::try_mutate(letting_info.location, |keys| {
+				keys.try_push(staker.clone()).map_err(|_| Error::<T>::TooManyLettingAgents)?;
+				Ok::<(), DispatchError>(())
+			})?;
+			LettingInfo::<T>::insert(staker.clone(), letting_info);
 			Ok(())
 		}
 
@@ -266,6 +289,16 @@ pub mod pallet {
 		/// Converts a u64 to a balance.
 		pub fn u64_to_balance_option(input: u64) -> Result<BalanceOf<T>, Error<T>> {
 			input.try_into().map_err(|_| Error::<T>::ConversionError)
+		}
+
+		/// Chooses the next free letting agent in a location
+		pub fn selects_letting_agent(location: u32, asset_id: u32) -> DispatchResult {
+			let letting_agents = Self::letting_agent_locations(location);
+			let letting_agent = letting_agents.iter().min_by_key(|letting_agent| {
+				Self::letting_info(letting_agent).unwrap().assigned_properties
+			}).ok_or(Error::<T>::NoLettingAgentFound)?;
+			LettingStorage::<T>::insert(asset_id, letting_agent);
+			Ok(())
 		}
 	}
 }

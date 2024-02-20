@@ -568,7 +568,8 @@ impl pallet_whitelist::Config for Runtime {
 parameter_types! {
 	pub const MinimumStakingAmount: Balance = 10 * DOLLARS;
 	pub const PropertyManagementPalletId: PalletId = PalletId(*b"py/ppmmt");
-	pub const MaxPropertie: u32 = 100;
+	pub const MaxProperty: u32 = 100;
+	pub const MaxLettingAgent: u32 = 100;
 }
 
 /// Configure the pallet-property-management in pallets/property-management.
@@ -582,19 +583,26 @@ impl pallet_property_management::Config for Runtime {
  	type CollectionId = u32;
 	type ItemId = u32; 
 	type Slash = ();
-	type MaxProperties = MaxPropertie;
+	type MaxProperties = MaxProperty;
+	type MaxLettingAgents = MaxLettingAgent;
 }
 
 parameter_types! {
 	pub const PropertyVotingTime: BlockNumber = 30;
 	pub const MaxVoteForBlock: u32 = 100;
+	pub const MinimumSlashingAmount: Balance = 10 * DOLLARS;
+	pub const MaximumVoter: u32 = 100;
 }
 
 /// Configure the pallet-property-governance in pallets/property-governance.
 impl pallet_property_governance::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
+	type Currency = Balances;
 	type VotingTime = PropertyVotingTime;
 	type MaxVotesForBlock =  MaxVoteForBlock;
+	type Slash = ();
+	type MinSlashingAmount = MinimumSlashingAmount;
+	type MaxVoter = MaximumVoter;
 }
 
 parameter_types! {

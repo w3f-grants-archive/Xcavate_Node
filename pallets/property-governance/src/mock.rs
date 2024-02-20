@@ -45,6 +45,7 @@ frame_support::construct_runtime!(
 		PropertyGovernance: pallet_property_governance,
 		NftFractionalization: pallet_nft_fractionalization,
 		NftMarketplace: pallet_nft_marketplace,
+		PropertyManagement: pallet_property_management,
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
 		Assets: pallet_assets::<Instance1>,
 		Whitelist: pallet_whitelist,
@@ -225,15 +226,39 @@ impl pallet_nft_marketplace::Config for Test {
 } 
 
 parameter_types! {
+	pub const PropertyManagementPalletId: PalletId = PalletId(*b"py/ppmmt");
+	pub const MaxProperty: u32 = 100;
+}
+
+/// Configure the pallet-property-management in pallets/property-management.
+impl pallet_property_management::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type Currency = Balances;
+	type PalletId = PropertyManagementPalletId;
+	type MinimumRemainingAmount = ConstU32<100>;
+	type AgentOrigin = EnsureRoot<Self::AccountId>;
+	type MinStakingAmount = ConstU32<100>;
+  	type CollectionId = u32;
+	type ItemId = u32;  
+	type Slash = ();
+	type MaxProperties = MaxProperty;
+}
+
+parameter_types! {
 	pub const PropertyVotingTime: BlockNumber = 30;
 	pub const MaxVoteForBlock: u32 = 100;
+	pub const MaximumVoter: u32 = 100;
 }
 
 /// Configure the pallet-property-governance in pallets/property-governance.
 impl pallet_property_governance::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
+	type Currency = Balances;
 	type VotingTime = PropertyVotingTime;
 	type MaxVotesForBlock =  MaxVoteForBlock;
+	type Slash = ();
+	type MinSlashingAmount = ConstU32<100>;
+	type MaxVoter = MaximumVoter;
 }
 
 // Build genesis storage according to the mock runtime.
