@@ -87,7 +87,7 @@ fn let_letting_agent_deposit_fails() {
 		assert_noop!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([100; 32].into())), Error::<Test>::TooManyLettingAgents);
 	});
 }
-/*
+
 #[test]
 fn distribute_income_works() {
 	new_test_ext().execute_with(|| {
@@ -138,4 +138,3 @@ fn withdraw_funds_works() {
 	});
 }
 
- */

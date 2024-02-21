@@ -192,6 +192,12 @@ pub mod pallet {
 		TooManyLettingAgents,
 		/// The user is not a property owner and has no permission to deposit.
 		NoPermission,
+		/// The letting agent of this property is already set.
+		LettingAgentAlreadySet,
+		/// The nft could not be found.
+		NoNftFound,
+		/// The account is not a letting agent of this location.
+		AgentNotFound,
 	}
 
 	#[pallet::call]
@@ -239,8 +245,23 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Set the letting agent for a property.
+		#[pallet::call_index(3)]
+		#[pallet::weight(0)]
+		pub fn set_letting_agent(
+			origin: OriginFor<T>, 
+			item_id: <T as pallet::Config>::ItemId,
+			collection_id: <T as pallet::Config>::CollectionId
+		) -> DispatchResult {
+			let origin = ensure_signed(origin)?;
+			let nft_details = pallet_nft_marketplace::Pallet::<T>::registered_nft_details(collection_id.into(), item_id.into()).ok_or(Error::<T>::NoNftFound)?;
+			ensure!(Self::letting_storage(nft_details.asset_id).is_none(), Error::<T>::LettingAgentAlreadySet);
+			Self::selects_letting_agent(nft_details.location, nft_details.asset_id)?;
+			Ok(())
+		}
+
 		///	The letting agent can distribute the rental income.
-		#[pallet::call_index(2)]
+		#[pallet::call_index(4)]
 		#[pallet::weight(0)]
 		pub fn distribute_income(origin: OriginFor<T>, asset_id: u32, amount: BalanceOf<T>) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
@@ -264,7 +285,7 @@ pub mod pallet {
 		}
 
 		/// A property owner can withdraw the collected funds.
-		#[pallet::call_index(4)]
+		#[pallet::call_index(5)]
 		#[pallet::weight(0)]
 		pub fn withdraw_funds(origin: OriginFor<T>) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
@@ -298,6 +319,14 @@ pub mod pallet {
 				Self::letting_info(letting_agent).unwrap().assigned_properties
 			}).ok_or(Error::<T>::NoLettingAgentFound)?;
 			LettingStorage::<T>::insert(asset_id, letting_agent);
+			Ok(())
+		}
+
+		pub fn remove_bad_letting_agent(location: u32, agent: AccountIdOf<T>) -> DispatchResult {
+			let mut letting_agents = Self::letting_agent_locations(location);
+			let index = letting_agents.iter().position(|x| *x == agent).ok_or(Error::<T>::AgentNotFound)?;
+			letting_agents.remove(index);
+			LettingAgentLocations::<T>::insert(location, letting_agents);
 			Ok(())
 		}
 	}

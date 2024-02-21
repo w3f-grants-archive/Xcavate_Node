@@ -84,6 +84,7 @@ pub mod pallet {
 	pub struct NftDetails {
 		pub spv_created: bool,
 		pub asset_id: u32,
+		pub location: u32,
 	}
 
 	/// Infos regarding the listing of an real estate object.
@@ -481,7 +482,7 @@ pub mod pallet {
 				data.clone(),
 			)?;
 			let registered_nft_details =
-				NftDetails { spv_created: Default::default(), asset_id: asset_number };
+				NftDetails { spv_created: Default::default(), asset_id: asset_number, location };
 			RegisteredNftDetails::<T>::insert(collection_id, item_id, registered_nft_details);
 			OngoingObjectListing::<T>::insert(listing_id, nft.clone());
 			ListedToken::<T>::insert(listing_id, 100);
