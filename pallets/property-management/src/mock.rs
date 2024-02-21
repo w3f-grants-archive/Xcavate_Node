@@ -226,7 +226,7 @@ impl pallet_nft_marketplace::Config for Test {
 
 parameter_types! {
 	pub const PropertyManagementPalletId: PalletId = PalletId(*b"py/ppmmt");
-	pub const MaxProperty: u32 = 100;
+	pub const MaxProperty: u32 = 10;
 	pub const MaxLettingAgent: u32 = 100;
 }
 

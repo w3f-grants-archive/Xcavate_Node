@@ -26,7 +26,7 @@ use frame_support::{
 
 use frame_support::sp_runtime::{
 	traits::{
-	AccountIdConversion, CheckedMul, CheckedAdd, Zero,
+	AccountIdConversion, CheckedMul, CheckedAdd, CheckedDiv, Zero,
 	},
 };
 
@@ -173,6 +173,8 @@ pub mod pallet {
 		StorageOverflow,
 		/// Error by convertion to balance type.
 		ConversionError,
+		/// Error by dividing a number.
+		DivisionError,
 		/// Error by multiplying a number.
 		MultiplyError,
 		ArithmeticOverflow,
@@ -198,6 +200,8 @@ pub mod pallet {
 		NoNftFound,
 		/// The account is not a letting agent of this location.
 		AgentNotFound,
+		/// The letting already deposited the necessary amount.
+		AlreadyDeposited,
 	}
 
 	#[pallet::call]
@@ -233,15 +237,16 @@ pub mod pallet {
 		#[pallet::call_index(1)]
 		#[pallet::weight(0)]
 		pub fn letting_agent_deposit(origin: OriginFor<T>) -> DispatchResult {
-			let staker = ensure_signed(origin)?;
-			<T as pallet::Config>::Currency::reserve(&staker, <T as Config>::MinStakingAmount::get())?;
-			let mut letting_info = Self::letting_info(staker.clone()).ok_or(Error::<T>::NoPermission)?;
+			let origin = ensure_signed(origin)?;
+			<T as pallet::Config>::Currency::reserve(&origin, <T as Config>::MinStakingAmount::get())?;
+			let mut letting_info = Self::letting_info(origin.clone()).ok_or(Error::<T>::NoPermission)?;
+			ensure!(!Self::letting_agent_locations(letting_info.location).contains(&origin), Error::<T>::AlreadyDeposited);
 			letting_info.deposited = true;
 			LettingAgentLocations::<T>::try_mutate(letting_info.location, |keys| {
-				keys.try_push(staker.clone()).map_err(|_| Error::<T>::TooManyLettingAgents)?;
+				keys.try_push(origin.clone()).map_err(|_| Error::<T>::TooManyLettingAgents)?;
 				Ok::<(), DispatchError>(())
 			})?;
-			LettingInfo::<T>::insert(staker.clone(), letting_info);
+			LettingInfo::<T>::insert(origin.clone(), letting_info);
 			Ok(())
 		}
 
@@ -250,8 +255,8 @@ pub mod pallet {
 		#[pallet::weight(0)]
 		pub fn set_letting_agent(
 			origin: OriginFor<T>, 
+			collection_id: <T as pallet::Config>::CollectionId,
 			item_id: <T as pallet::Config>::ItemId,
-			collection_id: <T as pallet::Config>::CollectionId
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let nft_details = pallet_nft_marketplace::Pallet::<T>::registered_nft_details(collection_id.into(), item_id.into()).ok_or(Error::<T>::NoNftFound)?;
@@ -276,7 +281,11 @@ pub mod pallet {
 			let owner_list = pallet_nft_marketplace::Pallet::<T>::property_owner(asset_id);
 			for owner in owner_list {
 				let token_amount = pallet_nft_marketplace::Pallet::<T>::property_owner_token(asset_id, owner.clone());
-				let amount_for_owner = Self::u64_to_balance_option(token_amount as u64)?*amount/Self::u64_to_balance_option(100)?;
+				let amount_for_owner = Self::u64_to_balance_option(token_amount as u64)?
+				.checked_mul(&amount)
+				.ok_or(Error::<T>::MultiplyError)?
+				.checked_div(&Self::u64_to_balance_option(100)?)
+				.ok_or(Error::<T>::DivisionError)?;
 				let mut old_funds = Self::stored_funds(owner.clone());
 				old_funds = old_funds.checked_add(&amount_for_owner).ok_or(Error::<T>::ArithmeticOverflow)?;
 				StoredFunds::<T>::insert(owner, old_funds);
@@ -319,6 +328,9 @@ pub mod pallet {
 				Self::letting_info(letting_agent).unwrap().assigned_properties
 			}).ok_or(Error::<T>::NoLettingAgentFound)?;
 			LettingStorage::<T>::insert(asset_id, letting_agent);
+			let mut letting_info = Self::letting_info(letting_agent).ok_or(Error::<T>::AgentNotFound)?;
+			letting_info.assigned_properties.try_push(asset_id).map_err(|_| Error::<T>::TooManyAssignedProperties)?;
+			LettingInfo::<T>::insert(letting_agent, letting_info);
 			Ok(())
 		}
 
