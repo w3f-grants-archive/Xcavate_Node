@@ -492,14 +492,14 @@ pub mod pallet {
 			let fractionalize_collection_id: FractionalizeCollectionId<T> =
 				collection_id.try_into().map_err(|_| Error::<T>::ConversionError)?;
 			let fractionalize_item_id: FractionalizeItemId<T> = next_item_id.into();
-			pallet_nft_fractionalization::Pallet::<T>::fractionalize(
+ 			pallet_nft_fractionalization::Pallet::<T>::fractionalize(
 				pallet_origin.clone(),
 				fractionalize_collection_id.into(),
 				fractionalize_item_id.into(),
 				asset_id.into(),
 				user_lookup,
 				nft_balance,
-			)?;
+			)?; 
 			next_item_id = next_item_id.checked_add(1).ok_or(Error::<T>::ArithmeticOverflow)?;
 			asset_number = asset_number.checked_add(1).ok_or(Error::<T>::ArithmeticOverflow)?;
 			NextNftId::<T>::insert(collection_id, next_item_id);

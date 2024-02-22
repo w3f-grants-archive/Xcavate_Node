@@ -162,6 +162,25 @@ pub mod pallet {
 			location: u32,
 			who: T::AccountId 
 		},
+		/// A letting agent deposited the necessary funds.
+		Deposited {
+			who: T::AccountId,
+		},
+		/// A letting agent has been added to a property.
+		LettingAgentSet {
+			asset_id: u32,
+			who: T::AccountId,
+		},
+		/// The rental income has been distributed.
+		IncomeDistributed {
+			asset_id: u32,
+			amount: BalanceOf<T>,
+		},
+		/// A user withdrew funds.
+		WithdrawFunds {
+			who: T::AccountId,
+			amount: BalanceOf<T>,
+		}
 	}
 
 	// Errors inform users that something went wrong.
@@ -247,6 +266,9 @@ pub mod pallet {
 				Ok::<(), DispatchError>(())
 			})?;
 			LettingInfo::<T>::insert(origin.clone(), letting_info);
+			Self::deposit_event(Event::<T>::Deposited {
+				who: origin,
+			});
 			Ok(())
 		}
 
@@ -290,6 +312,10 @@ pub mod pallet {
 				old_funds = old_funds.checked_add(&amount_for_owner).ok_or(Error::<T>::ArithmeticOverflow)?;
 				StoredFunds::<T>::insert(owner, old_funds);
 			};
+			Self::deposit_event(Event::<T>::IncomeDistributed {
+				asset_id,
+				amount,
+			});
 			Ok(())
 		}
 
@@ -307,6 +333,10 @@ pub mod pallet {
 				KeepAlive,
 			)
 			.map_err(|_| Error::<T>::NotEnoughFunds)?;
+			Self::deposit_event(Event::<T>::WithdrawFunds {
+				who: origin,
+				amount: user_funds,
+			});
 			Ok(())
 		}
 	}
@@ -331,6 +361,10 @@ pub mod pallet {
 			let mut letting_info = Self::letting_info(letting_agent).ok_or(Error::<T>::AgentNotFound)?;
 			letting_info.assigned_properties.try_push(asset_id).map_err(|_| Error::<T>::TooManyAssignedProperties)?;
 			LettingInfo::<T>::insert(letting_agent, letting_info);
+			Self::deposit_event(Event::<T>::LettingAgentSet {
+				asset_id,
+				who: letting_agent.clone(),
+			}); 
 			Ok(())
 		}
 

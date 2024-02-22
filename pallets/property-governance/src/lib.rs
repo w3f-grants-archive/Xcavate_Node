@@ -358,6 +358,7 @@ pub mod pallet {
 			<T as pallet::Config>::Slash::on_unbalanced(<T as pallet::Config>::Currency::slash_reserved(&letting_agent, amount).0);
 			let agent_info = pallet_property_management::Pallet::<T>::letting_info(letting_agent.clone()).ok_or(Error::<T>::LettingAgentNotFound)?;
 			pallet_property_management::Pallet::<T>::remove_bad_letting_agent(agent_info.location, letting_agent);
+			pallet_property_management::Pallet::<T>::selects_letting_agent(agent_info.location, inquery.asset_id);
 			Ok(())
 		}
 	}

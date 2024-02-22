@@ -78,7 +78,7 @@ impl frame_system::Config for Test {
 	type BlockLength = ();
 	type SS58Prefix = ();
 	type OnSetCode = ();
-	type MaxConsumers = frame_support::traits::ConstU32<16>;
+	type MaxConsumers = frame_support::traits::ConstU32<50>;
 }
 
 impl pallet_balances::Config for Test {
@@ -226,7 +226,7 @@ impl pallet_nft_marketplace::Config for Test {
 
 parameter_types! {
 	pub const PropertyManagementPalletId: PalletId = PalletId(*b"py/ppmmt");
-	pub const MaxProperty: u32 = 10;
+	pub const MaxProperty: u32 = 100;
 	pub const MaxLettingAgent: u32 = 100;
 }
 

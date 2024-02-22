@@ -60,6 +60,7 @@ fn inquery_agains_letting_agent_works() {
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
 		assert_ok!(PropertyGovernance::inquery_agains_letting_agent(RuntimeOrigin::signed([1; 32].into()), 0));
+		assert_eq!(PropertyGovernance::inqueries(0).is_some(), true);
 	});
 }
 

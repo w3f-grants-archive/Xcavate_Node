@@ -194,15 +194,17 @@ fn set_letting_agent_fails() {
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
 		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0, 0));
 		assert_noop!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0, 0), Error::<Test>::LettingAgentAlreadySet);
-		for x in 1..10 {
+		for x in 1..100 {
 			assert_ok!(NftMarketplace::list_object(
 				RuntimeOrigin::signed([0; 32].into()),
 				0,
 				10_000,
 				bvec![22, 22]
 			));
-			assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), x, 99));
-			assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0, x));
+			assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [(x+1); 32].into()));
+			Balances::make_free_balance_be(&[x; 32].into(), 100_000);
+			assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([x; 32].into()), (x as u32).into(), 100));
+			assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0, x.into()));
 		}
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
@@ -210,8 +212,8 @@ fn set_letting_agent_fails() {
 			10_000,
 			bvec![22, 22]
 		));
-		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 10, 100));
-		assert_noop!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0, 10), Error::<Test>::TooManyAssignedProperties);
+		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 100, 100));
+		assert_noop!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0, 100), Error::<Test>::TooManyAssignedProperties);
 	});
 }
 
