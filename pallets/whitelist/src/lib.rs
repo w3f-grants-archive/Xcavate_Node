@@ -49,7 +49,7 @@ pub mod pallet {
 	pub enum Event<T: Config> {
 		/// A new user has been successfully whitelisted.
 		NewUserWhitelisted { user: T::AccountId },
-		/// A new user has been successfully whitelisted.
+		/// A user has been removed from whitelisted.
 		UserRemoved { user: T::AccountId },
 	}
 
