@@ -323,6 +323,7 @@ pub mod pallet {
 	pub(super) type TokenListings<T: Config> =
 		StorageMap<_, Blake2_128Concat, u32, ListingDetailsType<T>, OptionQuery>;
 
+	/// Mapping of the assetid to the vector of token holder.
 	#[pallet::storage]
 	#[pallet::getter(fn property_owner)]
 	pub(super) type PropertyOwner<T: Config> = StorageMap<
@@ -333,6 +334,7 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	/// Mapping of assetid and accountid to the amount of token an account is holding of the asset.
 	#[pallet::storage]
 	#[pallet::getter(fn property_owner_token)]
 	pub(super) type PropertyOwnerToken<T: Config> = StorageDoubleMap<
@@ -617,10 +619,12 @@ pub mod pallet {
 			Self::transfer_funds(&origin, &Self::account_id(), transfer_price)?;
 			listed_token =
 				listed_token.checked_sub(amount).ok_or(Error::<T>::ArithmeticUnderflow)?;
-			TokenBuyer::<T>::try_mutate(listing_id, |keys| {
-				keys.try_push(origin.clone()).map_err(|_| Error::<T>::TooManyTokenBuyer)?;
-				Ok::<(), DispatchError>(())
-			})?;
+			if !Self::token_buyer(listing_id).contains(&origin) {
+				TokenBuyer::<T>::try_mutate(listing_id, |keys| {
+					keys.try_push(origin.clone()).map_err(|_| Error::<T>::TooManyTokenBuyer)?;
+					Ok::<(), DispatchError>(())
+				})?;
+			}
 			let mut token_of_owner = TokenOwner::<T>::take(origin.clone(), listing_id);
 			token_of_owner =
 				token_of_owner.checked_add(amount).ok_or(Error::<T>::ArithmeticOverflow)?;
@@ -703,18 +707,30 @@ pub mod pallet {
 					old_token_owner_amount,
 				);
 			}
-			PropertyOwner::<T>::try_mutate(
-				listing_details.asset_id,
-				|keys| {
-					keys.try_push(origin.clone()).map_err(|_| Error::<T>::TooManyTokenBuyer)?;
-					Ok::<(), DispatchError>(())
-				},
-			)?;
-			PropertyOwnerToken::<T>::insert(
-				listing_details.asset_id,
-				origin.clone(),
-				listing_details.amount,
-			);
+			if Self::property_owner(listing_details.asset_id).contains(&origin) {
+				let mut buyer_token_amount = PropertyOwnerToken::<T>::take(listing_details.asset_id, origin.clone());
+				buyer_token_amount = buyer_token_amount
+					.checked_add(listing_details.amount)
+					.ok_or(Error::<T>::ArithmeticOverflow)?;
+				PropertyOwnerToken::<T>::insert(
+					listing_details.asset_id,
+					origin.clone(),
+					buyer_token_amount,
+				);				
+			} else {
+				PropertyOwner::<T>::try_mutate(
+					listing_details.asset_id,
+					|keys| {
+						keys.try_push(origin.clone()).map_err(|_| Error::<T>::TooManyTokenBuyer)?;
+						Ok::<(), DispatchError>(())
+					},
+				)?;
+				PropertyOwnerToken::<T>::insert(
+					listing_details.asset_id,
+					origin.clone(),
+					listing_details.amount,
+				);
+			}
 			Self::deposit_event(Event::<T>::TokenBought {
 				item_index: listing_details.item_id,
 				buyer: origin.clone(),

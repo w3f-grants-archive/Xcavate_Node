@@ -170,8 +170,10 @@ fn listing_and_selling_multiple_objects() {
 			1_000_000,
 			bvec![22, 22]
 		));
-		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 1, 100));
-		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 2, 20));
+		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 1, 80));
+		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 1, 20));
+		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 2, 10));
+		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 2, 10));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([2; 32].into()), 2, 30));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([3; 32].into()),
@@ -187,6 +189,7 @@ fn listing_and_selling_multiple_objects() {
 		assert_eq!(NftMarketplace::token_buyer(2).len(), 2);
 		assert_eq!(NftMarketplace::token_owner::<AccountId, ItemId<Test>>([1; 32].into(), 1), 0);
 		assert_eq!(NftMarketplace::token_buyer(1).len(), 0);
+		assert_eq!(NftMarketplace::property_owner_token::<u32, AccountId>(1, [1; 32].into()), 100);
 	});
 }
 
@@ -273,15 +276,23 @@ fn buy_single_nft_works() {
 			1
 		));
 		assert_ok!(NftMarketplace::buy_relisted_token(RuntimeOrigin::signed([3; 32].into()), 1));
+		assert_ok!(NftMarketplace::relist_token(
+			RuntimeOrigin::signed([1; 32].into()),
+			0,
+			0,
+			1000,
+			1
+		));
+		assert_ok!(NftMarketplace::buy_relisted_token(RuntimeOrigin::signed([3; 32].into()), 2));
 		//assert_eq!(NftMarketplace::listed_nfts().len(), 0);
 		assert_eq!(NftMarketplace::token_listings(0).is_some(), false);
 		assert_eq!(NftMarketplace::property_owner(0).len(), 2);
-		assert_eq!(NftMarketplace::property_owner_token::<u32, AccountId>(0, [1; 32].into()), 99);
-		assert_eq!(NftMarketplace::property_owner_token::<u32, AccountId>(0, [3; 32].into()), 1);
-		assert_eq!(Balances::free_balance(&([1; 32].into())), 14_000_990);
-		assert_eq!(Balances::free_balance(&([3; 32].into())), 4_000);
+		assert_eq!(NftMarketplace::property_owner_token::<u32, AccountId>(0, [1; 32].into()), 98);
+		assert_eq!(NftMarketplace::property_owner_token::<u32, AccountId>(0, [3; 32].into()), 2);
+		assert_eq!(Balances::free_balance(&([1; 32].into())), 14_001_980);
+		assert_eq!(Balances::free_balance(&([3; 32].into())), 3_000);
 		//assert_eq!(NftMarketplace::seller_listings::<AccountId>([1; 32].into()).len(), 0);
-		assert_eq!(Assets::balance(0, &[3; 32].into()), 1);
+		assert_eq!(Assets::balance(0, &[3; 32].into()), 2);
 	})
 }
 

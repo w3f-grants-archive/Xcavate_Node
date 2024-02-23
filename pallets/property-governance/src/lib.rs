@@ -73,8 +73,8 @@ pub mod pallet {
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
 	pub struct VoteStats {
-		pub yes_votes: u64,
-		pub no_votes: u64,
+		pub yes_votes: u8,
+		pub no_votes: u8,
 	}
 
 	#[pallet::pallet]
@@ -166,6 +166,7 @@ pub mod pallet {
 	>;
 
 	#[pallet::storage]
+	#[pallet::getter(fn inquery_rounds_expiring)]
 	pub type InqueryRoundsExpiring<T: Config> = StorageMap<
 		_,
 		Blake2_128Concat,
@@ -212,15 +213,18 @@ pub mod pallet {
 			ended_votings.iter().for_each(|item| {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
 				let _ = <OngoingVotes<T>>::take(item);
+				let _ = <Proposals<T>>::take(item);
 			});
 
 			let ended_inquery_votings = InqueryRoundsExpiring::<T>::take(n);
 			ended_inquery_votings.iter().for_each(|item| {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
-				let voting_results = <OngoingVotes<T>>::take(item);
+				let voting_results = <OngoingInqueryVotes<T>>::take(item);
 				if let Some(voting_result) = voting_results {
 					if voting_result.yes_votes > voting_result.no_votes {
 						let _ = Self::change_letting_agent(*item);
+					} else {
+						Inqueries::<T>::take(*item);
 					}
 				}
 			});	
@@ -264,7 +268,7 @@ pub mod pallet {
 		/// Create proposal against a letting_agent
 		#[pallet::call_index(1)]
 		#[pallet::weight(0)]
-		pub fn inquery_agains_letting_agent(origin: OriginFor<T>, asset_id: u32) -> DispatchResult {
+		pub fn inquery_against_letting_agent(origin: OriginFor<T>, asset_id: u32) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let owner_list = pallet_nft_marketplace::Pallet::<T>::property_owner(asset_id);
 			ensure!(owner_list.contains(&origin), Error::<T>::NoPermission);
@@ -277,7 +281,7 @@ pub mod pallet {
 				asset_id,
 				created_at: current_block_number,
 			};
-			RoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
+			InqueryRoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
 				keys.try_push(inquery_id).map_err(|_| Error::<T>::TooManyProposals)?;
 				Ok::<(), DispatchError>(())
 			})?;
@@ -302,11 +306,12 @@ pub mod pallet {
 			let owner_list = pallet_nft_marketplace::Pallet::<T>::property_owner(proposal.asset_id);
 			ensure!(owner_list.contains(&origin), Error::<T>::NoPermission);
 			ensure!(!Self::proposal_voter(proposal_id).contains(&origin), Error::<T>::AlreadyVoted);
+			let voting_power = pallet_nft_marketplace::Pallet::<T>::property_owner_token(proposal.asset_id, origin.clone());
 			let mut current_vote = Self::ongoing_votes(proposal_id).ok_or(Error::<T>::NotOngoing)?;
 			if vote == Vote::Yes {
-				current_vote.yes_votes += 1;
+				current_vote.yes_votes += voting_power;
 			} else {
-				current_vote.no_votes += 1;
+				current_vote.no_votes += voting_power;
 			};
 			OngoingVotes::<T>::insert(proposal_id, current_vote);
 			ProposalVoter::<T>::try_mutate(proposal_id, |keys| {
@@ -330,11 +335,12 @@ pub mod pallet {
 			let owner_list = pallet_nft_marketplace::Pallet::<T>::property_owner(inquery.asset_id);
 			ensure!(owner_list.contains(&origin), Error::<T>::NoPermission);
 			ensure!(!Self::inquery_voter(inquery_id).contains(&origin), Error::<T>::AlreadyVoted);
+			let voting_power = pallet_nft_marketplace::Pallet::<T>::property_owner_token(inquery.asset_id, origin.clone());
 			let mut current_vote = Self::ongoing_inquery_votes(inquery_id).ok_or(Error::<T>::NotOngoing)?;
 			if vote == Vote::Yes {
-				current_vote.yes_votes += 1;
+				current_vote.yes_votes += voting_power;
 			} else {
-				current_vote.no_votes += 1;
+				current_vote.no_votes += voting_power;
 			};
 			OngoingInqueryVotes::<T>::insert(inquery_id, current_vote);
 			InqueryVoter::<T>::try_mutate(inquery_id, |keys| {
@@ -352,7 +358,7 @@ pub mod pallet {
 
 	impl<T: Config> Pallet<T> {
 		fn change_letting_agent(inquery_id: InqueryIndex) -> DispatchResult {
-			let inquery = Self::inqueries(inquery_id).ok_or(Error::<T>::NotOngoing)?;
+			let inquery = Inqueries::<T>::take(inquery_id).ok_or(Error::<T>::NotOngoing)?;
 			let letting_agent = pallet_property_management::Pallet::<T>::letting_storage(inquery.asset_id).unwrap();
 			let amount = <T as Config>::MinSlashingAmount::get();
 			<T as pallet::Config>::Slash::on_unbalanced(<T as pallet::Config>::Currency::slash_reserved(&letting_agent, amount).0);
