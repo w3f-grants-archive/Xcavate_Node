@@ -84,19 +84,24 @@ pub mod pallet {
 	pub trait Config: frame_system::Config + pallet_nft_marketplace::Config + pallet_property_management::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+
 		/// The reservable currency type.
 		type Currency: Currency<Self::AccountId>
 			+ ReservableCurrency<Self::AccountId>;
+
 		/// The amount of time given to vote for a proposal.
 		type VotingTime: Get<BlockNumberFor<Self>>;
 
 		/// The maximum amount of votes per block.
 		type MaxVotesForBlock: Get<u32>;
+
 		/// Handler for the unbalanced reduction when slashing a letting agent.
 		type Slash: OnUnbalanced<NegativeImbalanceOf<Self>>;
+
 		/// The minimum amount of a letting agent that will be slashed.
 		type MinSlashingAmount: Get<BalanceOf<Self>>;
-		/// The maximum amount of users who can vote on a ongoing voting.
+
+		/// The maximum amount of users who can vote on an ongoing voting.
 		type MaxVoter: Get<u32>;
 	}
 
@@ -144,18 +149,19 @@ pub mod pallet {
 	pub(super) type ProposalVoter<T: Config> = 
 		StorageMap<_, Blake2_128Concat, ProposalIndex, BoundedVec<AccountIdOf<T>, T::MaxVoter>, ValueQuery>;
 
-	/// Mapping from inquery to vector of users who voted.
-	#[pallet::storage]
-	#[pallet::getter(fn inquery_voter)]
-	pub(super) type InqueryVoter<T: Config> = 
-		StorageMap<_, Blake2_128Concat, InqueryIndex, BoundedVec<AccountIdOf<T>, T::MaxVoter>, ValueQuery>;
-
 	/// Mapping of ongoing votes about inqueries.
 	#[pallet::storage]
 	#[pallet::getter(fn ongoing_inquery_votes)]
 	pub(super) type OngoingInqueryVotes<T> = 
 		StorageMap<_, Blake2_128Concat, InqueryIndex, VoteStats, OptionQuery>;
 
+	/// Mapping from inquery to vector of users who voted.
+	#[pallet::storage]
+	#[pallet::getter(fn inquery_voter)]
+	pub(super) type InqueryVoter<T: Config> = 
+		StorageMap<_, Blake2_128Concat, InqueryIndex, BoundedVec<AccountIdOf<T>, T::MaxVoter>, ValueQuery>;
+
+	/// Stores the project keys and round types ending on a given block for proposal votings.
 	#[pallet::storage]
 	pub type RoundsExpiring<T: Config> = StorageMap<
 		_,
@@ -165,6 +171,7 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	/// Stores the project keys and round types ending on a given block for inquery votings.
 	#[pallet::storage]
 	#[pallet::getter(fn inquery_rounds_expiring)]
 	pub type InqueryRoundsExpiring<T: Config> = StorageMap<
@@ -210,6 +217,7 @@ pub mod pallet {
 			let mut weight = T::DbWeight::get().reads_writes(1, 1);
 
 			let ended_votings = RoundsExpiring::<T>::take(n);
+			/// checks if there is a voting for a proposal ending in this block.
 			ended_votings.iter().for_each(|item| {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
 				let _ = <OngoingVotes<T>>::take(item);
@@ -217,6 +225,7 @@ pub mod pallet {
 			});
 
 			let ended_inquery_votings = InqueryRoundsExpiring::<T>::take(n);
+			/// checks if there is a voting for an inquery ending in this block.
 			ended_inquery_votings.iter().for_each(|item| {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
 				let voting_results = <OngoingInqueryVotes<T>>::take(item);
@@ -234,6 +243,15 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
+		/// Creates a proposal for a real estate object.
+		/// Only one of the owner of the property can propose.
+		///
+		/// The origin must be Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `asset_id`: The asset id of the property.
+		///
+		/// Emits `Proposed` event when succesfful.
 		#[pallet::call_index(0)]
 		#[pallet::weight(0)]
 		pub fn propose(origin: OriginFor<T>, asset_id: u32) -> DispatchResult {
@@ -265,7 +283,15 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Create proposal against a letting_agent
+		/// Creates an inquery against the letting agent of the real estate object.
+		/// Only one of the owner of the property can propose.
+		///
+		/// The origin must be Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `asset_id`: The asset id of the property.
+		///
+		/// Emits `Inquery` event when succesfful.
 		#[pallet::call_index(1)]
 		#[pallet::weight(0)]
 		pub fn inquery_against_letting_agent(origin: OriginFor<T>, asset_id: u32) -> DispatchResult {
@@ -297,7 +323,15 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Voting on a proposal
+		/// Lets owner of the real estate object vote on a proposal.
+		///
+		/// The origin must be Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `proposal_id`: The index of the proposal.
+		/// - `vote`: Must be either a Yes vote or a No vote.
+		///
+		/// Emits `VotedOnProposal` event when succesfful.
 		#[pallet::call_index(2)]
 		#[pallet::weight(0)]
 		pub fn vote_on_proposal(origin: OriginFor<T>, proposal_id: ProposalIndex, vote: Vote) -> DispatchResult {
@@ -326,7 +360,15 @@ pub mod pallet {
 			Ok(())	
 		}
 
-		/// Voting against a letting agent
+		/// Lets owner of the real estate object vote on an inquery.
+		///
+		/// The origin must be Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `inquery_id`: The index of the inquery.
+		/// - `vote`: Must be either a Yes vote or a No vote.
+		///
+		/// Emits `VotedOnInquery` event when succesfful.
 		#[pallet::call_index(3)]
 		#[pallet::weight(0)]
 		pub fn vote_on_letting_agent_inquery(origin: OriginFor<T>, inquery_id: InqueryIndex, vote: Vote) -> DispatchResult {
@@ -357,14 +399,15 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
+		/// Changes the letting agent of a given real estate object.
 		fn change_letting_agent(inquery_id: InqueryIndex) -> DispatchResult {
 			let inquery = Inqueries::<T>::take(inquery_id).ok_or(Error::<T>::NotOngoing)?;
 			let letting_agent = pallet_property_management::Pallet::<T>::letting_storage(inquery.asset_id).unwrap();
 			let amount = <T as Config>::MinSlashingAmount::get();
 			<T as pallet::Config>::Slash::on_unbalanced(<T as pallet::Config>::Currency::slash_reserved(&letting_agent, amount).0);
 			let agent_info = pallet_property_management::Pallet::<T>::letting_info(letting_agent.clone()).ok_or(Error::<T>::LettingAgentNotFound)?;
-			pallet_property_management::Pallet::<T>::remove_bad_letting_agent(agent_info.location, letting_agent);
-			pallet_property_management::Pallet::<T>::selects_letting_agent(agent_info.location, inquery.asset_id);
+			let _ = pallet_property_management::Pallet::<T>::remove_bad_letting_agent(agent_info.location, letting_agent);
+			let _ = pallet_property_management::Pallet::<T>::selects_letting_agent(agent_info.location, inquery.asset_id);
 			Ok(())
 		}
 	}

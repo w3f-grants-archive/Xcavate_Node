@@ -18,7 +18,7 @@ pub use weights::*;
 
 use frame_support::{
 	traits::{
-	Currency, LockIdentifier, ReservableCurrency, 
+	Currency, ReservableCurrency, 
 	ExistenceRequirement::KeepAlive, OnUnbalanced
 	},
 	PalletId,
@@ -280,7 +280,7 @@ pub mod pallet {
 			collection_id: <T as pallet::Config>::CollectionId,
 			item_id: <T as pallet::Config>::ItemId,
 		) -> DispatchResult {
-			let origin = ensure_signed(origin)?;
+			let _origin = ensure_signed(origin)?;
 			let nft_details = pallet_nft_marketplace::Pallet::<T>::registered_nft_details(collection_id.into(), item_id.into()).ok_or(Error::<T>::NoNftFound)?;
 			ensure!(Self::letting_storage(nft_details.asset_id).is_none(), Error::<T>::LettingAgentAlreadySet);
 			Self::selects_letting_agent(nft_details.location, nft_details.asset_id)?;
