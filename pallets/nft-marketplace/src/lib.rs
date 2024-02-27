@@ -529,7 +529,7 @@ pub mod pallet {
 		///
 		/// Emits `TokenListed` event when succesfful
 		#[pallet::call_index(1)]
-		#[pallet::weight(<T as pallet::Config>::WeightInfo::list_token())]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::relist_token())]
 		pub fn relist_token(
 			origin: OriginFor<T>,
 			location: LocationId,

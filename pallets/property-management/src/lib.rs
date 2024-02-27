@@ -1,8 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-/// Edit this file to define custom logic or remove it if it is not needed.
-/// Learn more about FRAME and the core library of Substrate FRAME pallets:
-/// <https://docs.substrate.io/reference/frame-pallets/>
 pub use pallet::*;
 
 #[cfg(test)]
@@ -15,6 +12,7 @@ mod tests;
 mod benchmarking;
 pub mod weights;
 pub use weights::*;
+
 
 use frame_support::{
 	traits::{
@@ -45,7 +43,7 @@ pub mod pallet {
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 
-	/// Proposal with the proposal Details.
+	/// Info for the letting agent.
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
 	#[scale_info(skip_type_params(T))]
@@ -67,20 +65,26 @@ pub mod pallet {
 	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+
 		/// The reservable currency type.
 		type Currency: Currency<Self::AccountId>
 			+ ReservableCurrency<Self::AccountId>;
+
 		/// The property management's pallet id, used for deriving its sovereign account ID.
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
+
 		/// Minimum amount that should be left on letting agent account.
 		#[pallet::constant]
 		type MinimumRemainingAmount: Get<BalanceOf<Self>>;
+
 		/// Origin who can set a new letting agent.
 		type AgentOrigin: EnsureOrigin<Self::RuntimeOrigin>;
+
 		/// The minimum amount of a letting agent that has to be staked.
 		type MinStakingAmount: Get<BalanceOf<Self>>;
-		/// Collection id type from pallet nfts.
+
+ 		/// Collection id type from pallet nfts.
 		type CollectionId: IsType<<Self as pallet_nft_marketplace::Config>::CollectionId>
 			+ Parameter
 			+ From<u32>
@@ -105,15 +109,16 @@ pub mod pallet {
 		/// The maximum amount of properties that can be assigned to a letting agent.
 		#[pallet::constant]
 		type MaxProperties: Get<u32>;
+
 		/// The maximum amount of letting agents in a location.
 		#[pallet::constant]
 		type MaxLettingAgents: Get<u32>;
 	}
 
-	pub type CollectionId<T> = <T as Config>::CollectionId;
-	pub type ItemId<T> = <T as Config>::ItemId;
+ 	pub type CollectionId<T> = <T as Config>::CollectionId;
+	pub type ItemId<T> = <T as Config>::ItemId; 
 
-	/// Mapping from the real estate object to the letting agent
+	/// Mapping from the real estate object to the letting agent.
 	#[pallet::storage]
 	#[pallet::getter(fn letting_storage)]
 	pub type LettingStorage<T> = StorageMap<
@@ -141,7 +146,7 @@ pub mod pallet {
 	pub type LettingInfo<T: Config> = 
 		StorageMap<_, Blake2_128Concat, AccountIdOf<T>, LettingAgentInfo<T>, OptionQuery>;
 
-	/// Mapping from letting agent to the properties.
+	/// Mapping from location to the letting agents of this location.
 	#[pallet::storage]
 	#[pallet::getter(fn letting_agent_locations)]
 	pub type LettingAgentLocations<T: Config> = StorageMap<
@@ -152,8 +157,6 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
-	// Pallets use events to inform users when important changes are made.
-	// https://docs.substrate.io/main-docs/build/events-errors/
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
@@ -183,13 +186,8 @@ pub mod pallet {
 		}
 	}
 
-	// Errors inform users that something went wrong.
 	#[pallet::error]
 	pub enum Error<T> {
-		/// Error names should be descriptive.
-		NoneValue,
-		/// Errors should have helpful documentation associated with them.
-		StorageOverflow,
 		/// Error by convertion to balance type.
 		ConversionError,
 		/// Error by dividing a number.
@@ -197,8 +195,6 @@ pub mod pallet {
 		/// Error by multiplying a number.
 		MultiplyError,
 		ArithmeticOverflow,
-		/// One person in the list is not an owner of the property.
-		UserNotPropertyOwner,
 		/// The call has no funds stored.
 		UserHasNoFundsStored,
 		/// The pallet has not enough funds.
@@ -226,8 +222,15 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 
-		/// Sets the letting agent for an object real estate object.
-		/// - Parameter are origin, collection id, nft id and account id.
+		/// Adds a letting agent to a location.
+		///
+		/// The origin must be the sudo.
+		///
+		/// Parameters:
+		/// - `location`: The location number where the letting agent should be added to.
+		/// - `letting_agent`: The account of the letting_agent.
+		///
+		/// Emits `LettingAgentAdded` event when succesfful.
 		#[pallet::call_index(0)]
 		#[pallet::weight(0)]
 		pub fn add_letting_agent(
@@ -236,7 +239,7 @@ pub mod pallet {
 			letting_agent: AccountIdOf<T>,
 		) -> DispatchResult {
 			T::AgentOrigin::ensure_origin(origin)?;
-			ensure!(pallet_nft_marketplace::Pallet::<T>::location_collections(location).is_some(), Error::<T>::LocationUnknown);
+			//ensure!(pallet_nft_marketplace::Pallet::<T>::location_collections(location).is_some(), Error::<T>::LocationUnknown);
 			let letting_info = LettingAgentInfo {
 				account: letting_agent.clone(),
 				location,
@@ -251,8 +254,11 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Lets the letting agent stake his funds that could be slashed if he acts
-		/// malicious
+ 		/// Lets the letting agent deposit the required amount, to be able to operate as a letting agent.
+		///
+		/// The origin must be Signed and the sender must have sufficient funds free.
+		///
+		/// Emits `Deposited` event when succesfful.
 		#[pallet::call_index(1)]
 		#[pallet::weight(0)]
 		pub fn letting_agent_deposit(origin: OriginFor<T>) -> DispatchResult {
@@ -272,7 +278,15 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Set the letting agent for a property.
+		/// Sets a letting agent for a property.
+		///
+		/// The origin must be Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `collection_id`: The collection_id of the location.
+		/// - `item_id`: The item id of the nft.
+		///
+		/// Emits `LettingAgentSet` event when succesfful.
 		#[pallet::call_index(3)]
 		#[pallet::weight(0)]
 		pub fn set_letting_agent(
@@ -287,7 +301,15 @@ pub mod pallet {
 			Ok(())
 		}
 
-		///	The letting agent can distribute the rental income.
+		/// Lets the letting agent distribute the income for a property.
+		///
+		/// The origin must be Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `asset_id`: The asset id of the property.
+		/// - `amount`: The amount of funds that should be distributed.
+		///
+		/// Emits `IncomeDistributed` event when succesfful.
 		#[pallet::call_index(4)]
 		#[pallet::weight(0)]
 		pub fn distribute_income(origin: OriginFor<T>, asset_id: u32, amount: BalanceOf<T>) -> DispatchResult {
@@ -319,7 +341,11 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// A property owner can withdraw the collected funds.
+		/// Lets a property owner withdraw the distributed funds.
+		///
+		/// The origin must be Signed and the sender must have sufficient funds free.
+		///
+		/// Emits `WithdrawFunds` event when succesfful.
 		#[pallet::call_index(5)]
 		#[pallet::weight(0)]
 		pub fn withdraw_funds(origin: OriginFor<T>) -> DispatchResult {
@@ -351,7 +377,7 @@ pub mod pallet {
 			input.try_into().map_err(|_| Error::<T>::ConversionError)
 		}
 
-		/// Chooses the next free letting agent in a location
+	 	/// Chooses the next free letting agent in a location.
 		pub fn selects_letting_agent(location: u32, asset_id: u32) -> DispatchResult {
 			let letting_agents = Self::letting_agent_locations(location);
 			let letting_agent = letting_agents.iter().min_by_key(|letting_agent| {
@@ -368,6 +394,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Removes
 		pub fn remove_bad_letting_agent(location: u32, agent: AccountIdOf<T>) -> DispatchResult {
 			let mut letting_agents = Self::letting_agent_locations(location);
 			let index = letting_agents.iter().position(|x| *x == agent).ok_or(Error::<T>::AgentNotFound)?;

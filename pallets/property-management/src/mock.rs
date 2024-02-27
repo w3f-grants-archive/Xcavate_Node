@@ -211,8 +211,6 @@ impl pallet_nft_marketplace::Config for Test {
 	type Currency = Balances;
 	type PalletId = NftMarketplacePalletId;
 	type LocationOrigin = EnsureRoot<Self::AccountId>;
-	#[cfg(feature = "runtime-benchmarks")]
-	type Helper = NftHelper;
 	type MaxListedNfts = MaxListedNft;
 	type CollectionId = u32;
 	type ItemId = u32;

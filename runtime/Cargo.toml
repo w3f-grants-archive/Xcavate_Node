@@ -101,7 +101,7 @@ pallet-nft-marketplace = {  default-features = false, path = "../pallets/nft-mar
 pallet-community-projects = {  default-features = false, path = "../pallets/community-projects" }
 pallet-whitelist = {  default-features = false, path = "../pallets/whitelist" }
 pallet-property-management = {  default-features = false, path = "../pallets/property-management" }
-pallet-property-governance = {  default-features = false, path = "../pallets/property-governance" }
+#pallet-property-governance = {  default-features = false, path = "../pallets/property-governance" }
 
 
 [build-dependencies]
@@ -133,7 +133,7 @@ std = [
 	"pallet-community-projects/std",
 	"pallet-whitelist/std",
 	"pallet-property-management/std",
-	"pallet-property-governance/std",
+	#"pallet-property-governance/std",
 	"pallet-timestamp/std",
 	"pallet-transaction-payment-rpc-runtime-api/std",
 	"pallet-transaction-payment/std",
@@ -205,6 +205,7 @@ runtime-benchmarks = [
 	"pallet-nft-marketplace/runtime-benchmarks",
 	"pallet-community-projects/runtime-benchmarks",
 	"pallet-whitelist/runtime-benchmarks",
+	"pallet-property-management/runtime-benchmarks",
 	"pallet-nfts/runtime-benchmarks",
 	"pallet-uniques/runtime-benchmarks",
 	"pallet-assets/runtime-benchmarks",
@@ -246,6 +247,7 @@ try-runtime = [
 	"pallet-nft-marketplace/try-runtime",
 	"pallet-community-projects/try-runtime",
 	"pallet-whitelist/try-runtime",
+	"pallet-property-management/try-runtime",
 	"pallet-nfts/try-runtime",
 	"pallet-insecure-randomness-collective-flip/try-runtime",
 	"pallet-assets/try-runtime",
