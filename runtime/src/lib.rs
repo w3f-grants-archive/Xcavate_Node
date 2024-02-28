@@ -131,9 +131,9 @@ pub mod opaque {
 	impl_opaque_keys! {
 		pub struct SessionKeys {
 			// pub aura: Aura,
-			pub grandpa: Grandpa,
 			pub aura: Aura,
-			pub im_online: ImOnline,
+			pub grandpa: Grandpa,
+ 			pub im_online: ImOnline,
 			pub authority_discovery: AuthorityDiscovery,
 		}
 	}
@@ -300,6 +300,7 @@ impl frame_system::Config for Runtime {
 	/// The set code logic, just the default since we're not a parachain.
 	type OnSetCode = ();
 	type MaxConsumers = frame_support::traits::ConstU32<1024>;
+	type RuntimeTask = ();
 }
 
 impl pallet_insecure_randomness_collective_flip::Config for Runtime {}
@@ -794,6 +795,7 @@ parameter_types! {
 	pub const OffendingValidatorsThreshold: Perbill = Perbill::from_percent(17);
 	pub OffchainRepeat: BlockNumber = 5;
 	pub const HistoryDepth: u32 = 80;
+	pub const MaxExposurePageSize: u32 = 64;
 }
 
 pub struct StakingBenchmarkingConfig;
@@ -817,8 +819,8 @@ impl pallet_staking::Config for Runtime {
 	type SessionInterface = Self;
 	type AdminOrigin = frame_system::EnsureRoot<Self::AccountId>;
 	type EraPayout = pallet_staking::ConvertCurve<RewardCurve>;
+	type MaxExposurePageSize = MaxExposurePageSize;
 	type NextNewSession = Session;
-	type MaxNominatorRewardedPerValidator = MaxNominatorRewardedPerValidator;
 	type OffendingValidatorsThreshold = OffendingValidatorsThreshold;
 	type ElectionProvider = ElectionProviderMultiPhase;
 	type GenesisElectionProvider = onchain::OnChainExecution<OnChainSeqPhragmen>;
@@ -827,6 +829,7 @@ impl pallet_staking::Config for Runtime {
 	type WeightInfo = pallet_staking::weights::SubstrateWeight<Runtime>;
 	type BenchmarkingConfig = StakingBenchmarkingConfig;
 	type TargetList = pallet_staking::UseValidatorsMap<Runtime>;
+	type MaxControllersInDeprecationBatch = ConstU32<5900>;
 	type HistoryDepth = HistoryDepth;
 	type NominationsQuota = pallet_staking::FixedNominationsQuota<16>; // FIXME
 	type EventListeners = (); // FIXME
@@ -1065,7 +1068,6 @@ parameter_types! {
 	// phase durations. 1/4 of the last session for each.
 	pub const SignedPhase: u32 = EPOCH_DURATION_IN_BLOCKS / 4;
 	pub const UnsignedPhase: u32 = EPOCH_DURATION_IN_BLOCKS / 4;
-	pub BetterUnsignedThreshold: Perbill = Perbill::from_rational(1u32, 10_000);
 
 	// We prioritize im-online heartbeats over election solution submission.
 	pub const StakingUnsignedPriority: TransactionPriority = TransactionPriority::max_value() / 2;
@@ -1152,7 +1154,6 @@ impl pallet_election_provider_multi_phase::Config for Runtime {
 	type EstimateCallFee = TransactionPayment;
 	type SignedPhase = SignedPhase;
 	type UnsignedPhase = UnsignedPhase;
-	type BetterUnsignedThreshold = BetterUnsignedThreshold;
 	type BetterSignedThreshold = ();
 	type MinerConfig = SubmitMinerConfig;
 	type OffchainRepeat = OffchainRepeat;
