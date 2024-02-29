@@ -13,7 +13,6 @@ mod benchmarking;
 pub mod weights;
 pub use weights::*;
 
-
 use frame_support::{
 	traits::{
 	Currency, ReservableCurrency, 
@@ -43,6 +42,9 @@ pub mod pallet {
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 
+	#[pallet::pallet]
+	pub struct Pallet<T>(_);
+
 	/// Info for the letting agent.
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
@@ -53,9 +55,6 @@ pub mod pallet {
 		pub assigned_properties: BoundedVec<u32, T::MaxProperties>,
 		pub deposited: bool,
 	}	
-
-	#[pallet::pallet]
-	pub struct Pallet<T>(_);
 
 	#[pallet::config]
 	pub trait Config: frame_system::Config 
@@ -232,14 +231,14 @@ pub mod pallet {
 		///
 		/// Emits `LettingAgentAdded` event when succesfful.
 		#[pallet::call_index(0)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::DbWeight::get().reads_writes(1,1))]
 		pub fn add_letting_agent(
 			origin: OriginFor<T>, 
 			location: u32,
 			letting_agent: AccountIdOf<T>,
 		) -> DispatchResult {
 			T::AgentOrigin::ensure_origin(origin)?;
-			//ensure!(pallet_nft_marketplace::Pallet::<T>::location_collections(location).is_some(), Error::<T>::LocationUnknown);
+			ensure!(pallet_nft_marketplace::Pallet::<T>::location_collections(location).is_some(), Error::<T>::LocationUnknown);
 			let letting_info = LettingAgentInfo {
 				account: letting_agent.clone(),
 				location,
@@ -260,7 +259,7 @@ pub mod pallet {
 		///
 		/// Emits `Deposited` event when succesfful.
 		#[pallet::call_index(1)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::DbWeight::get().reads_writes(1,1))]
 		pub fn letting_agent_deposit(origin: OriginFor<T>) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			<T as pallet::Config>::Currency::reserve(&origin, <T as Config>::MinStakingAmount::get())?;
@@ -288,7 +287,7 @@ pub mod pallet {
 		///
 		/// Emits `LettingAgentSet` event when succesfful.
 		#[pallet::call_index(3)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::DbWeight::get().reads_writes(1,1))]
 		pub fn set_letting_agent(
 			origin: OriginFor<T>, 
 			collection_id: <T as pallet::Config>::CollectionId,
@@ -311,7 +310,7 @@ pub mod pallet {
 		///
 		/// Emits `IncomeDistributed` event when succesfful.
 		#[pallet::call_index(4)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::DbWeight::get().reads_writes(1,1))]
 		pub fn distribute_income(origin: OriginFor<T>, asset_id: u32, amount: BalanceOf<T>) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			<T as pallet::Config>::Currency::transfer(
@@ -347,7 +346,7 @@ pub mod pallet {
 		///
 		/// Emits `WithdrawFunds` event when succesfful.
 		#[pallet::call_index(5)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::DbWeight::get().reads_writes(1,1))]
 		pub fn withdraw_funds(origin: OriginFor<T>) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			ensure!(!Self::stored_funds(origin.clone()).is_zero(), Error::<T>::UserHasNoFundsStored);

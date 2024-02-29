@@ -1,9 +1,10 @@
-//! Benchmarking setup for pallet-template
+//! Benchmarking setup for pallet-property-management
 #![cfg(feature = "runtime-benchmarks")]
 use super::*;
 
 #[allow(unused)]
 use crate::Pallet as PropertyManagement;
+use frame_benchmarking::__private::vec;
 use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
 use frame_support::sp_runtime::traits::Bounded;
@@ -12,7 +13,7 @@ use pallet_nft_marketplace::Pallet as NftMarketplace;
 	<T as frame_system::Config>::AccountId,
 >>::Balance;  
 use pallet_whitelist::Pallet as Whitelist;
-use frame_support::traits::Get;
+use frame_support::{traits::Get, assert_ok};
 
 type BalanceOf1<T> = <<T as pallet_nft_marketplace::Config>::Currency as Currency<
 	<T as frame_system::Config>::AccountId,
@@ -42,9 +43,9 @@ fn setup_real_estate_object<T: Config>() {
 mod benchmarks {
 	use super::*;
 
- 	#[benchmark]
+	#[benchmark]
 	fn add_letting_agent() {
-		NftMarketplace::<T>::create_new_location(RawOrigin::Root.into());
+		assert_ok!(NftMarketplace::<T>::create_new_location(RawOrigin::Root.into()));
 		let letting_agent: T::AccountId = whitelisted_caller();
 /* 		<T as pallet_nfts::Config>::Currency::make_free_balance_be(
 			&letting_agent,
@@ -56,7 +57,7 @@ mod benchmarks {
 		assert_eq!(PropertyManagement::<T>::letting_info(letting_agent).is_some(), true);
 	} 
 
-/* 	#[benchmark]
+ 	#[benchmark]
 	fn letting_agent_deposit() {
 		NftMarketplace::<T>::create_new_location(RawOrigin::Root.into());
 		let letting_agent: T::AccountId = whitelisted_caller();
@@ -64,7 +65,7 @@ mod benchmarks {
 			&letting_agent,
 			DepositBalanceOf::<T>::max_value(),
 		);
-		PropertyManagement::<T>::add_letting_agent(RawOrigin::Root.into(), 0, letting_agent.clone());
+		PropertyManagement::<T>::add_letting_agent(RawOrigin::Root.into(), 1, letting_agent.clone());
 		#[extrinsic_call]
 		letting_agent_deposit(RawOrigin::Signed(letting_agent.clone()));
 
@@ -80,7 +81,7 @@ mod benchmarks {
 			&letting_agent,
 			DepositBalanceOf::<T>::max_value(),
 		);
-		PropertyManagement::<T>::add_letting_agent(RawOrigin::Root.into(), 0, letting_agent.clone());
+		PropertyManagement::<T>::add_letting_agent(RawOrigin::Root.into(), 1, letting_agent.clone());
 		PropertyManagement::<T>::letting_agent_deposit(RawOrigin::Signed(letting_agent.clone()).into());
 		#[extrinsic_call]
 		set_letting_agent(RawOrigin::Signed(letting_agent.clone()), 0.into(), 0.into());
@@ -125,8 +126,7 @@ mod benchmarks {
 		withdraw_funds(RawOrigin::Signed(caller.clone()));
 
 		assert_eq!(PropertyManagement::<T>::stored_funds(caller), 0u32.into());
-	} */
-
+	} 
 
 	impl_benchmark_test_suite!(PropertyManagement, crate::mock::new_test_ext(), crate::mock::Test);
 }

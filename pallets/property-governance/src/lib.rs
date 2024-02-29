@@ -5,6 +5,17 @@
 /// <https://docs.substrate.io/reference/frame-pallets/>
 pub use pallet::*;
 
+#[cfg(test)]
+mod mock;
+
+#[cfg(test)]
+mod tests;
+
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
+pub mod weights;
+pub use weights::*;
+
 pub type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
 
 use frame_support::{
@@ -21,22 +32,14 @@ pub type NegativeImbalanceOf<T> = <<T as Config>::Currency as Currency<
 pub type BalanceOf<T> = 
 	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
-#[cfg(test)]
-mod mock;
-
-#[cfg(test)]
-mod tests;
-
-#[cfg(feature = "runtime-benchmarks")]
-mod benchmarking;
-pub mod weights;
-pub use weights::*;
-
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
+
+	#[pallet::pallet]
+	pub struct Pallet<T>(_);
 
 	pub type ProposalIndex = u32;
 	pub type InqueryIndex = u32;
@@ -76,9 +79,6 @@ pub mod pallet {
 		pub yes_votes: u8,
 		pub no_votes: u8,
 	}
-
-	#[pallet::pallet]
-	pub struct Pallet<T>(_);
 
 	#[pallet::config]
 	pub trait Config: frame_system::Config + pallet_nft_marketplace::Config + pallet_property_management::Config {
@@ -253,7 +253,7 @@ pub mod pallet {
 		///
 		/// Emits `Proposed` event when succesfful.
 		#[pallet::call_index(0)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::DbWeight::get().reads_writes(1,1))]
 		pub fn propose(origin: OriginFor<T>, asset_id: u32) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let onwer_list = pallet_nft_marketplace::Pallet::<T>::property_owner(asset_id);
@@ -293,7 +293,7 @@ pub mod pallet {
 		///
 		/// Emits `Inquery` event when succesfful.
 		#[pallet::call_index(1)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::DbWeight::get().reads_writes(1,1))]
 		pub fn inquery_against_letting_agent(origin: OriginFor<T>, asset_id: u32) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let owner_list = pallet_nft_marketplace::Pallet::<T>::property_owner(asset_id);
@@ -333,7 +333,7 @@ pub mod pallet {
 		///
 		/// Emits `VotedOnProposal` event when succesfful.
 		#[pallet::call_index(2)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::DbWeight::get().reads_writes(1,1))]
 		pub fn vote_on_proposal(origin: OriginFor<T>, proposal_id: ProposalIndex, vote: Vote) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let proposal = Self::proposals(proposal_id).ok_or(Error::<T>::NotOngoing)?;
@@ -370,7 +370,7 @@ pub mod pallet {
 		///
 		/// Emits `VotedOnInquery` event when succesfful.
 		#[pallet::call_index(3)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::DbWeight::get().reads_writes(1,1))]
 		pub fn vote_on_letting_agent_inquery(origin: OriginFor<T>, inquery_id: InqueryIndex, vote: Vote) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let inquery = Self::inqueries(inquery_id).ok_or(Error::<T>::NotOngoing)?;

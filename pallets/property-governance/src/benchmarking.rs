@@ -4,6 +4,7 @@ use super::*;
 
 #[allow(unused)]
 use crate::Pallet as PropertyGovernance;
+use frame_benchmarking::__private::vec;
 use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
 use frame_support::sp_runtime::traits::Bounded;
@@ -60,9 +61,9 @@ mod benchmarks {
 			DepositBalanceOf::<T>::max_value(),
 		);
 		#[extrinsic_call]
-		propose(RawOrigin::Signed(caller.clone()), 0);
+		propose(RawOrigin::Signed(caller.clone()), 1);
 
-		assert_eq!(PropertyGovernance::<T>::proposals(1).is_some(), true);
+		assert_eq!(PropertyGovernance::<T>::proposals(0).is_some(), true);
 	}
 
  	#[benchmark]

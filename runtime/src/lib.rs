@@ -588,7 +588,7 @@ impl pallet_property_management::Config for Runtime {
 	type MaxLettingAgents = MaxLettingAgent;
 }
 
-/* parameter_types! {
+parameter_types! {
 	pub const PropertyVotingTime: BlockNumber = 30;
 	pub const MaxVoteForBlock: u32 = 100;
 	pub const MinimumSlashingAmount: Balance = 10 * DOLLARS;
@@ -604,7 +604,7 @@ impl pallet_property_governance::Config for Runtime {
 	type Slash = ();
 	type MinSlashingAmount = MinimumSlashingAmount;
 	type MaxVoter = MaximumVoter;
-} */
+} 
 
 parameter_types! {
 	pub Features: PalletFeatures = PalletFeatures::all_enabled();
@@ -1524,7 +1524,7 @@ construct_runtime!(
 		CommunityProject: pallet_community_projects,
 		Whitelist: pallet_whitelist,
 		PropertyManagement: pallet_property_management,
-		//PropertyGovernance: pallet_property_governance,
+		PropertyGovernance: pallet_property_governance,
 		Nfts: pallet_nfts,
 		Uniques: pallet_uniques, //10
 		RandomnessCollectiveFlip: pallet_insecure_randomness_collective_flip,
@@ -1622,7 +1622,7 @@ mod benches {
 		[pallet_community_projects, CommunityProject]
 		[pallet_whitelist, Whitelist]
 		[pallet_property_management, PropertyManagement]
-		//[pallet_property_governance, PropertyGovernance]
+		[pallet_property_governance, PropertyGovernance]
 		[pallet_nfts, Nfts]
 		[pallet_uniques, Uniques]
 		[pallet_assets, Assets]

@@ -76,6 +76,7 @@ impl frame_system::Config for Test {
 	type SS58Prefix = ();
 	type OnSetCode = ();
 	type MaxConsumers = frame_support::traits::ConstU32<10000>;
+	type RuntimeTask = ();
 }
 
 impl pallet_balances::Config for Test {
