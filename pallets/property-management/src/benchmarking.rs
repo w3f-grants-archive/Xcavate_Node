@@ -12,6 +12,8 @@ use pallet_nft_marketplace::Pallet as NftMarketplace;
  type DepositBalanceOf<T> = <<T as pallet_nfts::Config>::Currency as Currency<
 	<T as frame_system::Config>::AccountId,
 >>::Balance;  
+type DepositBalanceOf1<T> =
+	<<T as pallet::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 use pallet_whitelist::Pallet as Whitelist;
 use frame_support::{traits::Get, assert_ok};
 
@@ -65,7 +67,7 @@ mod benchmarks {
 			&letting_agent,
 			DepositBalanceOf::<T>::max_value(),
 		);
-		PropertyManagement::<T>::add_letting_agent(RawOrigin::Root.into(), 1, letting_agent.clone());
+		PropertyManagement::<T>::add_letting_agent(RawOrigin::Root.into(), 0, letting_agent.clone());
 		#[extrinsic_call]
 		letting_agent_deposit(RawOrigin::Signed(letting_agent.clone()));
 
@@ -81,7 +83,7 @@ mod benchmarks {
 			&letting_agent,
 			DepositBalanceOf::<T>::max_value(),
 		);
-		PropertyManagement::<T>::add_letting_agent(RawOrigin::Root.into(), 1, letting_agent.clone());
+		PropertyManagement::<T>::add_letting_agent(RawOrigin::Root.into(), 0, letting_agent.clone());
 		PropertyManagement::<T>::letting_agent_deposit(RawOrigin::Signed(letting_agent.clone()).into());
 		#[extrinsic_call]
 		set_letting_agent(RawOrigin::Signed(letting_agent.clone()), 0.into(), 0.into());
@@ -122,6 +124,11 @@ mod benchmarks {
 		let amount: BalanceOf<T> = 100_000u32.into();
 		PropertyManagement::<T>::distribute_income(RawOrigin::Signed(letting_agent).into(), 0, amount);
 		let caller: T::AccountId = whitelisted_caller();
+		let pallet_account = PropertyManagement::<T>::account_id();
+		let _ = <T as pallet::Config>::Currency::make_free_balance_be(
+			&pallet_account,
+			DepositBalanceOf1::<T>::max_value(),
+		);
 		#[extrinsic_call]
 		withdraw_funds(RawOrigin::Signed(caller.clone()));
 

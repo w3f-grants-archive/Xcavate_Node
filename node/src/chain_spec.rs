@@ -117,11 +117,11 @@ fn testnet_genesis(
 		// "grandpa": {
 		// 	"authorities": initial_authorities.iter().map(|x| (x.1.clone(), 1)).collect::<Vec<_>>(),
 		// },
-/* 		"assets" : {
+ 		"assets" : {
 			"assets": vec![(1, root_key.clone(), true, 1)], // Genesis assets: id, owner, is_sufficient, min_balance
 			//"metadata": vec![(1, "XUSD".into(), "XUSD".into(), 0)], // Genesis metadata: id, name, symbol, decimals
 			"accounts": endowed_accounts.iter().cloned().map(|x| (1, x.0.clone(), 1_000_000)).collect::<Vec<_>>(),
-		}, */
+		}, 
 		"sudo": {
 			// Assign network admin rights.
 			"key": Some(root_key),
