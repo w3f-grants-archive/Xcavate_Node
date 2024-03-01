@@ -65,6 +65,9 @@ pub mod pallet {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
+		/// Type representing the weight of this pallet.
+		type WeightInfo: WeightInfo;
+
 		/// The reservable currency type.
 		type Currency: Currency<Self::AccountId>
 			+ ReservableCurrency<Self::AccountId>;
@@ -231,7 +234,7 @@ pub mod pallet {
 		///
 		/// Emits `LettingAgentAdded` event when succesfful.
 		#[pallet::call_index(0)]
-		#[pallet::weight(T::DbWeight::get().reads_writes(1,1))]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::add_letting_agent())]
 		pub fn add_letting_agent(
 			origin: OriginFor<T>, 
 			location: u32,
@@ -259,7 +262,7 @@ pub mod pallet {
 		///
 		/// Emits `Deposited` event when succesfful.
 		#[pallet::call_index(1)]
-		#[pallet::weight(T::DbWeight::get().reads_writes(1,1))]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::letting_agent_deposit())]
 		pub fn letting_agent_deposit(origin: OriginFor<T>) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			<T as pallet::Config>::Currency::reserve(&origin, <T as Config>::MinStakingAmount::get())?;
@@ -287,7 +290,7 @@ pub mod pallet {
 		///
 		/// Emits `LettingAgentSet` event when succesfful.
 		#[pallet::call_index(3)]
-		#[pallet::weight(T::DbWeight::get().reads_writes(1,1))]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::set_letting_agent())]
 		pub fn set_letting_agent(
 			origin: OriginFor<T>, 
 			collection_id: <T as pallet::Config>::CollectionId,
@@ -310,7 +313,7 @@ pub mod pallet {
 		///
 		/// Emits `IncomeDistributed` event when succesfful.
 		#[pallet::call_index(4)]
-		#[pallet::weight(T::DbWeight::get().reads_writes(1,1))]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::distribute_income())]
 		pub fn distribute_income(origin: OriginFor<T>, asset_id: u32, amount: BalanceOf<T>) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			<T as pallet::Config>::Currency::transfer(
@@ -346,7 +349,7 @@ pub mod pallet {
 		///
 		/// Emits `WithdrawFunds` event when succesfful.
 		#[pallet::call_index(5)]
-		#[pallet::weight(T::DbWeight::get().reads_writes(1,1))]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::withdraw_funds())]
 		pub fn withdraw_funds(origin: OriginFor<T>) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			ensure!(!Self::stored_funds(origin.clone()).is_zero(), Error::<T>::UserHasNoFundsStored);

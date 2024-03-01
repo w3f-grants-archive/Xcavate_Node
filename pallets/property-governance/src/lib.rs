@@ -85,6 +85,9 @@ pub mod pallet {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
+		/// Type representing the weight of this pallet.
+		type WeightInfo: WeightInfo;
+
 		/// The reservable currency type.
 		type Currency: Currency<Self::AccountId>
 			+ ReservableCurrency<Self::AccountId>;
@@ -253,7 +256,7 @@ pub mod pallet {
 		///
 		/// Emits `Proposed` event when succesfful.
 		#[pallet::call_index(0)]
-		#[pallet::weight(T::DbWeight::get().reads_writes(1,1))]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::propose())]
 		pub fn propose(origin: OriginFor<T>, asset_id: u32) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let onwer_list = pallet_nft_marketplace::Pallet::<T>::property_owner(asset_id);
@@ -293,7 +296,7 @@ pub mod pallet {
 		///
 		/// Emits `Inquery` event when succesfful.
 		#[pallet::call_index(1)]
-		#[pallet::weight(T::DbWeight::get().reads_writes(1,1))]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::inquery_against_letting_agent())]
 		pub fn inquery_against_letting_agent(origin: OriginFor<T>, asset_id: u32) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let owner_list = pallet_nft_marketplace::Pallet::<T>::property_owner(asset_id);
@@ -333,7 +336,7 @@ pub mod pallet {
 		///
 		/// Emits `VotedOnProposal` event when succesfful.
 		#[pallet::call_index(2)]
-		#[pallet::weight(T::DbWeight::get().reads_writes(1,1))]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::vote_on_proposal())]
 		pub fn vote_on_proposal(origin: OriginFor<T>, proposal_id: ProposalIndex, vote: Vote) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let proposal = Self::proposals(proposal_id).ok_or(Error::<T>::NotOngoing)?;
@@ -370,7 +373,7 @@ pub mod pallet {
 		///
 		/// Emits `VotedOnInquery` event when succesfful.
 		#[pallet::call_index(3)]
-		#[pallet::weight(T::DbWeight::get().reads_writes(1,1))]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::vote_on_letting_agent_inquery())]
 		pub fn vote_on_letting_agent_inquery(origin: OriginFor<T>, inquery_id: InqueryIndex, vote: Vote) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let inquery = Self::inqueries(inquery_id).ok_or(Error::<T>::NotOngoing)?;

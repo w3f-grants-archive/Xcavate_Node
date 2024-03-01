@@ -576,6 +576,7 @@ parameter_types! {
 /// Configure the pallet-property-management in pallets/property-management.
 impl pallet_property_management::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_property_management::weights::SubstrateWeight<Runtime>;
 	type Currency = Balances;
 	type PalletId = PropertyManagementPalletId;
 	type MinimumRemainingAmount = MinimumRemainingAmount;
@@ -598,6 +599,7 @@ parameter_types! {
 /// Configure the pallet-property-governance in pallets/property-governance.
 impl pallet_property_governance::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_property_governance::weights::SubstrateWeight<Runtime>;
 	type Currency = Balances;
 	type VotingTime = PropertyVotingTime;
 	type MaxVotesForBlock =  MaxVoteForBlock;

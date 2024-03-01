@@ -64,11 +64,12 @@ pub fn development_config() -> Result<ChainSpec, String> {
 		// Initial PoA authorities
 		vec![authority_keys_from_seed("Alice")],
 		// Sudo account
-		get_account_id_from_seed::<sr25519::Public>("Alice"),
+		get_root_account(),
 		// Pre-funded accounts
 		get_endowed_accounts_with_balance(),
 		true,
 	))
+	.with_properties(chain_spec_properties())
 	.build())
 }
 
@@ -84,7 +85,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 		// Initial PoA authorities
 		vec![authority_keys_from_seed("Alice")],
 		// Sudo account
-		get_account_id_from_seed::<sr25519::Public>("Alice"),
+		get_root_account(),
 		// Pre-funded accounts
 		get_endowed_accounts_with_balance(),
 		true,
@@ -119,7 +120,7 @@ fn testnet_genesis(
 		// },
  		"assets" : {
 			"assets": vec![(1, root_key.clone(), true, 1)], // Genesis assets: id, owner, is_sufficient, min_balance
-			//"metadata": vec![(1, "XUSD".into(), "XUSD".into(), 0)], // Genesis metadata: id, name, symbol, decimals
+			"metadata": vec![(1, "XUSD".as_bytes(), "XUSD".as_bytes(), 0)], // Genesis metadata: id, name, symbol, decimals
 			"accounts": endowed_accounts.iter().cloned().map(|x| (1, x.0.clone(), 1_000_000)).collect::<Vec<_>>(),
 		}, 
 		"sudo": {
@@ -148,6 +149,17 @@ fn testnet_genesis(
 				.collect::<Vec<_>>(),
 		},
 	})
+}
+
+pub fn chain_spec_properties() -> serde_json::map::Map<String, serde_json::Value> {
+	serde_json::json!({
+		"ss58Format": 42,
+		"tokenDecimals": 12,
+		"tokenSymbol": "XCAV",
+	})
+	.as_object()
+	.expect("Map given; qed")
+	.clone()
 }
 
 pub fn get_endowed_accounts_with_balance() -> Vec<(AccountId, u128)> {
@@ -183,4 +195,12 @@ pub fn get_endowed_accounts_with_balance() -> Vec<(AccountId, u128)> {
 	});
 
 	accounts
+}
+
+pub fn get_root_account() -> AccountId {
+	let json_data = &include_bytes!("../../seed/balances.json")[..];
+	let additional_accounts_with_balance: Vec<(AccountId, u128)> =
+		serde_json::from_slice(json_data).unwrap_or_default();
+
+	additional_accounts_with_balance[0].0.clone()
 }

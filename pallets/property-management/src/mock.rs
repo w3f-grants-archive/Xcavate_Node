@@ -232,6 +232,7 @@ parameter_types! {
 /// Configure the pallet-property-management in pallets/property-management.
 impl pallet_property_management::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = weights::SubstrateWeight<Test>;
 	type Currency = Balances;
 	type PalletId = PropertyManagementPalletId;
 	type MinimumRemainingAmount = ConstU32<100>;
