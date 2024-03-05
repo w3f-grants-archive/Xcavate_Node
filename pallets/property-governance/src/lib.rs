@@ -106,6 +106,9 @@ pub mod pallet {
 
 		/// The maximum amount of users who can vote on an ongoing voting.
 		type MaxVoter: Get<u32>;
+
+		/// Threshold for inquery votes.
+		type Threshold: Get<u8>;
 	}
 
 	/// Number of proposals that have been made.
@@ -212,6 +215,8 @@ pub mod pallet {
 		AlreadyVoted,
 		/// Letting Agent not found.
 		LettingAgentNotFound,
+		/// The assets details could not be found.
+		NoAssetFound,
 	}
 
 	#[pallet::hooks]
@@ -220,7 +225,7 @@ pub mod pallet {
 			let mut weight = T::DbWeight::get().reads_writes(1, 1);
 
 			let ended_votings = RoundsExpiring::<T>::take(n);
-			/// checks if there is a voting for a proposal ending in this block.
+			// checks if there is a voting for a proposal ending in this block.
 			ended_votings.iter().for_each(|item| {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
 				let _ = <OngoingVotes<T>>::take(item);
@@ -228,12 +233,12 @@ pub mod pallet {
 			});
 
 			let ended_inquery_votings = InqueryRoundsExpiring::<T>::take(n);
-			/// checks if there is a voting for an inquery ending in this block.
+			// checks if there is a voting for an inquery ending in this block.
 			ended_inquery_votings.iter().for_each(|item| {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
 				let voting_results = <OngoingInqueryVotes<T>>::take(item);
 				if let Some(voting_result) = voting_results {
-					if voting_result.yes_votes > voting_result.no_votes {
+					if voting_result.yes_votes > voting_result.no_votes && <T as Config>::Threshold::get() < voting_result.yes_votes.saturating_add(voting_result.no_votes) {
 						let _ = Self::change_letting_agent(*item);
 					} else {
 						Inqueries::<T>::take(*item);
@@ -408,9 +413,9 @@ pub mod pallet {
 			let letting_agent = pallet_property_management::Pallet::<T>::letting_storage(inquery.asset_id).unwrap();
 			let amount = <T as Config>::MinSlashingAmount::get();
 			<T as pallet::Config>::Slash::on_unbalanced(<T as pallet::Config>::Currency::slash_reserved(&letting_agent, amount).0);
-			let agent_info = pallet_property_management::Pallet::<T>::letting_info(letting_agent.clone()).ok_or(Error::<T>::LettingAgentNotFound)?;
-			let _ = pallet_property_management::Pallet::<T>::remove_bad_letting_agent(agent_info.location, letting_agent);
-			let _ = pallet_property_management::Pallet::<T>::selects_letting_agent(agent_info.location, inquery.asset_id);
+			let asset_details = pallet_nft_marketplace::Pallet::<T>::asset_id_details(inquery.asset_id).ok_or(Error::<T>::NoAssetFound)?;
+			let _ = pallet_property_management::Pallet::<T>::remove_bad_letting_agent(asset_details.region, asset_details.location, letting_agent);
+			let _ = pallet_property_management::Pallet::<T>::selects_letting_agent(asset_details.region, asset_details.location, inquery.asset_id);
 			Ok(())
 		}
 	}

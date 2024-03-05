@@ -51,6 +51,7 @@ pub mod pallet {
 	use frame_system::pallet_prelude::*;
 
 	pub type ListedNftIndex = u32;
+	pub type RegionId = u32;
 	pub type LocationId = u32;
 
 	#[pallet::pallet]
@@ -77,13 +78,14 @@ pub mod pallet {
 		}
 	}
 
-	/// Infos regardint an listed nft of a real estate object on the marketplace.
+	/// Infos regarding an listed nft of a real estate object on the marketplace.
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
 	#[scale_info(skip_type_params(T))]
 	pub struct NftDetails {
 		pub spv_created: bool,
 		pub asset_id: u32,
+		pub region: u32,
 		pub location: u32,
 	}
 
@@ -112,6 +114,17 @@ pub mod pallet {
 		pub item_id: ItemId,
 		pub collection_id: CollectionId,
 		pub amount: u8,
+	}
+
+	/// Infos regarding the asset id.
+	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
+	#[scale_info(skip_type_params(T))]
+	pub struct AssetDetails<ItemId, CollectionId> {
+		pub collection_id: CollectionId,
+		pub item_id: ItemId,
+		pub region: u32,
+		pub location: u32,
 	}
 
 	/// AccountId storage
@@ -250,8 +263,31 @@ pub mod pallet {
 	pub(super) type NextAssetId<T: Config> = StorageValue<_, u32, ValueQuery>;
 
 	#[pallet::storage]
+	#[pallet::getter(fn next_region_id)]
+	pub(super) type NextRegionId<T: Config> = StorageValue<_, RegionId, ValueQuery>;
+
+	#[pallet::storage]
 	#[pallet::getter(fn next_location_id)]
-	pub(super) type NextLocationId<T: Config> = StorageValue<_, LocationId, ValueQuery>;
+	pub(super) type NextLocationId<T: Config> = StorageMap<
+		_, 
+		Blake2_128Concat,
+		RegionId,
+		LocationId, 
+		ValueQuery
+	>;
+
+	/// True if a location is registered
+	#[pallet::storage]
+	#[pallet::getter(fn location_registration)]
+	pub(super) type LocationRegistration<T: Config> = StorageDoubleMap<
+		_,
+		Blake2_128Concat,
+		RegionId,
+		Blake2_128Concat,
+		LocationId, 
+		bool,
+		ValueQuery,
+	>;
 
 	/// The Id for the next token listing.
 	#[pallet::storage]
@@ -259,11 +295,11 @@ pub mod pallet {
 	pub(super) type NextListingId<T: Config> = StorageValue<_, u32, ValueQuery>;
 
 	#[pallet::storage]
-	#[pallet::getter(fn location_collections)]
-	pub(super) type LocationCollections<T: Config> = StorageMap<
+	#[pallet::getter(fn region_collections)]
+	pub(super) type RegionCollections<T: Config> = StorageMap<
 		_,
 		Blake2_128Concat,
-		LocationId,
+		RegionId,
 		<T as pallet::Config>::CollectionId,
 		OptionQuery,
 	>;
@@ -347,6 +383,17 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	/// Mapping of the assetid to the collectionid and nftid.
+	#[pallet::storage]
+	#[pallet::getter(fn asset_id_details)]
+	pub(super) type AssetIdDetails<T: Config> = StorageMap<
+		_,
+		Blake2_128Concat,
+		u32,
+		AssetDetails<<T as pallet::Config>::ItemId, <T as pallet::Config>::CollectionId>,
+		OptionQuery,
+	>;
+
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
@@ -415,6 +462,10 @@ pub mod pallet {
 		/// There are already too many token buyer.
 		TooManyTokenBuyer,
 		/// This ID has no used.
+		RegionUnknown,
+		/// The location is already registered.
+		LocationRegistered,
+		/// The location is not registered.
 		LocationUnknown,
 	}
 
@@ -434,6 +485,7 @@ pub mod pallet {
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::list_object())]
 		pub fn list_object(
 			origin: OriginFor<T>,
+			region: RegionId,
 			location: LocationId,
 			price: BalanceOf<T>,
 			data: BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>,
@@ -445,8 +497,8 @@ pub mod pallet {
 				Error::<T>::UserNotWhitelisted
 			);
 			let collection_id: CollectionId<T> =
-				Self::location_collections(location).ok_or(Error::<T>::LocationUnknown)?;
-
+				Self::region_collections(region).ok_or(Error::<T>::RegionUnknown)?;
+			ensure!(Self::location_registration(region, location), Error::<T>::LocationUnknown);
 			let mut next_item_id = Self::next_nft_id(collection_id);
 			let mut asset_number: u32 = Self::next_asset_id();
 			let mut asset_id: AssetId2<T> = asset_number.into();
@@ -484,7 +536,7 @@ pub mod pallet {
 				data.clone(),
 			)?;
 			let registered_nft_details =
-				NftDetails { spv_created: Default::default(), asset_id: asset_number, location };
+				NftDetails { spv_created: Default::default(), asset_id: asset_number, region, location };
 			RegisteredNftDetails::<T>::insert(collection_id, item_id, registered_nft_details);
 			OngoingObjectListing::<T>::insert(listing_id, nft.clone());
 			ListedToken::<T>::insert(listing_id, 100);
@@ -502,6 +554,13 @@ pub mod pallet {
 				user_lookup,
 				nft_balance,
 			)?; 
+			let asset_details = AssetDetails {
+				collection_id,
+				item_id,
+				region,
+				location,
+			};
+			AssetIdDetails::<T>::insert(asset_number, asset_details);
 			next_item_id = next_item_id.checked_add(1).ok_or(Error::<T>::ArithmeticOverflow)?;
 			asset_number = asset_number.checked_add(1).ok_or(Error::<T>::ArithmeticOverflow)?;
 			NextNftId::<T>::insert(collection_id, next_item_id);
@@ -532,6 +591,7 @@ pub mod pallet {
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::relist_token())]
 		pub fn relist_token(
 			origin: OriginFor<T>,
+			region: RegionId,
 			location: LocationId,
 			item_id: <T as pallet::Config>::ItemId,
 			price: BalanceOf<T>,
@@ -544,7 +604,8 @@ pub mod pallet {
 				Error::<T>::UserNotWhitelisted
 			);
 			let collection_id: CollectionId<T> =
-				Self::location_collections(location).ok_or(Error::<T>::LocationUnknown)?;
+				Self::region_collections(region).ok_or(Error::<T>::RegionUnknown)?;
+			ensure!(Self::location_registration(region, location), Error::<T>::LocationUnknown);
 			let nft_details = Self::registered_nft_details(collection_id, item_id)
 				.ok_or(Error::<T>::NftNotFound)?;
 			let pallet_lookup = <T::Lookup as StaticLookup>::unlookup(Self::account_id());
@@ -689,7 +750,7 @@ pub mod pallet {
 			old_token_owner_amount = old_token_owner_amount
 				.checked_sub(listing_details.amount)
 				.ok_or(Error::<T>::ArithmeticUnderflow)?;
-			if old_token_owner_amount <= 0 {
+			if old_token_owner_amount == 0 {
 				let mut owner_list = PropertyOwner::<T>::take(
 					listing_details.asset_id,
 				);
@@ -848,7 +909,7 @@ pub mod pallet {
 
 		#[pallet::call_index(7)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::create_new_location())]
-		pub fn create_new_location(origin: OriginFor<T>) -> DispatchResult {
+		pub fn create_new_region(origin: OriginFor<T>) -> DispatchResult {
 			T::LocationOrigin::ensure_origin(origin)?;
 			if pallet_nfts::NextCollectionId::<T>::get().is_none() {
 				pallet_nfts::NextCollectionId::<T>::set(
@@ -861,7 +922,7 @@ pub mod pallet {
 			let collection_id: CollectionId<T> = collection_id.into();
 			let pallet_id: AccountIdOf<T> =
 				<T as pallet::Config>::PalletId::get().into_account_truncating();
-			let _ = pallet_nfts::Pallet::<T>::do_create_collection(
+			pallet_nfts::Pallet::<T>::do_create_collection(
 				collection_id.into(),
 				pallet_id.clone(),
 				pallet_id.clone(),
@@ -873,10 +934,23 @@ pub mod pallet {
 					collection: collection_id.into(),
 				},
 			)?;
-			let mut location_id = Self::next_location_id();
-			LocationCollections::<T>::insert(location_id, collection_id);
+			let mut region_id = Self::next_region_id();
+			RegionCollections::<T>::insert(region_id, collection_id);
+			region_id = region_id.checked_add(1).ok_or(Error::<T>::ArithmeticOverflow)?;
+			NextRegionId::<T>::put(region_id);
+			Ok(())
+		}
+
+		#[pallet::call_index(8)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::create_new_location())]
+		pub fn create_new_location(origin: OriginFor<T>, region: RegionId) -> DispatchResult {
+			T::LocationOrigin::ensure_origin(origin)?;
+			ensure!(Self::region_collections(region).is_some(), Error::<T>::RegionUnknown);
+			let mut location_id = Self::next_location_id(region);
+			ensure!(!Self::location_registration(region, location_id), Error::<T>::LocationRegistered);
+			LocationRegistration::<T>::insert(region, location_id, true);
 			location_id = location_id.checked_add(1).ok_or(Error::<T>::ArithmeticOverflow)?;
-			NextLocationId::<T>::put(location_id);
+			NextLocationId::<T>::insert(region, location_id);
 			Ok(())
 		}
 	}

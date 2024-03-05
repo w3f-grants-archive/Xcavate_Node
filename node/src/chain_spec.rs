@@ -12,8 +12,6 @@ use sp_runtime::{
 	traits::{IdentifyAccount, Verify},
 	Perbill,
 };
-use hex_literal::hex;
-use sp_core::crypto::UncheckedInto;
 
 // The URL for the telemetry server.
 // const STAGING_TELEMETRY_URL: &str = "wss://telemetry.polkadot.io/submit/";
@@ -107,10 +105,13 @@ fn testnet_genesis(
 	endowed_accounts: Vec<(AccountId, u128)>,
 	_enable_println: bool,
 ) -> serde_json::Value {
+
+	const ENDOWMENT: Balance = 100_000 * DOLLARS;
+
 	serde_json::json!({
 		"balances": {
 			// Configure endowed accounts with initial balance of 1 << 60.
-			"balances": endowed_accounts.iter().cloned().map(|x| (x.0, 1u64 << 60)).collect::<Vec<_>>(),
+			"balances": endowed_accounts.iter().cloned().map(|x| (x.0, ENDOWMENT)).collect::<Vec<_>>(),
 		},
 		// "aura": {
 		// 	"authorities": initial_authorities.iter().map(|x| (x.0.clone())).collect::<Vec<_>>(),
