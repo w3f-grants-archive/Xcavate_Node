@@ -23,7 +23,8 @@ fn setup_object_listing<T: Config>() -> (T::AccountId, BalanceOf<T>) {
 		&caller,
 		DepositBalanceOf::<T>::max_value(),
 	);
-	NftMarketplace::<T>::create_new_location(RawOrigin::Root.into());
+	NftMarketplace::<T>::create_new_region(RawOrigin::Root.into());
+	NftMarketplace::<T>::create_new_location(RawOrigin::Root.into(), 0);
 	(caller, value)
 }
 
@@ -37,6 +38,7 @@ mod benchmarks {
 		#[extrinsic_call]
 		list_object(
 			RawOrigin::Signed(caller),
+			0,
 			0,
 			value,
 			vec![0; <T as pallet_nfts::Config>::StringLimit::get() as usize]
@@ -60,6 +62,7 @@ mod benchmarks {
 		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
 		NftMarketplace::<T>::list_object(
 			RawOrigin::Signed(caller.clone()).into(),
+			0,
 			0,
 			value,
 			vec![0; <T as pallet_nfts::Config>::StringLimit::get() as usize]
@@ -87,6 +90,7 @@ mod benchmarks {
 		NftMarketplace::<T>::list_object(
 			RawOrigin::Signed(caller.clone()).into(),
 			0,
+			0,
 			value,
 			vec![0; <T as pallet_nfts::Config>::StringLimit::get() as usize]
 				.try_into()
@@ -95,7 +99,7 @@ mod benchmarks {
 		NftMarketplace::<T>::buy_token(RawOrigin::Signed(caller.clone()).into(), 0, 100);
 		let listing_value: BalanceOf<T> = 2_000u32.into();
 		#[extrinsic_call]
-		relist_token(RawOrigin::Signed(caller), 0, 0.into(), listing_value, 80);
+		relist_token(RawOrigin::Signed(caller), 0, 0, 0.into(), listing_value, 80);
 		//assert_eq!(NftMarketplace::<T>::listed_nfts().len(), 1);
 	}
 
@@ -106,6 +110,7 @@ mod benchmarks {
 		NftMarketplace::<T>::list_object(
 			RawOrigin::Signed(caller.clone()).into(),
 			0,
+			0,
 			value,
 			vec![0; <T as pallet_nfts::Config>::StringLimit::get() as usize]
 				.try_into()
@@ -115,6 +120,7 @@ mod benchmarks {
 		let listing_value: BalanceOf<T> = 2_000u32.into();
 		NftMarketplace::<T>::relist_token(
 			RawOrigin::Signed(caller.clone()).into(),
+			0,
 			0,
 			0.into(),
 			listing_value,
@@ -138,6 +144,7 @@ mod benchmarks {
 		NftMarketplace::<T>::list_object(
 			RawOrigin::Signed(caller.clone()).into(),
 			0,
+			0,
 			value,
 			vec![0; <T as pallet_nfts::Config>::StringLimit::get() as usize]
 				.try_into()
@@ -147,6 +154,7 @@ mod benchmarks {
 		let listing_value: BalanceOf<T> = 2_000u32.into();
 		NftMarketplace::<T>::relist_token(
 			RawOrigin::Signed(caller.clone()).into(),
+			0,
 			0,
 			0.into(),
 			listing_value,
@@ -172,6 +180,7 @@ mod benchmarks {
 		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
 		NftMarketplace::<T>::list_object(
 			RawOrigin::Signed(caller.clone()).into(),
+			0,
 			0,
 			value,
 			vec![0; <T as pallet_nfts::Config>::StringLimit::get() as usize]
@@ -201,6 +210,7 @@ mod benchmarks {
 		NftMarketplace::<T>::list_object(
 			RawOrigin::Signed(caller.clone()).into(),
 			0,
+			0,
 			value,
 			vec![0; <T as pallet_nfts::Config>::StringLimit::get() as usize]
 				.try_into()
@@ -210,6 +220,7 @@ mod benchmarks {
 		let listing_value: BalanceOf<T> = 2_000u32.into();
 		NftMarketplace::<T>::relist_token(
 			RawOrigin::Signed(caller.clone()).into(),
+			0,
 			0,
 			0.into(),
 			listing_value,
@@ -222,8 +233,15 @@ mod benchmarks {
 
 	#[benchmark]
 	fn create_new_location() {
+		NftMarketplace::<T>::create_new_region(RawOrigin::Root.into());
 		#[extrinsic_call]
-		create_new_location(RawOrigin::Root);
+		create_new_location(RawOrigin::Root, 0);
+	}
+
+	#[benchmark]
+	fn create_new_region() {
+		#[extrinsic_call]
+		create_new_region(RawOrigin::Root);
 	}
 
 	impl_benchmark_test_suite!(NftMarketplace, crate::mock::new_test_ext(), crate::mock::Test);

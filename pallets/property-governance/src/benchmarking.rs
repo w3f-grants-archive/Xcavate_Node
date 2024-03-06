@@ -27,10 +27,12 @@ fn setup_real_estate_object<T: Config>() {
 		&caller,
 		DepositBalanceOf::<T>::max_value(),
 	);
-	NftMarketplace::<T>::create_new_location(RawOrigin::Root.into());
+	NftMarketplace::<T>::create_new_region(RawOrigin::Root.into());
+	NftMarketplace::<T>::create_new_location(RawOrigin::Root.into(), 0);
 	Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
 	NftMarketplace::<T>::list_object(
 		RawOrigin::Signed(caller.clone()).into(),
+		0,
 		0,
 		value.into(),
 		vec![0; <T as pallet_nfts::Config>::StringLimit::get() as usize]
@@ -43,7 +45,7 @@ fn setup_real_estate_object<T: Config>() {
 		&letting_agent,
 		DepositBalanceOf::<T>::max_value(),
 	);
-	PropertyManagement::<T>::add_letting_agent(RawOrigin::Root.into(), 0, letting_agent.clone());
+	PropertyManagement::<T>::add_letting_agent(RawOrigin::Root.into(), 0, 0, letting_agent.clone());
 	PropertyManagement::<T>::letting_agent_deposit(RawOrigin::Signed(letting_agent.clone()).into());
 	PropertyManagement::<T>::set_letting_agent(RawOrigin::Signed(letting_agent.clone()).into(), 0.into(), 0.into());	
 }

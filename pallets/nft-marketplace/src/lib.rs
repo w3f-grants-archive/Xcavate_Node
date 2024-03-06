@@ -908,7 +908,7 @@ pub mod pallet {
 		}
 
 		#[pallet::call_index(7)]
-		#[pallet::weight(<T as pallet::Config>::WeightInfo::create_new_location())]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::create_new_region())]
 		pub fn create_new_region(origin: OriginFor<T>) -> DispatchResult {
 			T::LocationOrigin::ensure_origin(origin)?;
 			if pallet_nfts::NextCollectionId::<T>::get().is_none() {

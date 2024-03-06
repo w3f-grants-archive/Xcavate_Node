@@ -304,7 +304,7 @@ pub mod pallet {
 			T::AgentOrigin::ensure_origin(origin)?;
 			let mut letting_info = Self::letting_info(letting_agent.clone()).ok_or(Error::<T>::NoLettingAgentFound)?;
 			ensure!(pallet_nft_marketplace::Pallet::<T>::location_registration(letting_info.region, location), Error::<T>::LocationUnknown);
-			ensure!(!Self::letting_agent_locations(letting_info.region, letting_info.locations[0]).contains(&letting_agent), Error::<T>::LettingAgentInLocation);
+			ensure!(!Self::letting_agent_locations(letting_info.region, location).contains(&letting_agent), Error::<T>::LettingAgentInLocation);
 			ensure!(letting_info.deposited, Error::<T>::NotDeposited);
 			LettingAgentLocations::<T>::try_mutate(letting_info.region, location, |keys| {
 				keys.try_push(letting_agent.clone()).map_err(|_| Error::<T>::TooManyLettingAgents)?;

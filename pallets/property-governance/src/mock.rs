@@ -228,6 +228,7 @@ parameter_types! {
 	pub const PropertyManagementPalletId: PalletId = PalletId(*b"py/ppmmt");
 	pub const MaxProperty: u32 = 100;
 	pub const MaxLettingAgent: u32 = 100;
+	pub const MaxLocation: u32 = 100;
 }
 
 /// Configure the pallet-property-management in pallets/property-management.
@@ -244,12 +245,14 @@ impl pallet_property_management::Config for Test {
 	type Slash = ();
 	type MaxProperties = MaxProperty;
 	type MaxLettingAgents = MaxLettingAgent;
+	type MaxLocations = MaxLocation;
 }
 
 parameter_types! {
 	pub const PropertyVotingTime: BlockNumber = 30;
 	pub const MaxVoteForBlock: u32 = 100;
 	pub const MaximumVoter: u32 = 100;
+	pub const VotingThreshold: u8 = 67;
 }
 
 /// Configure the pallet-property-governance in pallets/property-governance.
@@ -262,6 +265,7 @@ impl pallet_property_governance::Config for Test {
 	type Slash = ();
 	type MinSlashingAmount = ConstU32<100>;
 	type MaxVoter = MaximumVoter;
+	type Threshold = VotingThreshold;
 }
 
 // Build genesis storage according to the mock runtime.

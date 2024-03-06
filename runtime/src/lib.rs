@@ -596,7 +596,7 @@ parameter_types! {
 	pub const MaxVoteForBlock: u32 = 100;
 	pub const MinimumSlashingAmount: Balance = 10 * DOLLARS;
 	pub const MaximumVoter: u32 = 100;
-	pub const VotingThreshold: u8 = 100;
+	pub const VotingThreshold: u8 = 67;
 }
 
 /// Configure the pallet-property-governance in pallets/property-governance.
