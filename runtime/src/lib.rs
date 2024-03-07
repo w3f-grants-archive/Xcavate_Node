@@ -506,7 +506,7 @@ parameter_types! {
 	pub const MaxListedNft: u32 = 100;
 }
 
-/// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
+/// Configure the pallet-nft-marketplace in pallets/nft-marketplace.
 impl pallet_nft_marketplace::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_nft_marketplace::weights::SubstrateWeight<Runtime>;
@@ -533,7 +533,7 @@ parameter_types! {
 	pub const MaxOngoingProject: u32 = 250;
 }
 
-/// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
+/// Configure the pallet-community-projects in pallets/community-projects.
 impl pallet_community_projects::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_community_projects::weights::SubstrateWeight<Runtime>;
@@ -555,7 +555,7 @@ parameter_types! {
 	pub const MaxWhitelistUsers: u32 = 1000;
 }
 
-/// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
+/// Configure the pallet-whitelist in pallets/whitelist.
 impl pallet_whitelist::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_whitelist::weights::SubstrateWeight<Runtime>;
