@@ -1,5 +1,5 @@
 use crate::{mock::*, Error};
-use crate::{CollectionId, ItemId};
+use crate::ItemId;
 use frame_support::{assert_noop, assert_ok};
 
 macro_rules! bvec {
@@ -7,10 +7,6 @@ macro_rules! bvec {
 		vec![$( $x )*].try_into().unwrap()
 	}
 }
-
-use pallet_nfts::{
-	CollectionConfig, CollectionSetting, CollectionSettings, ItemConfig, ItemSettings, MintSettings,
-};
 
 #[test]
 fn create_new_region_works() {
@@ -41,6 +37,14 @@ fn create_new_location_works() {
 }
 
 #[test]
+fn create_new_location_fails() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_noop!(NftMarketplace::create_new_location(RuntimeOrigin::root(), 1), Error::<Test>::RegionUnknown);
+	})
+}
+
+#[test]
 fn list_object_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
@@ -64,11 +68,21 @@ fn list_object_works() {
 }
 
 #[test]
-fn list_object_with_not_existing_location_fails() {
+fn list_object_fails() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_ok!(NftMarketplace::create_new_region(RuntimeOrigin::root()));
 		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_noop!(
+			NftMarketplace::list_object(
+				RuntimeOrigin::signed([0; 32].into()),
+				0,
+				0,
+				1_000_000,
+				bvec![22, 22]
+			),
+			Error::<Test>::RegionUnknown
+		);
+		assert_ok!(NftMarketplace::create_new_region(RuntimeOrigin::root()));
 		assert_noop!(
 			NftMarketplace::list_object(
 				RuntimeOrigin::signed([0; 32].into()),

@@ -1,4 +1,4 @@
-use crate::{mock::*, Error, Event};
+use crate::{mock::*, Error};
 use frame_support::{
 	assert_noop, assert_ok,
 	traits::{OnFinalize, OnInitialize},
@@ -250,7 +250,7 @@ fn inquery_pass() {
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 30));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([2; 32].into()), 0, 70));
-		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0, 0));
+		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0));
 		assert_eq!(PropertyManagement::letting_storage(0).unwrap(), [0; 32].into());
 		assert_eq!(PropertyManagement::letting_agent_locations(0, 0).len(), 2);
 		assert_ok!(PropertyGovernance::inquery_against_letting_agent(RuntimeOrigin::signed([1; 32].into()), 0));

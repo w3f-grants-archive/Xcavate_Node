@@ -4,9 +4,9 @@ use super::*;
 
 #[allow(unused)]
 use crate::Pallet as Whitelist;
-use frame_benchmarking::__private::vec;
 use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
+use frame_support::assert_ok;
 
 #[benchmarks]
 mod benchmarks {
@@ -24,7 +24,7 @@ mod benchmarks {
 	#[benchmark]
 	fn remove_from_whitelist() {
 		let caller: T::AccountId = whitelisted_caller();
-		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
+		assert_ok!(Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone()));
 		assert_eq!(Whitelist::<T>::whitelisted_accounts(caller.clone()), true);
 		#[extrinsic_call]
 		remove_from_whitelist(RawOrigin::Root, caller.clone());

@@ -14,7 +14,7 @@ type DepositBalanceOf<T> = <<T as pallet_nfts::Config>::Currency as Currency<
 >>::Balance;
 use pallet_whitelist::Pallet as Whitelist;
 use pallet_property_management::Pallet as PropertyManagement;
-use frame_support::traits::Get;
+use frame_support::{traits::Get, assert_ok};
 
 type BalanceOf1<T> = <<T as pallet_nft_marketplace::Config>::Currency as Currency<
 	<T as frame_system::Config>::AccountId,
@@ -27,10 +27,10 @@ fn setup_real_estate_object<T: Config>() {
 		&caller,
 		DepositBalanceOf::<T>::max_value(),
 	);
-	NftMarketplace::<T>::create_new_region(RawOrigin::Root.into());
-	NftMarketplace::<T>::create_new_location(RawOrigin::Root.into(), 0);
-	Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
-	NftMarketplace::<T>::list_object(
+	assert_ok!(NftMarketplace::<T>::create_new_region(RawOrigin::Root.into()));
+	assert_ok!(NftMarketplace::<T>::create_new_location(RawOrigin::Root.into(), 0));
+	assert_ok!(Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone()));
+	assert_ok!(NftMarketplace::<T>::list_object(
 		RawOrigin::Signed(caller.clone()).into(),
 		0,
 		0,
@@ -38,16 +38,16 @@ fn setup_real_estate_object<T: Config>() {
 		vec![0; <T as pallet_nfts::Config>::StringLimit::get() as usize]
 			.try_into()
 			.unwrap(),
-	);
-	NftMarketplace::<T>::buy_token(RawOrigin::Signed(caller.clone()).into(), 0, 100);
+	));
+	assert_ok!(NftMarketplace::<T>::buy_token(RawOrigin::Signed(caller.clone()).into(), 0, 100));
 	let letting_agent: T::AccountId = whitelisted_caller();
 	<T as pallet_nfts::Config>::Currency::make_free_balance_be(
 		&letting_agent,
 		DepositBalanceOf::<T>::max_value(),
 	);
-	PropertyManagement::<T>::add_letting_agent(RawOrigin::Root.into(), 0, 0, letting_agent.clone());
-	PropertyManagement::<T>::letting_agent_deposit(RawOrigin::Signed(letting_agent.clone()).into());
-	PropertyManagement::<T>::set_letting_agent(RawOrigin::Signed(letting_agent.clone()).into(), 0.into(), 0.into());	
+	assert_ok!(PropertyManagement::<T>::add_letting_agent(RawOrigin::Root.into(), 0, 0, letting_agent.clone()));
+	assert_ok!(PropertyManagement::<T>::letting_agent_deposit(RawOrigin::Signed(letting_agent.clone()).into()));
+	assert_ok!(PropertyManagement::<T>::set_letting_agent(RawOrigin::Signed(letting_agent.clone()).into(), 0));	
 }
 
 #[benchmarks]
@@ -90,7 +90,7 @@ mod benchmarks {
 			&caller,
 			DepositBalanceOf::<T>::max_value(),
 		);
-		PropertyGovernance::<T>::propose(RawOrigin::Signed(caller.clone()).into(), 0);
+		assert_ok!{PropertyGovernance::<T>::propose(RawOrigin::Signed(caller.clone()).into(), 0)};
 		#[extrinsic_call]
 		vote_on_proposal(RawOrigin::Signed(caller.clone()), 1, crate::Vote::Yes);
 
@@ -106,7 +106,7 @@ mod benchmarks {
 			&caller,
 			DepositBalanceOf::<T>::max_value(),
 		);
-		PropertyGovernance::<T>::inquery_against_letting_agent(RawOrigin::Signed(caller.clone()).into(), 0);
+		assert_ok!{PropertyGovernance::<T>::inquery_against_letting_agent(RawOrigin::Signed(caller.clone()).into(), 0)};
 		#[extrinsic_call]
 		vote_on_letting_agent_inquery(RawOrigin::Signed(caller.clone()), 1, crate::Vote::Yes);
 

@@ -5,10 +5,6 @@ use super::*;
 #[allow(unused)]
 use crate::Pallet as XcavateStaking;
 use frame_benchmarking::v2::*;
-use frame_support::{
-	ensure,
-	traits::{EnsureOrigin, OnInitialize, UnfilteredDispatchable},
-};
 use frame_system::RawOrigin;
 const SEED: u32 = 0;
 use frame_support::sp_runtime::traits::Bounded;
@@ -18,7 +14,7 @@ use pallet_whitelist::Pallet as Whitelist;
 
 use frame_support::sp_runtime::traits::StaticLookup;
 
-use frame_system::pallet_prelude::{BlockNumberFor, HeaderFor};
+use frame_system::pallet_prelude::BlockNumberFor;
 
 type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
 
@@ -79,11 +75,11 @@ mod benchmarks {
 		run_to_block::<T>(30u32.into()); */
 		let caller: T::AccountId = account("Alice", SEED, SEED);
 		let value: BalanceOf<T> = 100u32.into();
-		let _ = <T as pallet::Config>::Currency::make_free_balance_be(
+		<T as pallet::Config>::Currency::make_free_balance_be(
 			&caller,
 			DepositBalanceOf::<T>::max_value(),
 		);
-		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
+		assert_ok!(Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone()));
 
 		#[extrinsic_call]
 		stake(RawOrigin::Signed(caller.clone()), value);
@@ -96,12 +92,12 @@ mod benchmarks {
 	#[benchmark]
 	fn unstake() {
 		let alice: T::AccountId = account("alice", SEED, SEED);
-		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), alice);
+		assert_ok!(CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), alice));
 		let bob: T::AccountId = account("bob", SEED, SEED);
-		CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), bob.clone());
+		assert_ok!(CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), bob.clone()));
 		let (caller, value, beneficiary_lookup, developer_experience, loan_term) =
 			setup_proposal::<T>(SEED);
-		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
+		assert_ok!(Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone()));
 		assert_ok!(CommunityLoanPool::<T>::propose(
 			RawOrigin::Signed(caller.clone()).into(),
 			value,
@@ -110,14 +106,14 @@ mod benchmarks {
 			loan_term,
 		));
 		let alice: T::AccountId = account("alice", SEED, SEED);
-		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), alice.clone());
+		assert_ok!(Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), alice.clone()));
 		let proposal_id = CommunityLoanPool::<T>::proposal_count();
 		let milestones = get_max_milestones::<T>();
-		CommunityLoanPool::<T>::set_milestones(
+		assert_ok!(CommunityLoanPool::<T>::set_milestones(
 			RawOrigin::Signed(alice).into(),
 			proposal_id,
 			milestones,
-		);
+		));
 		run_to_block::<T>(30u32.into());
 		let caller: T::AccountId = account("alice", SEED, SEED);
 		let value: BalanceOf<T> = 1_000u32.into();
@@ -125,7 +121,6 @@ mod benchmarks {
 			&caller,
 			DepositBalanceOf::<T>::max_value(),
 		);
-		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
 		assert_ok!(XcavateStaking::<T>::stake(RawOrigin::Signed(caller.clone()).into(), value));
 		assert_eq!(XcavateStaking::<T>::active_stakings().len(), 1);
 		let unstake_value: BalanceOf<T> = 1u32.into();
@@ -146,7 +141,7 @@ mod benchmarks {
 			&caller,
 			DepositBalanceOf::<T>::max_value(),
 		);
-		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
+		assert_ok!(Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone()));
 		assert_ok!(XcavateStaking::<T>::stake(RawOrigin::Signed(caller.clone()).into(), value));
 		assert_eq!(XcavateStaking::<T>::queue_staking().len(), 1);
 		let unstake_value: BalanceOf<T> = 100u32.into();

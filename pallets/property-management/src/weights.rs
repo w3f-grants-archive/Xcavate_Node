@@ -35,6 +35,7 @@ use core::marker::PhantomData;
 pub trait WeightInfo {
 	fn add_letting_agent() -> Weight;
 	fn letting_agent_deposit() -> Weight;
+	fn add_letting_agent_to_location() -> Weight;
 	fn set_letting_agent() -> Weight;
 	fn distribute_income() -> Weight;
 	fn withdraw_funds() -> Weight;

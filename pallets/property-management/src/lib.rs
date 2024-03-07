@@ -178,6 +178,11 @@ pub mod pallet {
 		Deposited {
 			who: T::AccountId,
 		},
+		/// A letting agent has been added to a location.
+		LettingAgentAddedToLocation {
+			who: T::AccountId,
+			location: u32,
+		},
 		/// A letting agent has been added to a property.
 		LettingAgentSet {
 			asset_id: u32,
@@ -216,6 +221,8 @@ pub mod pallet {
 		RegionUnknown,
 		/// The location has already the maximum amount of letting agents.
 		TooManyLettingAgents,
+		/// The letting agent is already active in too many locations.
+		TooManyLocations,
 		/// The user is not a property owner and has no permission to deposit.
 		NoPermission,
 		/// The letting agent of this property is already set.
@@ -232,6 +239,8 @@ pub mod pallet {
 		LettingAgentInLocation,
 		/// The letting agent has no funds deposited.
 		NotDeposited,
+		/// The letting agent is already registered.
+		LettingAgentExists,
 	}
 
 	#[pallet::call]
@@ -257,6 +266,7 @@ pub mod pallet {
 			T::AgentOrigin::ensure_origin(origin)?;
 			ensure!(pallet_nft_marketplace::Pallet::<T>::region_collections(region).is_some(), Error::<T>::RegionUnknown);
 			ensure!(pallet_nft_marketplace::Pallet::<T>::location_registration(region, location), Error::<T>::LocationUnknown);
+			ensure!(Self::letting_info(letting_agent.clone()).is_none(), Error::<T>::LettingAgentExists);
 			let mut letting_info = LettingAgentInfo {
 					account: letting_agent.clone(),
 					region,
@@ -264,7 +274,7 @@ pub mod pallet {
 					assigned_properties: Default::default(),
 					deposited: Default::default(),
 				};	
-			letting_info.locations.try_push(location.clone()).map_err(|_| Error::<T>::TooManyLettingAgents)?;
+			letting_info.locations.try_push(location).map_err(|_| Error::<T>::TooManyLocations)?;
 			LettingInfo::<T>::insert(letting_agent.clone(), letting_info);
  			Self::deposit_event(Event::<T>::LettingAgentAdded {
 				region,
@@ -299,7 +309,7 @@ pub mod pallet {
 		}
 
 		#[pallet::call_index(2)]
-		#[pallet::weight(<T as pallet::Config>::WeightInfo::letting_agent_deposit())]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::add_letting_agent_to_location())]
 		pub fn add_letting_agent_to_location(origin: OriginFor<T>, location: u32, letting_agent: AccountIdOf<T>) -> DispatchResult {
 			T::AgentOrigin::ensure_origin(origin)?;
 			let mut letting_info = Self::letting_info(letting_agent.clone()).ok_or(Error::<T>::NoLettingAgentFound)?;
@@ -310,7 +320,12 @@ pub mod pallet {
 				keys.try_push(letting_agent.clone()).map_err(|_| Error::<T>::TooManyLettingAgents)?;
 				Ok::<(), DispatchError>(())
 			})?;
-			letting_info.locations.try_push(location.clone()).map_err(|_| Error::<T>::TooManyLettingAgents)?;
+			letting_info.locations.try_push(location).map_err(|_| Error::<T>::TooManyLocations)?;
+			LettingInfo::<T>::insert(letting_agent.clone(), letting_info);
+			Self::deposit_event(Event::<T>::LettingAgentAddedToLocation {
+				who: letting_agent,
+				location,
+			});
 			Ok(())
 		}
 
@@ -327,13 +342,12 @@ pub mod pallet {
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::set_letting_agent())]
 		pub fn set_letting_agent(
 			origin: OriginFor<T>, 
-			collection_id: <T as pallet::Config>::CollectionId,
-			item_id: <T as pallet::Config>::ItemId,
+			asset_id: u32,
 		) -> DispatchResult {
 			let _origin = ensure_signed(origin)?;
-			let nft_details = pallet_nft_marketplace::Pallet::<T>::registered_nft_details(collection_id.into(), item_id.into()).ok_or(Error::<T>::NoNftFound)?;
-			ensure!(Self::letting_storage(nft_details.asset_id).is_none(), Error::<T>::LettingAgentAlreadySet);
-			Self::selects_letting_agent(nft_details.region, nft_details.location, nft_details.asset_id)?;
+			let asset_details = pallet_nft_marketplace::Pallet::<T>::asset_id_details(asset_id).ok_or(Error::<T>::NoNftFound)?;
+			ensure!(Self::letting_storage(asset_id).is_none(), Error::<T>::LettingAgentAlreadySet);
+			Self::selects_letting_agent(asset_details.region, asset_details.location, asset_id)?;
 			Ok(())
 		}
 
