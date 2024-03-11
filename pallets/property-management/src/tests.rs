@@ -23,6 +23,7 @@ fn add_letting_agent_works() {
 			[0; 32].into(),
 		));
 		assert_eq!(PropertyManagement::letting_info::<AccountId>([0; 32].into()).is_some(), true);
+		assert_eq!(PropertyManagement::letting_info::<AccountId>([0; 32].into()).unwrap().locations[0], 0);
 	});
 }
 
@@ -240,6 +241,8 @@ fn set_letting_agent_works() {
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 3, 100));
 		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 3));
 		assert_eq!(PropertyManagement::letting_storage(0).unwrap(), [2; 32].into());
+		assert_eq!(PropertyManagement::letting_storage(1).unwrap(), [3; 32].into());
+		assert_eq!(PropertyManagement::letting_storage(2).unwrap(), [4; 32].into());
 		assert_eq!(PropertyManagement::letting_agent_locations(0, 0).len(), 3);
 		assert_eq!(PropertyManagement::letting_info::<AccountId>([2; 32].into()).unwrap().assigned_properties.len(), 2);
 		assert_eq!(PropertyManagement::letting_info::<AccountId>([3; 32].into()).unwrap().assigned_properties.len(), 1);
@@ -263,7 +266,7 @@ fn set_letting_agent_fails() {
 		));
 		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([0; 32].into())));
 		assert_eq!(Balances::free_balance(&([0; 32].into())), 19_999_900);
-		assert_noop!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0), Error::<Test>::NoNftFound);
+		assert_noop!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0), Error::<Test>::NoObjectFound);
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			0,
@@ -373,6 +376,15 @@ fn distribute_income_fails() {
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
 		assert_noop!(PropertyManagement::distribute_income(RuntimeOrigin::signed([5; 32].into()), 0, 200), Error::<Test>::NoLettingAgentFound);
 		assert_eq!(PropertyManagement::stored_funds::<AccountId>([1; 32].into()), 0);
+		assert_ok!(PropertyManagement::add_letting_agent(
+			RuntimeOrigin::root(),
+			0,
+			0,
+			[4; 32].into(),
+		));
+		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([4; 32].into())));
+		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0));
+		assert_noop!(PropertyManagement::distribute_income(RuntimeOrigin::signed([5; 32].into()), 0, 200), Error::<Test>::NoPermission);
 	});
 }
 

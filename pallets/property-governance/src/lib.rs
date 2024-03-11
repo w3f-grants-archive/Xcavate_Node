@@ -1,8 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-/// Edit this file to define custom logic or remove it if it is not needed.
-/// Learn more about FRAME and the core library of Substrate FRAME pallets:
-/// <https://docs.substrate.io/reference/frame-pallets/>
 pub use pallet::*;
 
 #[cfg(test)]
@@ -16,14 +13,14 @@ mod benchmarking;
 pub mod weights;
 pub use weights::*;
 
-pub type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
-
 use frame_support::{
 	sp_runtime::Saturating,
 	traits::{
 	Currency, ReservableCurrency, OnUnbalanced
 	},
 };
+
+pub type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
 
 pub type NegativeImbalanceOf<T> = <<T as Config>::Currency as Currency<
 <T as frame_system::Config>::AccountId,
@@ -213,8 +210,6 @@ pub mod pallet {
 		TooManyVotes,
 		/// The user already voted.
 		AlreadyVoted,
-		/// Letting Agent not found.
-		LettingAgentNotFound,
 		/// The assets details could not be found.
 		NoAssetFound,
 	}

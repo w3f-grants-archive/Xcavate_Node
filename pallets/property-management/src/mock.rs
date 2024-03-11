@@ -236,12 +236,8 @@ impl pallet_property_management::Config for Test {
 	type WeightInfo = weights::SubstrateWeight<Test>;
 	type Currency = Balances;
 	type PalletId = PropertyManagementPalletId;
-	type MinimumRemainingAmount = ConstU32<100>;
 	type AgentOrigin = EnsureRoot<Self::AccountId>;
 	type MinStakingAmount = ConstU32<100>;
-  	type CollectionId = u32;
-	type ItemId = u32;  
-	type Slash = ();
 	type MaxProperties = MaxProperty;
 	type MaxLettingAgents = MaxLettingAgent;
 	type MaxLocations = MaxLocation;

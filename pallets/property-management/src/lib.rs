@@ -59,7 +59,6 @@ pub mod pallet {
 
 	#[pallet::config]
 	pub trait Config: frame_system::Config 
-		+ pallet_nfts::Config 
 		+ pallet_whitelist::Config 
 		+ pallet_nft_marketplace::Config 
 	{
@@ -77,37 +76,11 @@ pub mod pallet {
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
 
-		/// Minimum amount that should be left on letting agent account.
-		#[pallet::constant]
-		type MinimumRemainingAmount: Get<BalanceOf<Self>>;
-
 		/// Origin who can set a new letting agent.
 		type AgentOrigin: EnsureOrigin<Self::RuntimeOrigin>;
 
 		/// The minimum amount of a letting agent that has to be staked.
 		type MinStakingAmount: Get<BalanceOf<Self>>;
-
- 		/// Collection id type from pallet nfts.
-		type CollectionId: IsType<<Self as pallet_nft_marketplace::Config>::CollectionId>
-			+ Parameter
-			+ From<u32>
-			+ Default
-			+ Ord
-			+ Copy
-			+ MaxEncodedLen
-			+ Encode;
-
-		/// Item id type from pallet nfts.
-		type ItemId: IsType<<Self as pallet_nft_marketplace::Config>::ItemId>
-			+ Parameter
-			+ From<u32>
-			+ Ord
-			+ Copy
-			+ MaxEncodedLen
-			+ Encode;
-		
-		/// Handler for the unbalanced reduction when slashing a letting agent.
-		type Slash: OnUnbalanced<NegativeImbalanceOf<Self>>;
 
 		/// The maximum amount of properties that can be assigned to a letting agent.
 		#[pallet::constant]
@@ -121,9 +94,6 @@ pub mod pallet {
 		#[pallet::constant]
 		type MaxLocations: Get<u32>;
 	}
-
- 	pub type CollectionId<T> = <T as Config>::CollectionId;
-	pub type ItemId<T> = <T as Config>::ItemId; 
 
 	/// Mapping from the real estate object to the letting agent.
 	#[pallet::storage]
@@ -209,7 +179,7 @@ pub mod pallet {
 		/// Error by multiplying a number.
 		MultiplyError,
 		ArithmeticOverflow,
-		/// The call has no funds stored.
+		/// The caller has no funds stored.
 		UserHasNoFundsStored,
 		/// The pallet has not enough funds.
 		NotEnoughFunds,
@@ -217,7 +187,7 @@ pub mod pallet {
 		TooManyAssignedProperties,
 		/// No letting agent could be selected.
 		NoLettingAgentFound,
-		/// The location is not registered.
+		/// The region is not registered.
 		RegionUnknown,
 		/// The location has already the maximum amount of letting agents.
 		TooManyLettingAgents,
@@ -227,8 +197,8 @@ pub mod pallet {
 		NoPermission,
 		/// The letting agent of this property is already set.
 		LettingAgentAlreadySet,
-		/// The nft could not be found.
-		NoNftFound,
+		/// The real estate object could not be found.
+		NoObjectFound,
 		/// The account is not a letting agent of this location.
 		AgentNotFound,
 		/// The letting already deposited the necessary amount.
@@ -246,11 +216,12 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 
-		/// Adds a letting agent to a location.
+		/// Adds an account as a letting agent.
 		///
 		/// The origin must be the sudo.
 		///
 		/// Parameters:
+		/// - `region`: The region number where the letting agent should be added to.
 		/// - `location`: The location number where the letting agent should be added to.
 		/// - `letting_agent`: The account of the letting_agent.
 		///
@@ -292,10 +263,10 @@ pub mod pallet {
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::letting_agent_deposit())]
 		pub fn letting_agent_deposit(origin: OriginFor<T>) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
-			<T as pallet::Config>::Currency::reserve(&origin, <T as Config>::MinStakingAmount::get())?;
 			let mut letting_info = Self::letting_info(origin.clone()).ok_or(Error::<T>::NoPermission)?;
 			ensure!(!Self::letting_agent_locations(letting_info.region, letting_info.locations[0]).contains(&origin), Error::<T>::LettingAgentInLocation);
 			ensure!(!letting_info.deposited, Error::<T>::AlreadyDeposited);
+			<T as pallet::Config>::Currency::reserve(&origin, <T as Config>::MinStakingAmount::get())?;
 			letting_info.deposited = true;
 			LettingAgentLocations::<T>::try_mutate(letting_info.region, letting_info.locations[0], |keys| {
 				keys.try_push(origin.clone()).map_err(|_| Error::<T>::TooManyLettingAgents)?;
@@ -308,6 +279,15 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Adds a letting agent to a location.
+		///
+		/// The origin must be the sudo.
+		///
+		/// Parameters:
+		/// - `location`: The location number where the letting agent should be added to.
+		/// - `letting_agent`: The account of the letting_agent.
+		///
+		/// Emits `LettingAgentAddedToLocation` event when succesfful.
 		#[pallet::call_index(2)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::add_letting_agent_to_location())]
 		pub fn add_letting_agent_to_location(origin: OriginFor<T>, location: u32, letting_agent: AccountIdOf<T>) -> DispatchResult {
@@ -334,8 +314,7 @@ pub mod pallet {
 		/// The origin must be Signed and the sender must have sufficient funds free.
 		///
 		/// Parameters:
-		/// - `collection_id`: The collection_id of the location.
-		/// - `item_id`: The item id of the nft.
+		/// - `asset_id`: The asset id of the real estate object.
 		///
 		/// Emits `LettingAgentSet` event when succesfful.
 		#[pallet::call_index(3)]
@@ -345,7 +324,7 @@ pub mod pallet {
 			asset_id: u32,
 		) -> DispatchResult {
 			let _origin = ensure_signed(origin)?;
-			let asset_details = pallet_nft_marketplace::Pallet::<T>::asset_id_details(asset_id).ok_or(Error::<T>::NoNftFound)?;
+			let asset_details = pallet_nft_marketplace::Pallet::<T>::asset_id_details(asset_id).ok_or(Error::<T>::NoObjectFound)?;
 			ensure!(Self::letting_storage(asset_id).is_none(), Error::<T>::LettingAgentAlreadySet);
 			Self::selects_letting_agent(asset_details.region, asset_details.location, asset_id)?;
 			Ok(())
@@ -377,10 +356,10 @@ pub mod pallet {
 			for owner in owner_list {
 				let token_amount = pallet_nft_marketplace::Pallet::<T>::property_owner_token(asset_id, owner.clone());
 				let amount_for_owner = Self::u64_to_balance_option(token_amount as u64)?
-				.checked_mul(&amount)
-				.ok_or(Error::<T>::MultiplyError)?
-				.checked_div(&Self::u64_to_balance_option(100)?)
-				.ok_or(Error::<T>::DivisionError)?;
+					.checked_mul(&amount)
+					.ok_or(Error::<T>::MultiplyError)?
+					.checked_div(&Self::u64_to_balance_option(100)?)
+					.ok_or(Error::<T>::DivisionError)?;
 				let mut old_funds = Self::stored_funds(owner.clone());
 				old_funds = old_funds.checked_add(&amount_for_owner).ok_or(Error::<T>::ArithmeticOverflow)?;
 				StoredFunds::<T>::insert(owner, old_funds);
@@ -423,6 +402,7 @@ pub mod pallet {
 		pub fn account_id() -> AccountIdOf<T> {
 			<T as pallet::Config>::PalletId::get().into_account_truncating()
 		}
+
 		/// Converts a u64 to a balance.
 		pub fn u64_to_balance_option(input: u64) -> Result<BalanceOf<T>, Error<T>> {
 			input.try_into().map_err(|_| Error::<T>::ConversionError)
@@ -445,7 +425,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Removes
+		/// Removes bad letting agents.
 		pub fn remove_bad_letting_agent(region: u32, location: u32, agent: AccountIdOf<T>) -> DispatchResult {
 			let mut letting_agents = Self::letting_agent_locations(region, location);
 			let index = letting_agents.iter().position(|x| *x == agent).ok_or(Error::<T>::AgentNotFound)?;

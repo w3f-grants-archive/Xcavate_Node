@@ -580,12 +580,8 @@ impl pallet_property_management::Config for Runtime {
 	type WeightInfo = pallet_property_management::weights::SubstrateWeight<Runtime>;
 	type Currency = Balances;
 	type PalletId = PropertyManagementPalletId;
-	type MinimumRemainingAmount = MinimumRemainingAmount;
 	type AgentOrigin = EnsureRoot<Self::AccountId>;
 	type MinStakingAmount = MinimumStakingAmount;
-	type CollectionId = u32;
-	type ItemId = u32;  
-	type Slash = ();
 	type MaxProperties = MaxProperty;
 	type MaxLettingAgents = MaxLettingAgent;
 	type MaxLocations = MaxLocation;
