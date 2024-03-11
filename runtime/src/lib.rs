@@ -503,7 +503,7 @@ impl pallet_xcavate_staking::Config for Runtime {
 
 parameter_types! {
 	pub const NftMarketplacePalletId: PalletId = PalletId(*b"py/nftxc");
-	pub const MaxListedNft: u32 = 100;
+	pub const MaxNftTokens: u32 = 100;
 }
 
 /// Configure the pallet-nft-marketplace in pallets/nft-marketplace.
@@ -512,7 +512,7 @@ impl pallet_nft_marketplace::Config for Runtime {
 	type WeightInfo = pallet_nft_marketplace::weights::SubstrateWeight<Runtime>;
 	type Currency = Balances;
 	type PalletId = NftMarketplacePalletId;
-	type MaxListedNfts = MaxListedNft;
+	type MaxNftToken = MaxNftTokens;
 	type LocationOrigin = EnsureRoot<Self::AccountId>;
 	#[cfg(feature = "runtime-benchmarks")]
 	type Helper = pallet_nft_marketplace::NftHelper;
