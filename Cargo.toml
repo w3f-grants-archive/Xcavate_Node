@@ -4,6 +4,11 @@ members = [
     "pallets/xcavate-staking",
     "runtime",
     "pallets/community-loan-pool",
+    "pallets/community-projects",
+    "pallets/nft-marketplace",
+    "pallets/property-governance",
+    "pallets/property-management",
+    "pallets/whitelist",
 ]
 resolver = "2"
 

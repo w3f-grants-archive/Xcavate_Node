@@ -1,4 +1,4 @@
-//! Benchmarking setup for pallet-template
+//! Benchmarking setup for pallet-community-projects
 #![cfg(feature = "runtime-benchmarks")]
 use super::*;
 
@@ -23,10 +23,7 @@ fn setup_listing<T: Config>(
 ) -> (
 	T::AccountId,
 	BoundedNftDonationTypes<T>,
-	BoundedVec<
-		BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>,
-		<T as Config>::MaxNftTypes,
-	>,
+	BoundedVec<BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>, <T as Config>::MaxNftTypes>,
 	u32,
 	BalanceOf<T>,
 	BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>,
@@ -46,8 +43,6 @@ fn setup_listing<T: Config>(
 	(caller, project_types, metadatas, duration, value, single_metadata)
 }
 
-fn setup_asset<T: Config>() {}
-
 #[benchmarks]
 mod benchmarks {
 	use super::*;
@@ -56,8 +51,7 @@ mod benchmarks {
 	fn list_project() {
 		let (caller, project_types, metadatas, duration, value, single_metadata) =
 			setup_listing::<T>(SEED);
-		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
-		let amount: BalanceOf<T> = 1u32.into();
+		assert_ok!(Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone()));
 		#[extrinsic_call]
 		list_project(
 			RawOrigin::Signed(caller),
@@ -67,25 +61,33 @@ mod benchmarks {
 			value,
 			single_metadata,
 		);
-		assert_eq!(CommunityProjects::<T>::listed_nft_types::<<T as pallet::Config>::CollectionId, u8>(0.into(), 4).unwrap().len(), 4);
+		assert_eq!(
+			CommunityProjects::<T>::listed_nft_types::<<T as pallet::Config>::CollectionId, u8>(
+				0.into(),
+				4
+			)
+			.unwrap()
+			.len(),
+			4
+		);
 	}
 
 	#[benchmark]
 	fn buy_nft() {
-		let (caller, project_types, metadatas, duration, value, single_metadata) =
+		let (caller, _, metadatas, duration, value, single_metadata) =
 			setup_listing::<T>(SEED);
-		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
+		assert_ok!(Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone()));
 		let many_project_types = get_project_nfts_many::<T>(4);
-		CommunityProjects::<T>::list_project(
+		assert_ok!(CommunityProjects::<T>::list_project(
 			RawOrigin::Signed(caller).into(),
 			many_project_types,
 			metadatas,
 			duration,
 			value,
 			single_metadata,
-		);
+		));
 		let buyer: T::AccountId = account("buyer", SEED, SEED);
-		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), buyer.clone());
+		assert_ok!(Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), buyer.clone()));
 		<T as pallet_nfts::Config>::Currency::make_free_balance_be(
 			&buyer,
 			DepositBalanceOf::<T>::max_value(),
@@ -95,7 +97,6 @@ mod benchmarks {
 		let user_lookup = <T::Lookup as StaticLookup>::unlookup(buyer.clone());
 		let asset_id = <T as pallet::Config>::Helper::to_asset(1);
 		let amount2: BalanceOf<T> = 4294967295u32.into();
-		let root_account: T::AccountId = account("Alice", SEED, SEED);
 		assert_ok!(Assets::<T, Instance1>::create(
 			RawOrigin::Signed(buyer.clone()).into(),
 			asset_id.clone().into(),
@@ -119,17 +120,17 @@ mod benchmarks {
 	fn bond_token() {
 		let (caller, project_types, metadatas, duration, value, single_metadata) =
 			setup_listing::<T>(SEED);
-		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
-		CommunityProjects::<T>::list_project(
+		assert_ok!(Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone()));
+		assert_ok!(CommunityProjects::<T>::list_project(
 			RawOrigin::Signed(caller).into(),
 			project_types,
 			metadatas,
 			duration,
 			value,
 			single_metadata,
-		);
+		));
 		let user: T::AccountId = account("user", SEED, SEED);
-		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), user.clone());
+		assert_ok!(Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), user.clone()));
 		<T as pallet_nfts::Config>::Currency::make_free_balance_be(
 			&user,
 			DepositBalanceOf::<T>::max_value(),
@@ -145,17 +146,17 @@ mod benchmarks {
 	fn vote_on_milestone() {
 		let (caller, project_types, metadatas, duration, value, single_metadata) =
 			setup_listing::<T>(SEED);
-		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
-		CommunityProjects::<T>::list_project(
+		assert_ok!(Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone()));
+		assert_ok!(CommunityProjects::<T>::list_project(
 			RawOrigin::Signed(caller).into(),
 			project_types,
 			metadatas,
 			duration,
 			value,
 			single_metadata,
-		);
+		));
 		let buyer: T::AccountId = account("buyer", SEED, SEED);
-		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), buyer.clone());
+		assert_ok!(Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), buyer.clone()));
 		<T as pallet_nfts::Config>::Currency::make_free_balance_be(
 			&buyer,
 			DepositBalanceOf::<T>::max_value(),
@@ -165,7 +166,6 @@ mod benchmarks {
 		let user_lookup = <T::Lookup as StaticLookup>::unlookup(buyer.clone());
 		let asset_id = <T as pallet::Config>::Helper::to_asset(1);
 		let amount2: BalanceOf<T> = 4294967295u32.into();
-		let root_account: T::AccountId = account("Alice", SEED, SEED);
 		assert_ok!(Assets::<T, Instance1>::create(
 			RawOrigin::Signed(buyer.clone()).into(),
 			asset_id.clone().into(),
@@ -179,29 +179,29 @@ mod benchmarks {
 			amount2,
 		));
 		assert_eq!(Assets::<T, Instance1>::balance(asset_id, buyer.clone()), amount2);
-		CommunityProjects::<T>::buy_nft(RawOrigin::Signed(buyer.clone()).into(), 0.into(), 1, 1);
+		assert_ok!(CommunityProjects::<T>::buy_nft(RawOrigin::Signed(buyer.clone()).into(), 0.into(), 1, 1));
 		run_to_block::<T>(11u32.into());
 		#[extrinsic_call]
 		vote_on_milestone(RawOrigin::Signed(buyer), 0.into(), crate::Vote::Yes);
 
 		//assert_eq!(Something::<T>::get(), Some(101u32));
-	} 
+	}
 
 	#[benchmark]
 	fn claim_refunded_token() {
 		let (caller, project_types, metadatas, duration, value, single_metadata) =
 			setup_listing::<T>(SEED);
-		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
-		CommunityProjects::<T>::list_project(
+		assert_ok!(Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone()));
+		assert_ok!(CommunityProjects::<T>::list_project(
 			RawOrigin::Signed(caller).into(),
 			project_types,
 			metadatas,
 			duration,
 			value,
 			single_metadata,
-		);
+		));
 		let buyer: T::AccountId = account("buyer", SEED, SEED);
-		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), buyer.clone());
+		assert_ok!(Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), buyer.clone()));
 		<T as pallet_nfts::Config>::Currency::make_free_balance_be(
 			&buyer,
 			DepositBalanceOf::<T>::max_value(),
@@ -211,7 +211,6 @@ mod benchmarks {
 		let user_lookup = <T::Lookup as StaticLookup>::unlookup(buyer.clone());
 		let asset_id = <T as pallet::Config>::Helper::to_asset(1);
 		let amount2: BalanceOf<T> = 4294967295u32.into();
-		let root_account: T::AccountId = account("Alice", SEED, SEED);
 		assert_ok!(Assets::<T, Instance1>::create(
 			RawOrigin::Signed(buyer.clone()).into(),
 			asset_id.clone().into(),
@@ -225,30 +224,42 @@ mod benchmarks {
 			amount2,
 		));
 		assert_eq!(Assets::<T, Instance1>::balance(asset_id, buyer.clone()), amount2);
-		CommunityProjects::<T>::buy_nft(RawOrigin::Signed(buyer.clone()).into(), 0.into(), 1, 1);
+		assert_ok!(CommunityProjects::<T>::buy_nft(RawOrigin::Signed(buyer.clone()).into(), 0.into(), 1, 1));
 		run_to_block::<T>(100u32.into());
-		assert_eq!(CommunityProjects::<T>::ended_projects::<<T as pallet::Config>::CollectionId>(0_u32.into()).unwrap().project_success, false);
+		assert_eq!(
+			CommunityProjects::<T>::ended_projects::<<T as pallet::Config>::CollectionId>(
+				0_u32.into()
+			)
+			.unwrap()
+			.project_success,
+			false
+		);
 		#[extrinsic_call]
 		claim_refunded_token(RawOrigin::Signed(buyer), 0.into());
 
-		assert_eq!(CommunityProjects::<T>::ended_projects::<<T as pallet::Config>::CollectionId>(0_u32.into()), None);
-	} 	
+		assert_eq!(
+			CommunityProjects::<T>::ended_projects::<<T as pallet::Config>::CollectionId>(
+				0_u32.into()
+			),
+			None
+		);
+	}
 
 	#[benchmark]
 	fn claim_bonding() {
 		let (caller, project_types, metadatas, duration, value, single_metadata) =
 			setup_listing::<T>(SEED);
-		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone());
-		CommunityProjects::<T>::list_project(
+		assert_ok!(Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone()));
+		assert_ok!(CommunityProjects::<T>::list_project(
 			RawOrigin::Signed(caller).into(),
 			project_types,
 			metadatas,
 			duration,
 			value,
 			single_metadata,
-		);
+		));
 		let buyer: T::AccountId = account("buyer", SEED, SEED);
-		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), buyer.clone());
+		assert_ok!(Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), buyer.clone()));
 		<T as pallet_nfts::Config>::Currency::make_free_balance_be(
 			&buyer,
 			DepositBalanceOf::<T>::max_value(),
@@ -258,7 +269,6 @@ mod benchmarks {
 		let user_lookup = <T::Lookup as StaticLookup>::unlookup(buyer.clone());
 		let asset_id = <T as pallet::Config>::Helper::to_asset(1);
 		let amount2: BalanceOf<T> = 4294967295u32.into();
-		let root_account: T::AccountId = account("Alice", SEED, SEED);
 		assert_ok!(Assets::<T, Instance1>::create(
 			RawOrigin::Signed(buyer.clone()).into(),
 			asset_id.clone().into(),
@@ -273,26 +283,64 @@ mod benchmarks {
 		));
 		assert_eq!(Assets::<T, Instance1>::balance(asset_id, buyer.clone()), amount2);
 		let user: T::AccountId = account("user", SEED, SEED);
-		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), user.clone());
+		assert_ok!(Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), user.clone()));
 		<T as pallet_nfts::Config>::Currency::make_free_balance_be(
 			&user,
 			DepositBalanceOf::<T>::max_value(),
 		);
 		let amount: BalanceOf2<T> = 10u32.into();
-		CommunityProjects::<T>::bond_token(RawOrigin::Signed(user.clone()).into(), 0.into(), amount);
-		CommunityProjects::<T>::buy_nft(RawOrigin::Signed(buyer.clone()).into(), 0.into(), 1, 1);
+		assert_ok!(CommunityProjects::<T>::bond_token(
+			RawOrigin::Signed(user.clone()).into(),
+			0.into(),
+			amount,
+		));
+		assert_ok!(CommunityProjects::<T>::buy_nft(RawOrigin::Signed(buyer.clone()).into(), 0.into(), 1, 1));
 		run_to_block::<T>(100u32.into());
-		assert_eq!(CommunityProjects::<T>::ended_projects::<<T as pallet::Config>::CollectionId>(0_u32.into()).unwrap().project_success, false);
+		assert_eq!(
+			CommunityProjects::<T>::ended_projects::<<T as pallet::Config>::CollectionId>(
+				0_u32.into()
+			)
+			.unwrap()
+			.project_success,
+			false
+		);
 		run_to_block::<T>(100u32.into());
-		assert_eq!(CommunityProjects::<T>::ended_projects::<<T as pallet::Config>::CollectionId>(0_u32.into()).unwrap().project_success, false);
-		assert_eq!(CommunityProjects::<T>::project_bonding::<<T as pallet::Config>::CollectionId, AccountIdOf<T>>(0_u32.into(), user.clone()).unwrap(), 10_u32.try_into().map_err(|_| Error::<T>::ConversionError).unwrap());
-		assert_eq!(CommunityProjects::<T>::ended_projects::<<T as pallet::Config>::CollectionId>(0_u32.into()).unwrap().bonding_balance, 10_u32.try_into().map_err(|_| Error::<T>::ConversionError).unwrap());
+		assert_eq!(
+			CommunityProjects::<T>::ended_projects::<<T as pallet::Config>::CollectionId>(
+				0_u32.into()
+			)
+			.unwrap()
+			.project_success,
+			false
+		);
+		assert_eq!(
+			CommunityProjects::<T>::project_bonding::<
+				<T as pallet::Config>::CollectionId,
+				AccountIdOf<T>,
+			>(0_u32.into(), user.clone())
+			.unwrap(),
+			10_u32.try_into().map_err(|_| Error::<T>::ConversionError).unwrap()
+		);
+		assert_eq!(
+			CommunityProjects::<T>::ended_projects::<<T as pallet::Config>::CollectionId>(
+				0_u32.into()
+			)
+			.unwrap()
+			.bonding_balance,
+			10_u32.try_into().map_err(|_| Error::<T>::ConversionError).unwrap()
+		);
 		#[extrinsic_call]
 		claim_bonding(RawOrigin::Signed(user.clone()), 0.into());
 
-		assert_eq!(CommunityProjects::<T>::ended_projects::<<T as pallet::Config>::CollectionId>(0_u32.into()).unwrap().bonding_balance, 0_u32.try_into().map_err(|_| Error::<T>::ConversionError).unwrap());
-	} 	
-
+		assert_eq!(
+			CommunityProjects::<T>::ended_projects::<<T as pallet::Config>::CollectionId>(
+				0_u32.into()
+			)
+			.unwrap()
+			.bonding_balance,
+			0_u32.try_into().map_err(|_| Error::<T>::ConversionError).unwrap()
+		);
+	}
 
 	impl_benchmark_test_suite!(CommunityProjects, crate::mock::new_test_ext(), crate::mock::Test);
 }

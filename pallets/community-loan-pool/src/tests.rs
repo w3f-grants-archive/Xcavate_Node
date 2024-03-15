@@ -143,6 +143,7 @@ fn add_committee_member_fails_when_member_is_two_times_added() {
 fn voting_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		Timestamp::set_timestamp(1);
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(CommunityLoanPool::add_committee_member(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(Whitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));

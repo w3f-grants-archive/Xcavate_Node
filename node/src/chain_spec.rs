@@ -1,12 +1,10 @@
 use node_template_runtime::{
-	constants::currency::DOLLARS, opaque::SessionKeys, AccountId, AssetsConfig, BabeConfig,
-	Balance, BalancesConfig, CouncilConfig, DemocracyConfig, MaxNominations,
-	SessionConfig, Signature, StakerStatus, StakingConfig, SudoConfig, SystemConfig,
-	TechnicalCommitteeConfig, BABE_GENESIS_EPOCH_CONFIG, WASM_BINARY, RuntimeGenesisConfig
+	constants::currency::DOLLARS, AccountId, RuntimeGenesisConfig, Signature, WASM_BINARY, 
+	BABE_GENESIS_EPOCH_CONFIG, opaque::SessionKeys, Balance,
 };
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
-use sc_service::{ChainType, Properties};
 use sp_authority_discovery::AuthorityId as AuthorityDiscoveryId;
+use sc_service::ChainType;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_core::{sr25519, Pair, Public};
@@ -38,35 +36,131 @@ where
 	AccountPublic::from(get_from_seed::<TPublic>(seed)).into_account()
 }
 
-/// Helper function to generate stash, controller and session key from seed
-pub fn authority_keys_from_seed(
-	seed: &str,
-) -> (AccountId, AccountId, GrandpaId, AuraId, ImOnlineId, AuthorityDiscoveryId) {
-	(
-		get_account_id_from_seed::<sr25519::Public>(&format!("{}//stash", seed)),
-		get_account_id_from_seed::<sr25519::Public>(seed),
-		get_from_seed::<GrandpaId>(seed),
-		get_from_seed::<AuraId>(seed),
-		get_from_seed::<ImOnlineId>(seed),
-		get_from_seed::<AuthorityDiscoveryId>(seed),
-	)
+/// Generate an Aura authority key.
+pub fn authority_keys_from_seed(s: &str) -> (AccountId, AccountId, AuraId, GrandpaId, ImOnlineId, AuthorityDiscoveryId) {
+	(get_account_id_from_seed::<sr25519::Public>(s), get_account_id_from_seed::<sr25519::Public>(s), get_from_seed::<AuraId>(s), get_from_seed::<GrandpaId>(s), get_from_seed::<ImOnlineId>(s), get_from_seed::<AuthorityDiscoveryId>(s))
 }
 
 fn session_keys(
-	grandpa: GrandpaId,
 	aura: AuraId,
-	im_online: ImOnlineId,
-	authority_discovery: AuthorityDiscoveryId,
+	grandpa: GrandpaId,
+ 	im_online: ImOnlineId,
+	authority_discovery: AuthorityDiscoveryId, 
 ) -> SessionKeys {
-	SessionKeys { grandpa, aura, im_online, authority_discovery }
+	SessionKeys { aura, grandpa, im_online, authority_discovery}
 }
 
-pub fn get_root_account() -> AccountId {
-	let json_data = &include_bytes!("../../seed/balances.json")[..];
-	let additional_accounts_with_balance: Vec<(AccountId, u128)> =
-		serde_json::from_slice(json_data).unwrap_or_default();
+pub fn development_config() -> Result<ChainSpec, String> {
+	Ok(ChainSpec::builder(
+		WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?,
+		None,
+	)
+	.with_name("Development")
+	.with_id("dev")
+	.with_chain_type(ChainType::Development)
+	.with_genesis_config_patch(testnet_genesis(
+		// Initial PoA authorities
+		vec![authority_keys_from_seed("Alice")],
+		// Sudo account
+		get_root_account(),
+		// Pre-funded accounts
+		get_endowed_accounts_with_balance(),
+		true,
+	))
+	.with_properties(chain_spec_properties())
+	.build())
+}
 
-	additional_accounts_with_balance[0].0.clone()
+pub fn local_testnet_config() -> Result<ChainSpec, String> {
+	Ok(ChainSpec::builder(
+		WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?,
+		None,
+	)
+	.with_name("Local Testnet")
+	.with_id("local_testnet")
+	.with_chain_type(ChainType::Local)
+	.with_genesis_config_patch(testnet_genesis(
+		// Initial PoA authorities
+		vec![authority_keys_from_seed("Alice")],
+		// Sudo account
+		get_root_account(),
+		// Pre-funded accounts
+		get_endowed_accounts_with_balance(),
+		true,
+	))
+	.build())
+}
+
+/// Configure initial storage state for FRAME modules.
+fn testnet_genesis(
+	initial_authorities: Vec<(
+		AccountId,
+		AccountId,
+		AuraId,
+		GrandpaId,
+ 		ImOnlineId,
+		AuthorityDiscoveryId,
+	)>,
+	root_key: AccountId,
+	endowed_accounts: Vec<(AccountId, u128)>,
+	_enable_println: bool,
+) -> serde_json::Value {
+
+	const ENDOWMENT: Balance = 100_000 * DOLLARS;
+
+	serde_json::json!({
+		"balances": {
+			// Configure endowed accounts with initial balance of 1 << 60.
+			"balances": endowed_accounts.iter().cloned().map(|x| (x.0, ENDOWMENT)).collect::<Vec<_>>(),
+		},
+		// "aura": {
+		// 	"authorities": initial_authorities.iter().map(|x| (x.0.clone())).collect::<Vec<_>>(),
+		// },
+		// "grandpa": {
+		// 	"authorities": initial_authorities.iter().map(|x| (x.1.clone(), 1)).collect::<Vec<_>>(),
+		// },
+ 		"assets" : {
+			"assets": vec![(1, root_key.clone(), true, 1)], // Genesis assets: id, owner, is_sufficient, min_balance
+			"metadata": vec![(1, "XUSD".as_bytes(), "XUSD".as_bytes(), 0)], // Genesis metadata: id, name, symbol, decimals
+			"accounts": endowed_accounts.iter().cloned().map(|x| (1, x.0.clone(), 1_000_000)).collect::<Vec<_>>(),
+		}, 
+		"sudo": {
+			// Assign network admin rights.
+			"key": Some(root_key),
+		},
+		"staking": {
+			"validatorCount": initial_authorities.len() as u32,
+			"minimumValidatorCount": initial_authorities.len() as u32,
+			"invulnerables": initial_authorities.iter().map(|x| x.0.clone()).collect::<Vec<_>>(),
+			"slashRewardFraction": Perbill::from_percent(10),
+		},
+		"babe": {
+			"epochConfig": Some(BABE_GENESIS_EPOCH_CONFIG),
+		},
+		"session": {
+			"keys": initial_authorities
+				.iter()
+				.map(|x| {
+					(
+						x.0.clone(),
+						x.0.clone(),
+						session_keys(x.2.clone(), x.3.clone() , x.4.clone(), x.5.clone()),
+					)
+				})
+				.collect::<Vec<_>>(),
+		},
+	})
+}
+
+pub fn chain_spec_properties() -> serde_json::map::Map<String, serde_json::Value> {
+	serde_json::json!({
+		"ss58Format": 42,
+		"tokenDecimals": 12,
+		"tokenSymbol": "XCAV",
+	})
+	.as_object()
+	.expect("Map given; qed")
+	.clone()
 }
 
 pub fn get_endowed_accounts_with_balance() -> Vec<(AccountId, u128)> {
@@ -104,187 +198,10 @@ pub fn get_endowed_accounts_with_balance() -> Vec<(AccountId, u128)> {
 	accounts
 }
 
-pub fn development_config() -> Result<ChainSpec, String> {
-	let wasm_binary = WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?;
+pub fn get_root_account() -> AccountId {
+	let json_data = &include_bytes!("../../seed/balances.json")[..];
+	let additional_accounts_with_balance: Vec<(AccountId, u128)> =
+		serde_json::from_slice(json_data).unwrap_or_default();
 
-	// Give your base currency a unit name and decimal places
-	let mut properties = Properties::new();
-	properties.insert("tokenSymbol".into(), "XCAV".into());
-	properties.insert("tokenDecimals".into(), 12.into());
-	properties.insert("ss58Format".into(), 42.into());
-
-	Ok(ChainSpec::from_genesis(
-		// Name
-		"Development",
-		// ID
-		"dev",
-		ChainType::Development,
-		move || {
-			testnet_genesis(
-				wasm_binary,
-				vec![authority_keys_from_seed("Alice")],
-				vec![],
-				get_root_account(),
-				get_endowed_accounts_with_balance(),
-				true,
-			)
-		},
-		// Bootnodes
-		vec![],
-		// Telemetry
-		None,
-		// Protocol ID
-		None,
-		None,
-		// Properties
-		Some(properties),
-		// Extensions
-		None,
-	))
-}
-
-pub fn local_testnet_config() -> Result<ChainSpec, String> {
-	let wasm_binary = WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?;
-
-	let mut properties = Properties::new();
-	properties.insert("tokenSymbol".into(), "XCAV".into());
-	properties.insert("tokenDecimals".into(), 12.into());
-	properties.insert("ss58Format".into(), 42.into());
-
-	Ok(ChainSpec::from_genesis(
-		// Name
-		"Local Testnet",
-		// ID
-		"local_testnet",
-		ChainType::Local,
-		move || {
-			testnet_genesis(
-				wasm_binary,
-				vec![authority_keys_from_seed("Alice"), authority_keys_from_seed("Bob")],
-				vec![],
-				get_root_account(),
-				get_endowed_accounts_with_balance(),
-				true,
-			)
-		},
-		// Bootnodes
-		vec![],
-		// Telemetry
-		None,
-		// Protocol ID
-		None,
-		// Properties
-		None,
-		Some(properties),
-		// Extensions
-		None,
-	))
-}
-
-/// Configure initial storage state for FRAME modules.
-fn testnet_genesis(
-	wasm_binary: &[u8],
-	initial_authorities: Vec<(
-		AccountId,
-		AccountId,
-		GrandpaId,
-		AuraId,
-		ImOnlineId,
-		AuthorityDiscoveryId,
-	)>,
-	initial_nominators: Vec<AccountId>,
-	root_key: AccountId,
-	endowed_accounts: Vec<(AccountId, u128)>,
-	_enable_println: bool,
-) -> RuntimeGenesisConfig {
-	// endow all authorities and nominators.
-	/* 	initial_authorities
-	.iter()
-	.map(|x| &x.0)
-	.chain(initial_nominators.iter())
-	.for_each(|x, y| {
-		if !endowed_accounts.contains((x,y)) {
-			endowed_accounts.push(x.clone())
-		}
-	}); */
-
-	// stakers: all validators and nominators.
-	let mut rng = rand::thread_rng();
-	let stakers = initial_authorities
-		.iter()
-		.map(|x| (x.0.clone(), x.0.clone(), STASH, StakerStatus::Validator))
-		.chain(initial_nominators.iter().map(|x| {
-			use rand::{seq::SliceRandom, Rng};
-			let limit = (MaxNominations::get() as usize).min(initial_authorities.len());
-			let count = rng.gen::<usize>() % limit;
-			let nominations = initial_authorities
-				.as_slice()
-				.choose_multiple(&mut rng, count)
-				.map(|choice| choice.0.clone())
-				.collect::<Vec<_>>();
-			(x.clone(), x.clone(), STASH, StakerStatus::Nominator(nominations))
-		}))
-		.collect::<Vec<_>>();
-
-	let _num_endowed_accounts = endowed_accounts.len();
-
-	const ENDOWMENT: Balance = 10_000_000 * DOLLARS;
-	const STASH: Balance = ENDOWMENT / 1000;
-
-	RuntimeGenesisConfig {
-		system: SystemConfig { code: wasm_binary.to_vec(), ..Default::default() },
-		balances: BalancesConfig {
-			balances: endowed_accounts.iter().cloned().map(|x| (x.0.clone(), x.1)).collect(),
-		},
-		aura: Default::default(),
-		grandpa: Default::default(),
-		sudo: SudoConfig {
-			// Assign network admin rights.
-			key: Some(root_key.clone()),
-		},
-		transaction_payment: Default::default(),
-		assets:  AssetsConfig {
-			assets: vec![(1, root_key.clone(), true, 1)], // Genesis assets: id, owner, is_sufficient, min_balance
-			metadata: vec![(1, "XUSD".into(), "XUSD".into(), 0)], // Genesis metadata: id, name, symbol, decimals
-			accounts: endowed_accounts.iter().cloned().map(|x| (1, x.0.clone(), 1_000_000)).collect(),
-		},
-		pool_assets: Default::default(),
-		im_online: Default::default(),
-		council: CouncilConfig { members: vec![], phantom: Default::default() },
-		staking: StakingConfig {
-			validator_count: initial_authorities.len() as u32,
-			minimum_validator_count: initial_authorities.len() as u32,
-			invulnerables: initial_authorities.iter().map(|x| x.0.clone()).collect(),
-			slash_reward_fraction: Perbill::from_percent(10),
-			stakers,
-			..Default::default()
-		},
-		babe: BabeConfig {
-			authorities: Default::default(),
-			epoch_config: Some(BABE_GENESIS_EPOCH_CONFIG),
-			..Default::default()
-		},
-		session: SessionConfig {
-			keys: initial_authorities
-				.iter()
-				.map(|x| {
-					(
-						x.0.clone(),
-						x.0.clone(),
-						session_keys(x.2.clone(), x.3.clone(), x.4.clone(), x.5.clone()),
-					)
-				})
-				.collect::<Vec<_>>(),
-		},
-		authority_discovery: Default::default(),
-		treasury: Default::default(),
-		alliance_motion: Default::default(),
-		democracy: DemocracyConfig::default(),
-		technical_committee: TechnicalCommitteeConfig {
-			members: vec![],
-			phantom: Default::default(),
-		},
-		community_loan_pool: Default::default(),
-		nomination_pools: Default::default(),
-	}
+	additional_accounts_with_balance[0].0.clone()
 }

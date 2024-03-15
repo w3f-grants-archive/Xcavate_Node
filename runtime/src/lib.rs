@@ -18,8 +18,9 @@ use frame_support::{
 	ord_parameter_types,
 	pallet_prelude::{DispatchClass, Get},
 	traits::{
-		tokens::{PayFromAccount, UnityAssetBalanceConversion}, AsEnsureOriginWithArg, EitherOfDiverse,
-		EqualPrivilegeOnly, fungible::HoldConsideration, LinearStoragePrice,
+		fungible::HoldConsideration,
+		tokens::{PayFromAccount, UnityAssetBalanceConversion},
+		AsEnsureOriginWithArg, EitherOfDiverse, EqualPrivilegeOnly, LinearStoragePrice,
 	},
 	PalletId,
 };
@@ -76,21 +77,21 @@ pub use frame_support::{
 		},
 		IdentityFee, Weight,
 	},
-	StorageValue, BoundedVec,
+	BoundedVec, StorageValue,
 };
 pub use frame_system::Call as SystemCall;
 pub use pallet_balances::Call as BalancesCall;
-use pallet_election_provider_multi_phase::{SolutionAccuracyOf, GeometricDepositBase};
+use pallet_election_provider_multi_phase::{GeometricDepositBase, SolutionAccuracyOf};
 /// Import the nft pallet
 use pallet_nfts::PalletFeatures;
 #[cfg(any(feature = "std", test))]
 pub use pallet_staking::StakerStatus;
 pub use pallet_timestamp::Call as TimestampCall;
 use pallet_transaction_payment::{ConstFeeMultiplier, CurrencyAdapter, Multiplier};
+use sp_runtime::traits::IdentityLookup;
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
-use sp_runtime::traits::IdentityLookup;
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -130,9 +131,9 @@ pub mod opaque {
 	impl_opaque_keys! {
 		pub struct SessionKeys {
 			// pub aura: Aura,
-			pub grandpa: Grandpa,
 			pub aura: Aura,
-			pub im_online: ImOnline,
+			pub grandpa: Grandpa,
+ 			pub im_online: ImOnline,
 			pub authority_discovery: AuthorityDiscovery,
 		}
 	}
@@ -298,7 +299,8 @@ impl frame_system::Config for Runtime {
 	type SS58Prefix = SS58Prefix;
 	/// The set code logic, just the default since we're not a parachain.
 	type OnSetCode = ();
-	type MaxConsumers = frame_support::traits::ConstU32<16>;
+	type MaxConsumers = frame_support::traits::ConstU32<1024>;
+	type RuntimeTask = ();
 }
 
 impl pallet_insecure_randomness_collective_flip::Config for Runtime {}
@@ -501,16 +503,16 @@ impl pallet_xcavate_staking::Config for Runtime {
 
 parameter_types! {
 	pub const NftMarketplacePalletId: PalletId = PalletId(*b"py/nftxc");
-	pub const MaxListedNft: u32 = 100;
+	pub const MaxNftTokens: u32 = 100;
 }
 
-/// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
+/// Configure the pallet-nft-marketplace in pallets/nft-marketplace.
 impl pallet_nft_marketplace::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_nft_marketplace::weights::SubstrateWeight<Runtime>;
 	type Currency = Balances;
 	type PalletId = NftMarketplacePalletId;
-	type MaxListedNfts = MaxListedNft;
+	type MaxNftToken = MaxNftTokens;
 	type LocationOrigin = EnsureRoot<Self::AccountId>;
 	#[cfg(feature = "runtime-benchmarks")]
 	type Helper = pallet_nft_marketplace::NftHelper;
@@ -531,7 +533,7 @@ parameter_types! {
 	pub const MaxOngoingProject: u32 = 250;
 }
 
-/// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
+/// Configure the pallet-community-projects in pallets/community-projects.
 impl pallet_community_projects::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_community_projects::weights::SubstrateWeight<Runtime>;
@@ -553,7 +555,7 @@ parameter_types! {
 	pub const MaxWhitelistUsers: u32 = 1000;
 }
 
-/// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
+/// Configure the pallet-whitelist in pallets/whitelist.
 impl pallet_whitelist::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_whitelist::weights::SubstrateWeight<Runtime>;
@@ -563,6 +565,48 @@ impl pallet_whitelist::Config for Runtime {
 	>;
 	type MaxUsersInWhitelist = MaxWhitelistUsers;
 }
+
+parameter_types! {
+	pub const MinimumStakingAmount: Balance = 100 * DOLLARS;
+	pub const PropertyManagementPalletId: PalletId = PalletId(*b"py/ppmmt");
+	pub const MaxProperty: u32 = 1000;
+	pub const MaxLettingAgent: u32 = 100;
+	pub const MaxLocation: u32 = 100;
+}
+
+/// Configure the pallet-property-management in pallets/property-management.
+impl pallet_property_management::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_property_management::weights::SubstrateWeight<Runtime>;
+	type Currency = Balances;
+	type PalletId = PropertyManagementPalletId;
+	type AgentOrigin = EnsureRoot<Self::AccountId>;
+	type MinStakingAmount = MinimumStakingAmount;
+	type MaxProperties = MaxProperty;
+	type MaxLettingAgents = MaxLettingAgent;
+	type MaxLocations = MaxLocation;
+}
+
+parameter_types! {
+	pub const PropertyVotingTime: BlockNumber = 30;
+	pub const MaxVoteForBlock: u32 = 100;
+	pub const MinimumSlashingAmount: Balance = 10 * DOLLARS;
+	pub const MaximumVoter: u32 = 100;
+	pub const VotingThreshold: u8 = 67;
+}
+
+/// Configure the pallet-property-governance in pallets/property-governance.
+impl pallet_property_governance::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_property_governance::weights::SubstrateWeight<Runtime>;
+	type Currency = Balances;
+	type VotingTime = PropertyVotingTime;
+	type MaxVotesForBlock =  MaxVoteForBlock;
+	type Slash = ();
+	type MinSlashingAmount = MinimumSlashingAmount;
+	type MaxVoter = MaximumVoter;
+	type Threshold = VotingThreshold;
+} 
 
 parameter_types! {
 	pub Features: PalletFeatures = PalletFeatures::all_enabled();
@@ -753,6 +797,7 @@ parameter_types! {
 	pub const OffendingValidatorsThreshold: Perbill = Perbill::from_percent(17);
 	pub OffchainRepeat: BlockNumber = 5;
 	pub const HistoryDepth: u32 = 80;
+	pub const MaxExposurePageSize: u32 = 64;
 }
 
 pub struct StakingBenchmarkingConfig;
@@ -776,8 +821,8 @@ impl pallet_staking::Config for Runtime {
 	type SessionInterface = Self;
 	type AdminOrigin = frame_system::EnsureRoot<Self::AccountId>;
 	type EraPayout = pallet_staking::ConvertCurve<RewardCurve>;
+	type MaxExposurePageSize = MaxExposurePageSize;
 	type NextNewSession = Session;
-	type MaxNominatorRewardedPerValidator = MaxNominatorRewardedPerValidator;
 	type OffendingValidatorsThreshold = OffendingValidatorsThreshold;
 	type ElectionProvider = ElectionProviderMultiPhase;
 	type GenesisElectionProvider = onchain::OnChainExecution<OnChainSeqPhragmen>;
@@ -786,6 +831,7 @@ impl pallet_staking::Config for Runtime {
 	type WeightInfo = pallet_staking::weights::SubstrateWeight<Runtime>;
 	type BenchmarkingConfig = StakingBenchmarkingConfig;
 	type TargetList = pallet_staking::UseValidatorsMap<Runtime>;
+	type MaxControllersInDeprecationBatch = ConstU32<5900>;
 	type HistoryDepth = HistoryDepth;
 	type NominationsQuota = pallet_staking::FixedNominationsQuota<16>; // FIXME
 	type EventListeners = (); // FIXME
@@ -1024,7 +1070,6 @@ parameter_types! {
 	// phase durations. 1/4 of the last session for each.
 	pub const SignedPhase: u32 = EPOCH_DURATION_IN_BLOCKS / 4;
 	pub const UnsignedPhase: u32 = EPOCH_DURATION_IN_BLOCKS / 4;
-	pub BetterUnsignedThreshold: Perbill = Perbill::from_rational(1u32, 10_000);
 
 	// We prioritize im-online heartbeats over election solution submission.
 	pub const StakingUnsignedPriority: TransactionPriority = TransactionPriority::max_value() / 2;
@@ -1111,14 +1156,14 @@ impl pallet_election_provider_multi_phase::Config for Runtime {
 	type EstimateCallFee = TransactionPayment;
 	type SignedPhase = SignedPhase;
 	type UnsignedPhase = UnsignedPhase;
-	type BetterUnsignedThreshold = BetterUnsignedThreshold;
 	type BetterSignedThreshold = ();
 	type MinerConfig = SubmitMinerConfig;
 	type OffchainRepeat = OffchainRepeat;
 	type MinerTxPriority = MultiPhaseUnsignedPriority;
 	type SignedMaxSubmissions = ConstU32<10>;
 	type SignedRewardBase = SignedRewardBase;
-	type SignedDepositBase = GeometricDepositBase<Balance, SignedFixedDeposit, SignedDepositIncreaseFactor>;
+	type SignedDepositBase =
+		GeometricDepositBase<Balance, SignedFixedDeposit, SignedDepositIncreaseFactor>;
 	type SignedDepositByte = SignedDepositByte;
 	type SignedMaxRefunds = ConstU32<3>;
 	type SignedDepositWeight = ();
@@ -1311,7 +1356,6 @@ parameter_types! {
 	pub const Deposit: Balance = DOLLARS;
 }
 
-
 impl pallet_nft_fractionalization::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type Deposit = Deposit;
@@ -1481,6 +1525,8 @@ construct_runtime!(
 		NftMarketplace: pallet_nft_marketplace,
 		CommunityProject: pallet_community_projects,
 		Whitelist: pallet_whitelist,
+		PropertyManagement: pallet_property_management,
+		PropertyGovernance: pallet_property_governance,
 		Nfts: pallet_nfts,
 		Uniques: pallet_uniques, //10
 		RandomnessCollectiveFlip: pallet_insecure_randomness_collective_flip,
@@ -1577,6 +1623,8 @@ mod benches {
 		[pallet_nft_marketplace, NftMarketplace]
 		[pallet_community_projects, CommunityProject]
 		[pallet_whitelist, Whitelist]
+		[pallet_property_management, PropertyManagement]
+		[pallet_property_governance, PropertyGovernance]
 		[pallet_nfts, Nfts]
 		[pallet_uniques, Uniques]
 		[pallet_assets, Assets]
@@ -1827,7 +1875,7 @@ impl_runtime_apis! {
 		}
 	}
 }
- 
+
 #[cfg(test)]
 mod tests {
 	use super::*;

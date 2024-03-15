@@ -344,13 +344,8 @@ pub mod pallet {
 	/// Mapping of ongoing loans.
 	#[pallet::storage]
 	#[pallet::getter(fn loans)]
-	pub(super) type Loans<T: Config> = StorageMap<
-		_,
-		Blake2_128Concat,
-		LoanIndex,
-		LoanInfoType<T>,
-		OptionQuery,
-	>;
+	pub(super) type Loans<T: Config> =
+		StorageMap<_, Blake2_128Concat, LoanIndex, LoanInfoType<T>, OptionQuery>;
 
 	/// Mapping of ongoing votes.
 	#[pallet::storage]
@@ -802,7 +797,7 @@ pub mod pallet {
 				&loan_pallet,
 				&signer,
 				// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
-				(sending_amount as u128 * 1000000000000)
+				(sending_amount as u128 * 1/* 000000000000 */)
 					.try_into()
 					.map_err(|_| Error::<T>::ConversionError)?,
 				KeepAlive,
@@ -847,7 +842,7 @@ pub mod pallet {
 				&signer,
 				&loan_pallet,
 				// For unit tests this line has to be commented out and the line blow has to be uncommented due to the dicmals on polkadot js
-				(sending_amount as u128 * 1000000000000)
+				(sending_amount as u128 * 1/* 000000000000 */)
 					.try_into()
 					.map_err(|_| Error::<T>::ConversionError)?,
 				KeepAlive,

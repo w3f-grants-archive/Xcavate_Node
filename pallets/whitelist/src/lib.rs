@@ -49,7 +49,7 @@ pub mod pallet {
 	pub enum Event<T: Config> {
 		/// A new user has been successfully whitelisted.
 		NewUserWhitelisted { user: T::AccountId },
-		/// A new user has been successfully whitelisted.
+		/// A new user has been successfully removed.
 		UserRemoved { user: T::AccountId },
 	}
 
@@ -78,7 +78,10 @@ pub mod pallet {
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::add_to_whitelist())]
 		pub fn add_to_whitelist(origin: OriginFor<T>, user: AccountIdOf<T>) -> DispatchResult {
 			T::WhitelistOrigin::ensure_origin(origin)?;
-			ensure!(!Self::whitelisted_accounts(user.clone()), Error::<T>::AccountAlreadyWhitelisted);
+			ensure!(
+				!Self::whitelisted_accounts(user.clone()),
+				Error::<T>::AccountAlreadyWhitelisted
+			);
 			WhitelistedAccounts::<T>::insert(user.clone(), true);
 			Self::deposit_event(Event::<T>::NewUserWhitelisted { user });
 			Ok(())

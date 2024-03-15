@@ -75,7 +75,8 @@ impl frame_system::Config for Test {
 	type BlockLength = ();
 	type SS58Prefix = ();
 	type OnSetCode = ();
-	type MaxConsumers = frame_support::traits::ConstU32<16>;
+	type MaxConsumers = frame_support::traits::ConstU32<10000>;
+	type RuntimeTask = ();
 }
 
 impl pallet_balances::Config for Test {
@@ -195,7 +196,7 @@ impl pallet_nft_fractionalization::Config for Test {
 
 parameter_types! {
 	pub const NftMarketplacePalletId: PalletId = PalletId(*b"py/nftxc");
-	pub const MaxListedNft: u32 = 1000000;
+	pub const MaxNftTokens: u32 = 100;
 	pub const MaxNftsInCollection: u32 = 100;
 	pub const TreasuryPalletId: PalletId = PalletId(*b"py/trsry");
 	pub const CommunityProjectPalletId: PalletId = PalletId(*b"py/cmprj");
@@ -207,10 +208,10 @@ impl pallet_nft_marketplace::Config for Test {
 	type WeightInfo = weights::SubstrateWeight<Test>;
 	type Currency = Balances;
 	type PalletId = NftMarketplacePalletId;
+	type MaxNftToken = MaxNftTokens;
 	type LocationOrigin = EnsureRoot<Self::AccountId>;
 	#[cfg(feature = "runtime-benchmarks")]
 	type Helper = NftHelper;
-	type MaxListedNfts = MaxListedNft;
 	type CollectionId = u32;
 	type ItemId = u32;
 	type TreasuryId = TreasuryPalletId;
