@@ -1387,10 +1387,21 @@ impl pallet_nft_fractionalization::Config for Runtime {
 	type RuntimeHoldReason = RuntimeHoldReason;
 }
 
+
+/// Maximum number of blocks simultaneously accepted by the Runtime, not yet included
+/// into the relay chain.
+const UNINCLUDED_SEGMENT_CAPACITY: u32 = 3;
+/// How many parachain blocks are processed by the relay chain per parent. Limits the
+/// number of blocks authored per slot.
+const BLOCK_PROCESSING_VELOCITY: u32 = 1;
+/// Relay chain slot duration, in milliseconds.
+const RELAY_CHAIN_SLOT_DURATION_MILLIS: u32 = 6000;
+
+
 impl cumulus_pallet_parachain_system::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type OnSystemEvent = ();
-	type SelfParaId = parachain_info::Pallet<Runtime>; // TODO:
+	type SelfParaId = parachain_info::Pallet<Runtime>;
 	type OutboundXcmpMessageSource = XcmpQueue;
     type DmpQueue = frame_support::traits::EnqueueWithOrigin<MessageQueue, RelayOrigin>;
 	type ReservedDmpWeight = ReservedDmpWeight;
@@ -1401,7 +1412,15 @@ impl cumulus_pallet_parachain_system::Config for Runtime {
 	type WeightInfo = ();
 }
 
+type ConsensusHook = cumulus_pallet_aura_ext::FixedVelocityConsensusHook<
+	Runtime,
+	RELAY_CHAIN_SLOT_DURATION_MILLIS,
+	BLOCK_PROCESSING_VELOCITY,
+	UNINCLUDED_SEGMENT_CAPACITY,
+>;
+
 impl parachain_info::Config for Runtime {}
+impl cumulus_pallet_aura_ext::Config for Runtime {}
 
 parameter_types! {
 	pub const ReservedXcmpWeight: Weight = MAXIMUM_BLOCK_WEIGHT.saturating_div(4);
@@ -1528,8 +1547,9 @@ construct_runtime!(
 		ParachainSystem: cumulus_pallet_parachain_system,
 		XcmpQueue: cumulus_pallet_xcmp_queue,
 		CumulusXcm: cumulus_pallet_xcm,
-		MessageQueue: pallet_message_queue
-		ParachainInfo: parachain_info
+		MessageQueue: pallet_message_queue,
+		ParachainInfo: parachain_info,
+		AuraExt: cumulus_pallet_aura_ext
 
 	}
 );
@@ -1839,7 +1859,7 @@ impl_runtime_apis! {
 
 cumulus_pallet_parachain_system::register_validate_block! {
 	Runtime = Runtime,
-    BlockExecutor = pallet_author_inherent::BlockExecutor::<Runtime, Executive>,
+	BlockExecutor = cumulus_pallet_aura_ext::BlockExecutor::<Runtime, Executive>,
 }
 
 #[cfg(test)]
