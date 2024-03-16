@@ -10,6 +10,7 @@ include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 pub mod constants;
 use codec::Decode;
 mod voter_bags;
+pub mod xcm_config;
 use constants::{currency::*, time::*};
 use frame_election_provider_support::{onchain, ExtendedBalance, SequentialPhragmen, VoteWeight};
 use frame_support::genesis_builder_helper::{build_config, create_default_config};
@@ -24,6 +25,7 @@ use frame_support::{
 	},
 	PalletId,
 };
+use pallet_xcm::{EnsureXcm, IsVoiceOfBody};
 use sp_staking::currency_to_vote::U128CurrencyToVote;
 //use acurast_p256_crypto::MultiSignature;
 // use pallet_acurast_fulfillment_receiver::Fulfillment;
@@ -1558,6 +1560,8 @@ construct_runtime!(
 		Preimage: pallet_preimage,
 		Democracy: pallet_democracy,
 		NftFractionalization: pallet_nft_fractionalization,
+
+		PolkadotXcm: pallet_xcm,
 
 		// TODO:
 		// Referenda: pallet_referenda,

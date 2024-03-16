@@ -103,6 +103,9 @@ pallet-whitelist = {  default-features = false, path = "../pallets/whitelist" }
 pallet-property-management = {  default-features = false, path = "../pallets/property-management" }
 pallet-property-governance = {  default-features = false, path = "../pallets/property-governance" }
 
+# Polkadot
+pallet-xcm = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.6.0", default-features = false }
+
 
 [build-dependencies]
 substrate-wasm-builder = {  git = "https://github.com/paritytech/polkadot-sdk", optional = true, tag = "polkadot-v1.6.0" }
@@ -110,6 +113,7 @@ substrate-wasm-builder = {  git = "https://github.com/paritytech/polkadot-sdk", 
 [features]
 default = ["std"]
 std = [
+	"pallet-xcm/std",
 	"frame-try-runtime?/std",
 	"frame-system-benchmarking?/std",
 	"frame-benchmarking?/std",
@@ -191,6 +195,7 @@ std = [
 	# "acurast-p256-crypto/std",
 ]
 runtime-benchmarks = [
+	"pallet-xcm/runtime-benchmarks",
 	"frame-benchmarking/runtime-benchmarks",
 	"frame-support/runtime-benchmarks",
 	"frame-system-benchmarking/runtime-benchmarks",
@@ -230,6 +235,7 @@ runtime-benchmarks = [
 	"pallet-nft-fractionalization/runtime-benchmarks",
 ]
 try-runtime = [
+	"pallet-xcm/try-runtime",
 	"frame-try-runtime/try-runtime",
 	"frame-executive/try-runtime",
 	"frame-system/try-runtime",
