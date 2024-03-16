@@ -11,6 +11,7 @@ pub mod constants;
 use codec::Decode;
 mod voter_bags;
 pub mod xcm_config;
+use xcm_config::{RelayLocation, XcmConfig, XcmOriginToTransactDispatchOrigin};
 use constants::{currency::*, time::*};
 use frame_election_provider_support::{onchain, ExtendedBalance, SequentialPhragmen, VoteWeight};
 use frame_support::genesis_builder_helper::{build_config, create_default_config};
@@ -21,15 +22,23 @@ use frame_support::{
 	traits::{
 		fungible::HoldConsideration,
 		tokens::{PayFromAccount, UnityAssetBalanceConversion},
-		AsEnsureOriginWithArg, EitherOfDiverse, EqualPrivilegeOnly, LinearStoragePrice,
+		AsEnsureOriginWithArg, EitherOfDiverse, EqualPrivilegeOnly, LinearStoragePrice, TransformOrigin,
 	},
 	PalletId,
 };
+// Polkadot imports
+use polkadot_runtime_common::{BlockHashCount, SlowAdjustingFeeUpdate};
 use pallet_xcm::{EnsureXcm, IsVoiceOfBody};
 use sp_staking::currency_to_vote::U128CurrencyToVote;
 //use acurast_p256_crypto::MultiSignature;
 // use pallet_acurast_fulfillment_receiver::Fulfillment;
 
+// XCM Imports
+use xcm::latest::prelude::BodyId;
+use xcm_executor::XcmExecutor;
+
+use cumulus_pallet_parachain_system::RelayNumberMonotonicallyIncreases;
+use cumulus_primitives_core::{AggregateMessageOrigin, AssetId, Concrete, ParaId};
 use frame_system::{
 	limits::BlockWeights as SystemBlockWeights, EnsureRoot, EnsureSigned, EnsureSignedBy,
 	EnsureWithSuccess,
@@ -300,7 +309,7 @@ impl frame_system::Config for Runtime {
 	/// This is used as an identifier of the chain. 42 is the generic substrate prefix.
 	type SS58Prefix = SS58Prefix;
 	/// The set code logic, just the default since we're not a parachain.
-	type OnSetCode = ();
+	type OnSetCode = cumulus_pallet_parachain_system::ParachainSetCode<Self>;;
 	type MaxConsumers = frame_support::traits::ConstU32<1024>;
 	type RuntimeTask = ();
 }
@@ -1378,138 +1387,91 @@ impl pallet_nft_fractionalization::Config for Runtime {
 	type RuntimeHoldReason = RuntimeHoldReason;
 }
 
-// TODO::
-
-// parameter_types! {
-// 	pub const VoteLockingPeriod: BlockNumber = 30 * DAYS;
-// }
-
-// impl pallet_conviction_voting::Config for Runtime {
-// 	type WeightInfo = pallet_conviction_voting::weights::SubstrateWeight<Self>;
-// 	type RuntimeEvent = RuntimeEvent;
-// 	type Currency = Balances;
-// 	type VoteLockingPeriod = VoteLockingPeriod;
-// 	type MaxVotes = ConstU32<512>;
-// 	type MaxTurnout = frame_support::traits::TotalIssuanceOf<Balances, Self::AccountId>;
-// 	type Polls = Referenda;
-// }
-
-// impl pallet_ranked_collective::Config for Runtime {
-// 	type WeightInfo = pallet_ranked_collective::weights::SubstrateWeight<Self>;
-// 	type RuntimeEvent = RuntimeEvent;
-// 	type PromoteOrigin = EnsureRootWithSuccess<AccountId, ConstU16<65535>>;
-// 	type DemoteOrigin = EnsureRootWithSuccess<AccountId, ConstU16<65535>>;
-// 	type Polls = RankedPolls;
-// 	type MinRankOfClass = traits::Identity;
-// 	type VoteWeight = pallet_ranked_collective::Geometric;
-// }
-
-// parameter_types! {
-// 	pub const AlarmInterval: BlockNumber = 1;
-// 	pub const SubmissionDeposit: Balance = 100 * DOLLARS;
-// 	pub const UndecidingTimeout: BlockNumber = 28 * DAYS;
-// }
-
-// pub struct TracksInfo;
-// impl pallet_referenda::TracksInfo<Balance, BlockNumber> for TracksInfo {
-// 	type Id = u16;
-// 	type RuntimeOrigin = <RuntimeOrigin as frame_support::traits::OriginTrait>::PalletsOrigin;
-// 	fn tracks() -> &'static [(Self::Id, pallet_referenda::TrackInfo<Balance, BlockNumber>)] {
-// 		static DATA: [(u16, pallet_referenda::TrackInfo<Balance, BlockNumber>); 1] = [(
-// 			0u16,
-// 			pallet_referenda::TrackInfo {
-// 				name: "root",
-// 				max_deciding: 1,
-// 				decision_deposit: 10,
-// 				prepare_period: 4,
-// 				decision_period: 4,
-// 				confirm_period: 2,
-// 				min_enactment_period: 4,
-// 				min_approval: pallet_referenda::Curve::LinearDecreasing {
-// 					length: Perbill::from_percent(100),
-// 					floor: Perbill::from_percent(50),
-// 					ceil: Perbill::from_percent(100),
-// 				},
-// 				min_support: pallet_referenda::Curve::LinearDecreasing {
-// 					length: Perbill::from_percent(100),
-// 					floor: Perbill::from_percent(0),
-// 					ceil: Perbill::from_percent(100),
-// 				},
-// 			},
-// 		)];
-// 		&DATA[..]
-// 	}
-// 	fn track_for(id: &Self::RuntimeOrigin) -> Result<Self::Id, ()> {
-// 		if let Ok(system_origin) = frame_system::RawOrigin::try_from(id.clone()) {
-// 			match system_origin {
-// 				frame_system::RawOrigin::Root => Ok(0),
-// 				_ => Err(()),
-// 			}
-// 		} else {
-// 			Err(())
-// 		}
-// 	}
-// }
-
-// pallet_referenda::impl_tracksinfo_get!(TracksInfo, Balance, BlockNumber);
-
-// impl pallet_referenda::Config for Runtime {
-// 	type WeightInfo = pallet_referenda::weights::SubstrateWeight<Self>;
-// 	type RuntimeCall = RuntimeCall;
-// 	type RuntimeEvent = RuntimeEvent;
-// 	type Scheduler = Scheduler;
-// 	type Currency = pallet_balances::Pallet<Self>;
-// 	type SubmitOrigin = EnsureSigned<AccountId>;
-// 	type CancelOrigin = EnsureRoot<AccountId>;
-// 	type KillOrigin = EnsureRoot<AccountId>;
-// 	type Slash = ();
-// 	type Votes = pallet_conviction_voting::VotesOf<Runtime>;
-// 	type Tally = pallet_conviction_voting::TallyOf<Runtime>;
-// 	type SubmissionDeposit = SubmissionDeposit;
-// 	type MaxQueued = ConstU32<100>;
-// 	type UndecidingTimeout = UndecidingTimeout;
-// 	type AlarmInterval = AlarmInterval;
-// 	type Tracks = TracksInfo;
-// 	type Preimages = Preimage;
-// }
-
-// impl pallet_referenda::Config<pallet_referenda::Instance2> for Runtime {
-// 	type WeightInfo = pallet_referenda::weights::SubstrateWeight<Self>;
-// 	type RuntimeCall = RuntimeCall;
-// 	type RuntimeEvent = RuntimeEvent;
-// 	type Scheduler = Scheduler;
-// 	type Currency = pallet_balances::Pallet<Self>;
-// 	type SubmitOrigin = EnsureSigned<AccountId>;
-// 	type CancelOrigin = EnsureRoot<AccountId>;
-// 	type KillOrigin = EnsureRoot<AccountId>;
-// 	type Slash = ();
-// 	type Votes = pallet_ranked_collective::Votes;
-// 	type Tally = pallet_ranked_collective::TallyOf<Runtime>;
-// 	type SubmissionDeposit = SubmissionDeposit;
-// 	type MaxQueued = ConstU32<100>;
-// 	type UndecidingTimeout = UndecidingTimeout;
-// 	type AlarmInterval = AlarmInterval;
-// 	type Tracks = TracksInfo;
-// 	type Preimages = Preimage;
-// }
-
-// TODO:
-
-/* pub struct OnAcurastFulfillment;
-impl pallet_acurast_fulfillment_receiver::traits::OnFulfillment<Runtime> for OnAcurastFulfillment {
-	fn on_fulfillment(
-		_from: <Runtime as frame_system::Config>::AccountId,
-		_fulfillment: Fulfillment,
-	) -> DispatchResultWithInfo<PostDispatchInfo> {
-		Ok(PostDispatchInfo { actual_weight: None, pays_fee: Pays::No })
-	}
-} */
-
-/* impl pallet_acurast_fulfillment_receiver::Config for Runtime {
+impl cumulus_pallet_parachain_system::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type OnFulfillment = OnAcurastFulfillment;
+	type OnSystemEvent = ();
+	type SelfParaId = parachain_info::Pallet<Runtime>; // TODO:
+	type OutboundXcmpMessageSource = XcmpQueue;
+    type DmpQueue = frame_support::traits::EnqueueWithOrigin<MessageQueue, RelayOrigin>;
+	type ReservedDmpWeight = ReservedDmpWeight;
+	type XcmpMessageHandler = XcmpQueue;
+	type ReservedXcmpWeight = ReservedXcmpWeight;
+	type CheckAssociatedRelayNumber = RelayNumberMonotonicallyIncreases;
+	type ConsensusHook = ConsensusHook;
 	type WeightInfo = ();
-} */
+}
+
+impl parachain_info::Config for Runtime {}
+
+parameter_types! {
+	pub const ReservedXcmpWeight: Weight = MAXIMUM_BLOCK_WEIGHT.saturating_div(4);
+	pub const ReservedDmpWeight: Weight = MAXIMUM_BLOCK_WEIGHT.saturating_div(4);
+	pub const RelayOrigin: AggregateMessageOrigin = AggregateMessageOrigin::Parent;
+}
+
+
+impl cumulus_pallet_dmp_queue::Config for Runtime {
+	type WeightInfo = ();
+    type RuntimeEvent = RuntimeEvent;
+    type DmpSink = frame_support::traits::EnqueueWithOrigin<MessageQueue, RelayOrigin>;
+}
+
+parameter_types! {
+	/// The asset ID for the asset that we use to pay for message delivery fees.
+	pub FeeAssetId: AssetId = Concrete(xcm_config::RelayLocation::get());
+	/// The base fee for the message delivery fees.
+	pub const BaseDeliveryFee: Balance = 300_000_000;
+	/// The fee per byte
+	pub const ByteFee: Balance = 1_000_000;
+}
+
+pub type PriceForSiblingParachainDelivery = polkadot_runtime_common::xcm_sender::ExponentialPrice<
+	FeeAssetId,
+	BaseDeliveryFee,
+	ByteFee,
+	XcmpQueue,
+>;
+
+impl cumulus_pallet_xcmp_queue::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type ChannelInfo = ParachainSystem;
+	type VersionWrapper = ();
+	type ControllerOrigin = EnsureRoot<AccountId>;
+	type ControllerOriginConverter = XcmOriginToTransactDispatchOrigin;
+	type PriceForSiblingDelivery = PriceForSiblingParachainDelivery;
+	type WeightInfo = ();
+	 // Enqueue XCMP messages from siblings for later processing.
+	 type XcmpQueue = TransformOrigin<MessageQueue, AggregateMessageOrigin, ParaId, parachains_common::message_queue::ParaIdToSibling>;
+	 type MaxInboundSuspended = sp_core::ConstU32<1_000>;
+}
+
+parameter_types! {
+    pub MessageQueueServiceWeight: Weight = Perbill::from_percent(25) * RuntimeBlockWeights::get().max_block;
+}
+
+impl pallet_message_queue::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type WeightInfo = pallet_message_queue::weights::SubstrateWeight<Runtime>;
+    #[cfg(feature = "runtime-benchmarks")]
+    type MessageProcessor = pallet_message_queue::mock_helpers::NoopMessageProcessor<
+        cumulus_primitives_core::AggregateMessageOrigin,
+    >;
+    #[cfg(not(feature = "runtime-benchmarks"))]
+    type MessageProcessor = xcm_builder::ProcessXcmMessage<
+        AggregateMessageOrigin,
+        XcmExecutor<XcmConfig>,
+        RuntimeCall,
+    >;
+    type Size = u32;
+    // The XCMP queue pallet is only ever able to handle the `Sibling(ParaId)` origin:
+    type QueueChangeHandler = parachains_common::message_queue::NarrowOriginToSibling<XcmpQueue>;
+    // NarrowOriginToSibling calls XcmpQueue's is_pause if Origin is sibling. Allows all other origins
+    type QueuePausedQuery = parachains_common::message_queue::NarrowOriginToSibling<XcmpQueue>;
+    // TODO verify values
+    type HeapSize = sp_core::ConstU32<{ 64 * 1024 }>;
+    type MaxStale = sp_core::ConstU32<8>;
+    type ServiceWeight = MessageQueueServiceWeight;
+}
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
@@ -1562,18 +1524,12 @@ construct_runtime!(
 		NftFractionalization: pallet_nft_fractionalization,
 
 		PolkadotXcm: pallet_xcm,
-
-		// TODO:
-		// Referenda: pallet_referenda,
-		// RankedPolls: pallet_referenda::<Instance2>,
-		// ConvictionVoting: pallet_conviction_voting,
-		// RankedCollective: pallet_ranked_collective,
-		// TODO::
-		// AssetConversionTxPayment: pallet_asset_conversion_tx_payment,
-		// AssetConversion: pallet_asset_conversion,
-
-		// Acurast
-		//AcurastReceiver: pallet_acurast_fulfillment_receiver::{Pallet, Call, Storage, Event<T>} = 40,
+		DmpQueue: cumulus_pallet_dmp_queue,
+		ParachainSystem: cumulus_pallet_parachain_system,
+		XcmpQueue: cumulus_pallet_xcmp_queue,
+		CumulusXcm: cumulus_pallet_xcm,
+		MessageQueue: pallet_message_queue
+		ParachainInfo: parachain_info
 
 	}
 );
@@ -1635,6 +1591,7 @@ mod benches {
 		[pallet_utility, Utility]
 		[pallet_multisig, Multisig]
 		[pallet_nft_fractionalization, NftFractionalization]
+		[cumulus_pallet_xcmp_queue, XcmpQueue]
 	);
 }
 
@@ -1878,6 +1835,11 @@ impl_runtime_apis! {
 			build_config::<RuntimeGenesisConfig>(config)
 		}
 	}
+}
+
+cumulus_pallet_parachain_system::register_validate_block! {
+	Runtime = Runtime,
+    BlockExecutor = pallet_author_inherent::BlockExecutor::<Runtime, Executive>,
 }
 
 #[cfg(test)]
