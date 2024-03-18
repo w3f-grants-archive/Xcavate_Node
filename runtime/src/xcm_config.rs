@@ -173,10 +173,10 @@ impl ShouldExecute for DenyReserveTransferToRelayChain {
 				ReserveAssetDeposited { .. }
 					if matches!(origin, MultiLocation { parents: 1, interior: Here }) =>
 				{
-					log::warn!(
+/* 					log::warn!(
 						target: "xcm::barrier",
 						"Unexpected ReserveAssetDeposited from the Relay Chain",
-					);
+					); */
 					Ok(ControlFlow::Continue(()))
 				},
 				_ => Ok(ControlFlow::Continue(())),
