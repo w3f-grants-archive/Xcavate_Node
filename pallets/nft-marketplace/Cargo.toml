@@ -31,7 +31,7 @@ pallet-nft-fractionalization = {  default-features = false, git = "https://githu
 enumflags2 = { version = "0.7.7" }
 
 # Local dependencies
-pallet-whitelist = { path = "../whitelist", default-features = false }
+pallet-xcavate-whitelist = { path = "../xcavate-whitelist", default-features = false }
 
 [dev-dependencies]
 sp-core = {  git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.6.0" }
@@ -49,7 +49,7 @@ std = [
 	"serde",
 	"pallet-nfts/std",
 	"pallet-balances/std",
-	"pallet-whitelist/std",
+	# "pallet-xcavate-whitelist/std",
 	"pallet-assets/std",
 	"pallet-nft-fractionalization/std",
 ]

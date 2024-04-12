@@ -1,5 +1,5 @@
 [package]
-name = "pallet-whitelist"
+name = "pallet-xcavate-whitelist"
 version = "4.0.0-dev"
 description = "The Xcavate pallet whitelist"
 authors = ["Xcavate Network"]

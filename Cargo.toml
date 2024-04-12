@@ -8,7 +8,7 @@ members = [
     "pallets/nft-marketplace",
     "pallets/property-governance",
     "pallets/property-management",
-    "pallets/whitelist",
+    "pallets/xcavate-whitelist",
 ]
 resolver = "2"
 

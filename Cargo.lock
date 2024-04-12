@@ -4752,8 +4752,8 @@ dependencies = [
  "pallet-treasury",
  "pallet-uniques",
  "pallet-utility",
- "pallet-whitelist",
  "pallet-xcavate-staking",
+ "pallet-xcavate-whitelist",
  "parity-scale-codec",
  "polkadot-primitives",
  "scale-info",
@@ -5145,7 +5145,7 @@ dependencies = [
  "pallet-nfts",
  "pallet-timestamp",
  "pallet-transaction-payment",
- "pallet-whitelist",
+ "pallet-xcavate-whitelist",
  "parity-scale-codec",
  "scale-info",
  "serde",
@@ -5167,7 +5167,7 @@ dependencies = [
  "pallet-balances",
  "pallet-nfts",
  "pallet-timestamp",
- "pallet-whitelist",
+ "pallet-xcavate-whitelist",
  "parity-scale-codec",
  "scale-info",
  "serde",
@@ -5351,7 +5351,7 @@ dependencies = [
  "pallet-balances",
  "pallet-nft-fractionalization",
  "pallet-nfts",
- "pallet-whitelist",
+ "pallet-xcavate-whitelist",
  "parity-scale-codec",
  "scale-info",
  "serde",
@@ -5456,7 +5456,7 @@ dependencies = [
  "pallet-nft-marketplace",
  "pallet-nfts",
  "pallet-property-management",
- "pallet-whitelist",
+ "pallet-xcavate-whitelist",
  "parity-scale-codec",
  "scale-info",
  "serde",
@@ -5477,7 +5477,7 @@ dependencies = [
  "pallet-nft-fractionalization",
  "pallet-nft-marketplace",
  "pallet-nfts",
- "pallet-whitelist",
+ "pallet-xcavate-whitelist",
  "parity-scale-codec",
  "scale-info",
  "serde",
@@ -5710,20 +5710,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pallet-whitelist"
-version = "4.0.0-dev"
-dependencies = [
- "frame-benchmarking",
- "frame-support",
- "frame-system",
- "parity-scale-codec",
- "scale-info",
- "sp-core",
- "sp-io",
- "sp-runtime",
-]
-
-[[package]]
 name = "pallet-xcavate-staking"
 version = "4.0.0-dev"
 dependencies = [
@@ -5736,7 +5722,7 @@ dependencies = [
  "pallet-nfts",
  "pallet-timestamp",
  "pallet-transaction-payment",
- "pallet-whitelist",
+ "pallet-xcavate-whitelist",
  "parity-scale-codec",
  "scale-info",
  "serde",
@@ -5744,6 +5730,20 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std 8.0.0",
+]
+
+[[package]]
+name = "pallet-xcavate-whitelist"
+version = "4.0.0-dev"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
 ]
 
 [[package]]

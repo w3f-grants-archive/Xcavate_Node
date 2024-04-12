@@ -99,7 +99,7 @@ pallet-community-loan-pool = {  default-features = false, path = "../pallets/com
 pallet-xcavate-staking = {  default-features = false, path = "../pallets/xcavate-staking" }
 pallet-nft-marketplace = {  default-features = false, path = "../pallets/nft-marketplace" }
 pallet-community-projects = {  default-features = false, path = "../pallets/community-projects" }
-pallet-whitelist = {  default-features = false, path = "../pallets/whitelist" }
+pallet-xcavate-whitelist = {  default-features = false, path = "../pallets/xcavate-whitelist" }
 pallet-property-management = {  default-features = false, path = "../pallets/property-management" }
 pallet-property-governance = {  default-features = false, path = "../pallets/property-governance" }
 
@@ -131,7 +131,7 @@ std = [
 	"pallet-xcavate-staking/std",
 	"pallet-nft-marketplace/std",
 	"pallet-community-projects/std",
-	"pallet-whitelist/std",
+	"pallet-xcavate-whitelist/std",
 	"pallet-property-management/std",
 	"pallet-property-governance/std",
 	"pallet-timestamp/std",
@@ -204,7 +204,7 @@ runtime-benchmarks = [
 	"pallet-xcavate-staking/runtime-benchmarks",
 	"pallet-nft-marketplace/runtime-benchmarks",
 	"pallet-community-projects/runtime-benchmarks",
-	"pallet-whitelist/runtime-benchmarks",
+	"pallet-xcavate-whitelist/runtime-benchmarks",
 	"pallet-property-governance/runtime-benchmarks",
 	"pallet-property-management/runtime-benchmarks",
 	"pallet-nfts/runtime-benchmarks",
@@ -247,7 +247,7 @@ try-runtime = [
 	"pallet-xcavate-staking/try-runtime",
 	"pallet-nft-marketplace/try-runtime",
 	"pallet-community-projects/try-runtime",
-	"pallet-whitelist/try-runtime",
+	"pallet-xcavate-whitelist/try-runtime",
 	"pallet-property-management/try-runtime",
 	"pallet-nfts/try-runtime",
 	"pallet-insecure-randomness-collective-flip/try-runtime",

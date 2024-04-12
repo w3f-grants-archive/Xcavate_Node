@@ -30,7 +30,7 @@ sp-std = {  default-features = false, git = "https://github.com/paritytech/polka
 enumflags2 = { version = "0.7.7" }
 
 # Local dependencies
-pallet-whitelist = { path = "../whitelist", default-features = false }
+pallet-xcavate-whitelist = { path = "../xcavate-whitelist", default-features = false }
 
 [dev-dependencies]
 sp-core = {  git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.6.0" }
@@ -51,7 +51,7 @@ std = [
 	"pallet-timestamp/std",
 	"pallet-assets/std",
 	"sp-std/std",
-	"pallet-whitelist/std",
+	"pallet-xcavate-whitelist/std",
 ]
 runtime-benchmarks = ["frame-benchmarking/runtime-benchmarks"]
 try-runtime = ["frame-support/try-runtime"]

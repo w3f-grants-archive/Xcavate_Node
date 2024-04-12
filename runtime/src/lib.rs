@@ -504,6 +504,7 @@ impl pallet_xcavate_staking::Config for Runtime {
 parameter_types! {
 	pub const NftMarketplacePalletId: PalletId = PalletId(*b"py/nftxc");
 	pub const MaxNftTokens: u32 = 100;
+	pub const Postcode: u32 = 10;
 }
 
 /// Configure the pallet-nft-marketplace in pallets/nft-marketplace.
@@ -520,10 +521,11 @@ impl pallet_nft_marketplace::Config for Runtime {
 	type ItemId = u32;
 	type TreasuryId = TreasuryPalletId;
 	type CommunityProjectsId = CommunityProjectPalletId;
-	type FractionalizeCollectionId = <Self as pallet_nfts::Config>::CollectionId;
+ 	type FractionalizeCollectionId = <Self as pallet_nfts::Config>::CollectionId;
 	type FractionalizeItemId = <Self as pallet_nfts::Config>::ItemId;
 	type AssetId = <Self as pallet_assets::Config<Instance1>>::AssetId;
-	type AssetId2 = u32;
+	type AssetId2 = u32; 
+	type PostcodeLimit = Postcode;
 }
 
 parameter_types! {
@@ -555,10 +557,10 @@ parameter_types! {
 	pub const MaxWhitelistUsers: u32 = 1000;
 }
 
-/// Configure the pallet-whitelist in pallets/whitelist.
-impl pallet_whitelist::Config for Runtime {
+/// Configure the pallet-xcavate-whitelist in pallets/xcavate-whitelist.
+impl pallet_xcavate_whitelist::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_whitelist::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = pallet_xcavate_whitelist::weights::SubstrateWeight<Runtime>;
 	type WhitelistOrigin = EitherOfDiverse<
 		EnsureRoot<AccountId>,
 		pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>,
@@ -1524,7 +1526,7 @@ construct_runtime!(
 		XcavateStaking: pallet_xcavate_staking,
 		NftMarketplace: pallet_nft_marketplace,
 		CommunityProject: pallet_community_projects,
-		Whitelist: pallet_whitelist,
+		XcavateWhitelist: pallet_xcavate_whitelist,
 		PropertyManagement: pallet_property_management,
 		PropertyGovernance: pallet_property_governance,
 		Nfts: pallet_nfts,
@@ -1622,7 +1624,7 @@ mod benches {
 		[pallet_xcavate_staking, XcavateStaking]
 		[pallet_nft_marketplace, NftMarketplace]
 		[pallet_community_projects, CommunityProject]
-		[pallet_whitelist, Whitelist]
+		[pallet_xcavate_whitelist, XcavateWhitelist]
 		[pallet_property_management, PropertyManagement]
 		[pallet_property_governance, PropertyGovernance]
 		[pallet_nfts, Nfts]

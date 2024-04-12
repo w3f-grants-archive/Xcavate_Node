@@ -168,7 +168,7 @@ pub mod pallet {
 		frame_system::Config
 		+ pallet_nfts::Config
 		+ pallet_assets::Config<Instance1>
-		+ pallet_whitelist::Config
+		+ pallet_xcavate_whitelist::Config
 	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
@@ -549,7 +549,7 @@ pub mod pallet {
 			let signer = ensure_signed(origin.clone())?;
 
 			ensure!(
-				pallet_whitelist::Pallet::<T>::whitelisted_accounts(signer.clone()),
+				pallet_xcavate_whitelist::Pallet::<T>::whitelisted_accounts(signer.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
 
@@ -674,7 +674,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let signer = ensure_signed(origin.clone())?;
 			ensure!(
-				pallet_whitelist::Pallet::<T>::whitelisted_accounts(signer.clone()),
+				pallet_xcavate_whitelist::Pallet::<T>::whitelisted_accounts(signer.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
 			let mut project =
@@ -756,7 +756,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			ensure!(
-				pallet_whitelist::Pallet::<T>::whitelisted_accounts(origin.clone()),
+				pallet_xcavate_whitelist::Pallet::<T>::whitelisted_accounts(origin.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
 			let mut current_vote =
@@ -801,7 +801,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			ensure!(
-				pallet_whitelist::Pallet::<T>::whitelisted_accounts(origin.clone()),
+				pallet_xcavate_whitelist::Pallet::<T>::whitelisted_accounts(origin.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
 			let mut project =

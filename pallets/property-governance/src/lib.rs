@@ -409,7 +409,7 @@ pub mod pallet {
 			let amount = <T as Config>::MinSlashingAmount::get();
 			<T as pallet::Config>::Slash::on_unbalanced(<T as pallet::Config>::Currency::slash_reserved(&letting_agent, amount).0);
 			let asset_details = pallet_nft_marketplace::Pallet::<T>::asset_id_details(inquery.asset_id).ok_or(Error::<T>::NoAssetFound)?;
-			let _ = pallet_property_management::Pallet::<T>::remove_bad_letting_agent(asset_details.region, asset_details.location, letting_agent);
+			let _ = pallet_property_management::Pallet::<T>::remove_bad_letting_agent(asset_details.region, asset_details.location.clone(), letting_agent);
 			let _ = pallet_property_management::Pallet::<T>::selects_letting_agent(asset_details.region, asset_details.location, inquery.asset_id);
 			Ok(())
 		}

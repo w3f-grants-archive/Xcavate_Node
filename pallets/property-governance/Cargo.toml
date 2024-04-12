@@ -28,7 +28,7 @@ pallet-assets = {  default-features = false, git = "https://github.com/paritytec
 pallet-nft-fractionalization = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.6.0" }
 
 # Local dependencies
-pallet-whitelist = { path = "../whitelist", default-features = false }
+pallet-xcavate-whitelist = { path = "../xcavate-whitelist", default-features = false }
 pallet-nft-marketplace = { path = "../nft-marketplace", default-features = false }
 pallet-property-management = { path = "../property-management", default-features = false }
 
@@ -47,7 +47,7 @@ std = [
 	"scale-info/std",
 	"serde",
 	"pallet-nfts/std",
-	"pallet-whitelist/std",
+	"pallet-xcavate-whitelist/std",
 	"pallet-balances/std",
 	"pallet-nft-marketplace/std",
 	"pallet-assets/std",
