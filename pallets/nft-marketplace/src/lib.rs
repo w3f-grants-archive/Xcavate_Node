@@ -17,7 +17,7 @@ pub use weights::*;
 use pallet_assets::Instance1;
 
 use frame_support::{
-	traits::{Currency, ExistenceRequirement::KeepAlive, Incrementable, ReservableCurrency},
+	traits::{Currency, Incrementable, ReservableCurrency},
 	PalletId,
 };
 
@@ -91,7 +91,7 @@ pub mod pallet {
 	#[scale_info(skip_type_params(T))]
 	pub struct NftListingDetails<Balance, ItemId, CollectionId, T: Config> {
 		pub real_estate_developer: AccountIdOf<T>,
-		pub current_price: Balance,
+		pub token_price: Balance,
 		pub collected_funds: Balance,
 		pub asset_id: u32,
 		pub item_id: ItemId,
@@ -121,6 +121,24 @@ pub mod pallet {
 		pub item_id: ItemId,
 		pub region: u32,
 		pub location: LocationId<T>,
+	}
+
+	/// Infos regarding an offer.
+	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
+	#[scale_info(skip_type_params(T))]
+	pub struct OfferDetails<Balance, T: Config> {
+		pub buyer: AccountIdOf<T>,
+		pub token_price: Balance,
+		pub amount: u32,
+	}
+
+	/// Offer enum.
+	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
+	pub enum Offer {
+		Accept,
+		Reject,
 	}
 
 	/// AccountId storage.
@@ -269,6 +287,12 @@ pub mod pallet {
 	#[pallet::getter(fn next_region_id)]
 	pub(super) type NextRegionId<T: Config> = StorageValue<_, RegionId, ValueQuery>;
 
+	/// Id for the next offer for a listing.
+	#[pallet::storage]
+	#[pallet::getter(fn next_offer_id)]
+	pub(super) type NextOfferId<T: Config> =
+		StorageMap<_, Blake2_128Concat, u32, u32, ValueQuery>;
+
 	/// True if a location is registered.
 	#[pallet::storage]
 	#[pallet::getter(fn location_registration)]
@@ -388,6 +412,19 @@ pub mod pallet {
 		OptionQuery,
 	>;
 
+	/// Mapping from listing to offer details.
+	#[pallet::storage]
+	#[pallet::getter(fn ongoing_offers)]
+	pub(super) type OngoingOffer<T: Config> = StorageDoubleMap<
+		_,
+		Blake2_128Concat,
+		u32,
+		Blake2_128Concat,
+		u32,
+		OfferDetails<BalanceOf<T>, T>,
+		OptionQuery,
+	>;
+
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
@@ -427,6 +464,10 @@ pub mod pallet {
 		RegionCreated { region_id: u32, collection_id: CollectionId<T> },
 		/// New location has been created.
 		LocationCreated { region_id: u32, location_id: LocationId<T> }, 
+		/// A new offer has been made.
+		OfferCreated { listing_id: u32, price: BalanceOf<T> },
+		/// An offer has been cancelled.
+		OfferCancelled { listing_id: u32, offer_id: u32},
 	}
 
 	// Errors inform users that something went wrong.
@@ -552,7 +593,7 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			region: RegionId,
 			location: LocationId<T>,
-			price: BalanceOf<T>,
+			token_price: BalanceOf<T>,
 			token_amount: u32,
 			data: BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>,
 		) -> DispatchResult {
@@ -578,7 +619,7 @@ pub mod pallet {
 			let mut listing_id = Self::next_listing_id();
 			let nft = NftListingDetails {
 				real_estate_developer: signer.clone(),
-				current_price: price,
+				token_price,
 				collected_funds: Default::default(),
 				asset_id: asset_number,
 				item_id,
@@ -636,7 +677,7 @@ pub mod pallet {
 			Self::deposit_event(Event::<T>::ObjectListed {
 				collection_index: collection_id,
 				item_index: item_id,
-				price,
+				price: token_price,
 				seller: signer,
 			});
 			Ok(())
@@ -654,7 +695,7 @@ pub mod pallet {
 		#[pallet::call_index(3)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::buy_token())]
 		pub fn buy_token(origin: OriginFor<T>, listing_id: u32, amount: u32) -> DispatchResult {
-			let origin = ensure_signed(origin)?;
+			let origin = ensure_signed(origin.clone())?;
 			ensure!(
 				pallet_xcavate_whitelist::Pallet::<T>::whitelisted_accounts(origin.clone()),
 				Error::<T>::UserNotWhitelisted
@@ -672,15 +713,13 @@ pub mod pallet {
 			);
 
 			let price = nft_details
-				.current_price
+				.token_price
 				.checked_mul(&Self::u64_to_balance_option(amount as u64)?)
-				.ok_or(Error::<T>::MultiplyError)?
-				.checked_div(&Self::u64_to_balance_option(nft_details.token_amount.into())?)
-				.ok_or(Error::<T>::DivisionError)?;
+				.ok_or(Error::<T>::MultiplyError)?;
 			let transfer_price = price
 				.checked_mul(&Self::u64_to_balance_option(1/* 000000000000 */)?)
 				.ok_or(Error::<T>::MultiplyError)?;
-			Self::transfer_funds(&origin, &Self::account_id(), transfer_price)?;
+			Self::transfer_funds(origin.clone(), Self::account_id(), transfer_price)?;
 			listed_token =
 				listed_token.checked_sub(amount).ok_or(Error::<T>::ArithmeticUnderflow)?;
 			if !Self::token_buyer(listing_id).contains(&origin) {
@@ -793,82 +832,109 @@ pub mod pallet {
 			);
 			let mut listing_details =
 				TokenListings::<T>::take(listing_id).ok_or(Error::<T>::TokenNotForSale)?;
+			ensure!(listing_details.amount >= amount, Error::<T>::NotEnoughTokenAvailable);
 			let price = listing_details
 				.token_price
 				.checked_mul(&Self::u64_to_balance_option(amount.into())?)
 				.ok_or(Error::<T>::MultiplyError)?
 				.checked_mul(&Self::u64_to_balance_option(1/* 000000000000 */)?)
 				.ok_or(Error::<T>::MultiplyError)?;
-			Self::calculate_fees(price, origin.clone(), listing_details.seller.clone())?;
-			let user_lookup = <T::Lookup as StaticLookup>::unlookup(origin.clone());
-			let asset_id: AssetId2<T> = listing_details.asset_id.into();
-			let token_amount = amount.into();
-			let pallet_origin: OriginFor<T> = RawOrigin::Signed(Self::account_id()).into();
-			pallet_assets::Pallet::<T, Instance1>::transfer(
-				pallet_origin,
-				asset_id.into().into(),
-				user_lookup,
-				token_amount,
-			)
-			.map_err(|_| Error::<T>::NotEnoughFunds)?;
-			let mut old_token_owner_amount = PropertyOwnerToken::<T>::take(
-				listing_details.asset_id,
-				listing_details.seller.clone(),
+			Self::buying_token_process(listing_id, origin, listing_details, price, amount)?;
+			Ok(())
+		}
+
+		/// Created an offer for a token listing.
+		///
+		/// The origin must be Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `listing_id`: The listing that the investor wants to buy from.
+		/// - `offer_price`: The offer price for token that are offered.
+		/// - `amount`: The amount of token that the investor wants to buy.
+		///
+		/// Emits `OfferCreated` event when succesfful.
+		#[pallet::call_index(20)]
+		#[pallet::weight(0)]
+		pub fn make_offer(
+			origin: OriginFor<T>,
+			listing_id: u32,
+			offer_price: BalanceOf<T>,
+			amount: u32,
+		) -> DispatchResult {
+			let signer = ensure_signed(origin)?;
+			ensure!(
+				pallet_xcavate_whitelist::Pallet::<T>::whitelisted_accounts(signer.clone()),
+				Error::<T>::UserNotWhitelisted
 			);
-			old_token_owner_amount = old_token_owner_amount
-				.checked_sub(amount)
-				.ok_or(Error::<T>::ArithmeticUnderflow)?;
-			if old_token_owner_amount == 0 {
-				let mut owner_list = PropertyOwner::<T>::take(
-					listing_details.asset_id,
-				);
-				let index =
-					owner_list.iter().position(|x| *x == listing_details.seller.clone()).ok_or(Error::<T>::InvalidIndex)?;
-				owner_list.remove(index);
-				PropertyOwner::<T>::insert(
-					listing_details.asset_id,
-					owner_list,
-				);
-			} else {
-				PropertyOwnerToken::<T>::insert(
-					listing_details.asset_id,
-					listing_details.seller.clone(),
-					old_token_owner_amount,
-				);
-			}
-			if Self::property_owner(listing_details.asset_id).contains(&origin) {
-				let mut buyer_token_amount = PropertyOwnerToken::<T>::take(listing_details.asset_id, origin.clone());
-				buyer_token_amount = buyer_token_amount
-					.checked_add(amount)
-					.ok_or(Error::<T>::ArithmeticOverflow)?;
-				PropertyOwnerToken::<T>::insert(
-					listing_details.asset_id,
-					origin.clone(),
-					buyer_token_amount,
-				);				
-			} else {
-				PropertyOwner::<T>::try_mutate(
-					listing_details.asset_id,
-					|keys| {
-						keys.try_push(origin.clone()).map_err(|_| Error::<T>::TooManyTokenBuyer)?;
-						Ok::<(), DispatchError>(())
-					},
-				)?;
-				PropertyOwnerToken::<T>::insert(
-					listing_details.asset_id,
-					origin.clone(),
-					amount,
-				);
-			}
-			listing_details.amount = listing_details.amount.checked_sub(amount).ok_or(Error::<T>::ArithmeticUnderflow)?;
-			if listing_details.amount > 0 {
-				TokenListings::<T>::insert(listing_id, listing_details.clone());
-			}
-			Self::deposit_event(Event::<T>::TokenBought {
-				asset_id: listing_details.asset_id,
-				buyer: origin.clone(),
-				price: listing_details.token_price,
+			let listing_details = Self::token_listings(listing_id).ok_or(Error::<T>::TokenNotForSale)?;
+			ensure!(Self::token_listings(listing_id).is_some(), Error::<T>::TokenNotForSale);
+			ensure!(listing_details.amount >= amount, Error::<T>::NotEnoughTokenAvailable);
+			let offer_details = OfferDetails {
+				buyer: signer,
+				token_price: offer_price,
+				amount,
+			};
+			let mut offer_id = Self::next_offer_id(listing_id);
+			OngoingOffer::<T>::insert(listing_id, offer_id, offer_details);
+			offer_id = offer_id.checked_add(1).ok_or(Error::<T>::ArithmeticOverflow)?;
+			NextOfferId::<T>::insert(listing_id, offer_id);
+			Self::deposit_event(Event::<T>::OfferCreated { 
+				listing_id,
+				price: offer_price, 
 			});
+			Ok(())
+		}
+
+		/// Lets the investor handle an offer.
+		///
+		/// The origin must be Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `listing_id`: The listing that the investor wants to buy from.
+		/// - `offer_id`: The offer that the seller wants to cancel.
+		/// - `offer`: Enum for offer which is either Accept or Reject.
+		#[pallet::call_index(21)]
+		#[pallet::weight(0)]
+		pub fn handle_offer(
+			origin: OriginFor<T>,
+			listing_id: u32,
+			offer_id: u32,
+			offer: Offer,
+		) -> DispatchResult {
+			let signer = ensure_signed(origin)?;
+			ensure!(
+				pallet_xcavate_whitelist::Pallet::<T>::whitelisted_accounts(signer.clone()),
+				Error::<T>::UserNotWhitelisted
+			);
+			let listing_details = Self::token_listings(listing_id).ok_or(Error::<T>::TokenNotForSale)?;
+			ensure!(listing_details.seller == signer, Error::<T>::NoPermission);
+			let offer_details = OngoingOffer::<T>::take(listing_id, offer_id).ok_or(Error::<T>::InvalidIndex)?;
+			if offer == Offer::Accept {
+				Self::buying_token_process(listing_id, signer, listing_details, offer_details.token_price, offer_details.amount)?;
+			} 
+			Ok(())
+		}
+
+		/// Lets the investor cancel an offer.
+		///
+		/// The origin must be Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `listing_id`: The listing that the investor wants to buy from.
+		/// - `offer_id`: The offer that the seller wants to cancel.
+		///
+		/// Emits `OfferCancelled` event when succesfful.
+		#[pallet::call_index(22)]
+		#[pallet::weight(0)]
+		pub fn cancel_offer(
+			origin: OriginFor<T>,
+			listing_id: u32,
+			offer_id: u32,
+		) -> DispatchResult {
+			let signer = ensure_signed(origin)?;
+			let offer_details = OngoingOffer::<T>::take(listing_id, offer_id).ok_or(Error::<T>::InvalidIndex)?;
+			ensure!(offer_details.buyer == signer, Error::<T>::NoPermission);
+			Self::deposit_event(Event::<T>::OfferCancelled { listing_id, offer_id});
 			Ok(())
 		}
 
@@ -935,7 +1001,7 @@ pub mod pallet {
 				Error::<T>::SpvAlreadyCreated
 			);
 			ensure!(ListedToken::<T>::contains_key(listing_id), Error::<T>::TokenNotForSale);
-			nft_details.current_price = new_price;
+			nft_details.token_price = new_price;
 			OngoingObjectListing::<T>::insert(listing_id, nft_details.clone());
 			Self::deposit_event(Event::<T>::ObjectUpdated {
 				listing_index: listing_id,
@@ -1043,6 +1109,81 @@ pub mod pallet {
 			Ok(())
 		}
 
+		fn buying_token_process(listing_id: u32, account: AccountIdOf<T>, mut listing_details: ListingDetailsType<T>, price: BalanceOf<T>, amount: u32) -> DispatchResult {
+			Self::calculate_fees(price, account.clone(), listing_details.seller.clone())?;
+			let user_lookup = <T::Lookup as StaticLookup>::unlookup(account.clone());
+			let asset_id: AssetId2<T> = listing_details.asset_id.into();
+			let token_amount = amount.into();
+			let pallet_origin: OriginFor<T> = RawOrigin::Signed(Self::account_id()).into();
+			pallet_assets::Pallet::<T, Instance1>::transfer(
+				pallet_origin,
+				asset_id.into().into(),
+				user_lookup,
+				token_amount,
+			)
+			.map_err(|_| Error::<T>::NotEnoughFunds)?;
+			let mut old_token_owner_amount = PropertyOwnerToken::<T>::take(
+				listing_details.asset_id,
+				listing_details.seller.clone(),
+			);
+			old_token_owner_amount = old_token_owner_amount
+				.checked_sub(amount)
+				.ok_or(Error::<T>::ArithmeticUnderflow)?;
+			if old_token_owner_amount == 0 {
+				let mut owner_list = PropertyOwner::<T>::take(
+					listing_details.asset_id,
+				);
+				let index =
+					owner_list.iter().position(|x| *x == listing_details.seller.clone()).ok_or(Error::<T>::InvalidIndex)?;
+				owner_list.remove(index);
+				PropertyOwner::<T>::insert(
+					listing_details.asset_id,
+					owner_list,
+				);
+			} else {
+				PropertyOwnerToken::<T>::insert(
+					listing_details.asset_id,
+					listing_details.seller.clone(),
+					old_token_owner_amount,
+				);
+			}
+			if Self::property_owner(listing_details.asset_id).contains(&account) {
+				let mut buyer_token_amount = PropertyOwnerToken::<T>::take(listing_details.asset_id, account.clone());
+				buyer_token_amount = buyer_token_amount
+					.checked_add(amount)
+					.ok_or(Error::<T>::ArithmeticOverflow)?;
+				PropertyOwnerToken::<T>::insert(
+					listing_details.asset_id,
+					account.clone(),
+					buyer_token_amount,
+				);				
+			} else {
+				PropertyOwner::<T>::try_mutate(
+					listing_details.asset_id,
+					|keys| {
+						keys.try_push(account.clone()).map_err(|_| Error::<T>::TooManyTokenBuyer)?;
+						Ok::<(), DispatchError>(())
+					},
+				)?;
+				PropertyOwnerToken::<T>::insert(
+					listing_details.asset_id,
+					account.clone(),
+					amount,
+				);
+			}
+			listing_details.amount = listing_details.amount.checked_sub(amount).ok_or(Error::<T>::ArithmeticUnderflow)?;
+			if listing_details.amount > 0 {
+				TokenListings::<T>::insert(listing_id, listing_details.clone());
+				OngoingOffer::<T>::clear_prefix(listing_id, 2000, None);
+			}
+			Self::deposit_event(Event::<T>::TokenBought {
+				asset_id: listing_details.asset_id,
+				buyer: account.clone(),
+				price: listing_details.token_price,
+			});
+			Ok(())
+		}
+
 		fn calculate_fees(
 			price: BalanceOf<T>,
 			sender: AccountIdOf<T>,
@@ -1066,9 +1207,9 @@ pub mod pallet {
 				.ok_or(Error::<T>::MultiplyError)?
 				.checked_div(&Self::u64_to_balance_option(100)?)
 				.ok_or(Error::<T>::DivisionError)?;
-			Self::transfer_funds(&sender, &treasury_id, treasury_fees)?;
-			Self::transfer_funds(&sender, &community_projects_id, community_fees)?;
-			Self::transfer_funds(&sender, &receiver, seller_part)?;
+			Self::transfer_funds(sender.clone(), treasury_id, treasury_fees)?;
+			Self::transfer_funds(sender.clone(), community_projects_id, community_fees)?;
+			Self::transfer_funds(sender, receiver, seller_part)?;
 			Ok(())
 		}
 
@@ -1108,12 +1249,22 @@ pub mod pallet {
 		}
 
 		fn transfer_funds(
-			from: &AccountIdOf<T>,
-			to: &AccountIdOf<T>,
+			from: AccountIdOf<T>,
+			to: AccountIdOf<T>,
 			amount: BalanceOf<T>,
 		) -> DispatchResult {
-			Ok(<T as pallet::Config>::Currency::transfer(from, to, amount, KeepAlive)
-				.map_err(|_| Error::<T>::NotEnoughFunds)?)
+			let u32_amunt = TryInto::<u32>::try_into(amount).map_err(|_| Error::<T>::ConversionError)?;
+			let origin: OriginFor<T> = RawOrigin::Signed(from).into();
+			let account_lookup = <T::Lookup as StaticLookup>::unlookup(to);
+			let asset_id: AssetId2<T> = 1.into();
+			let token_amount = u32_amunt.into();
+			Ok(pallet_assets::Pallet::<T, Instance1>::transfer(
+				origin,
+				asset_id.into().into(),
+				account_lookup,
+				token_amount,
+			)
+			.map_err(|_| Error::<T>::NotEnoughFunds)?)
 		} 
 		
 	}

@@ -1,985 +1,249 @@
-use crate::{mock::*, Error};
-use frame_support::{
-	assert_noop, assert_ok,
-	traits::{OnFinalize, OnInitialize},
+use super::*;
+
+use crate as pallet_community_projects;
+use frame_support::{parameter_types, traits::AsEnsureOriginWithArg};
+use sp_core::ConstU32;
+use sp_runtime::{
+	traits::{AccountIdLookup, BlakeTwo256, IdentifyAccount, Verify},
+	MultiSignature,
 };
 
-use crate::Config;
-use crate::{BalanceOf, BoundedNftDonationTypes, NftDonationTypes};
-use sp_core::bounded::BoundedVec;
+use frame_system::EnsureRoot;
 
-macro_rules! bvec {
-	($( $x:tt )*) => {
-		vec![$( $x )*].try_into().unwrap()
+//use pallet_transaction_payment::CurrencyAdapter;
+
+//use pallet_transaction_payment::{ConstFeeMultiplier, Multiplier};
+
+use sp_runtime::BuildStorage;
+
+use pallet_nfts::PalletFeatures;
+
+pub type Block = frame_system::mocking::MockBlock<Test>;
+
+pub type BlockNumber = u64;
+
+pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
+pub type Signature = MultiSignature;
+pub type AccountPublic = <Signature as Verify>::Signer;
+
+/* let id = [0: u32].into();
+
+pub const ALICE: AccountId = id;
+pub const BOB: AccountId = 2;
+pub const CHARLIE: AccountId = 3;
+pub const DAVE: AccountId = 4;  */
+
+pub const MILLISECS_PER_BLOCK: u64 = 6000;
+pub const MINUTES: BlockNumber = 60_000 / (MILLISECS_PER_BLOCK as BlockNumber);
+pub const HOURS: BlockNumber = MINUTES * 60;
+pub const DAYS: BlockNumber = HOURS * 24;
+
+//use frame_benchmarking::account;
+
+// Configure a mock runtime to test the pallet.
+frame_support::construct_runtime!(
+	pub enum Test
+	{
+		System: frame_system::{Pallet, Call, Config<T>, Storage, Event<T>},
+		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
+		Uniques: pallet_nfts::{Pallet, Call, Storage, Event<T>},
+		CommunityProjects: pallet_community_projects,
+		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
+		Assets: pallet_assets::<Instance1>,
+		Whitelist: pallet_whitelist,
 	}
+);
+
+parameter_types! {
+	pub const BlockHashCount: BlockNumber = 2400;
 }
 
-fn get_project_nfts(mut n: u32) -> BoundedNftDonationTypes<Test> {
-	let max = <Test as Config>::MaxNftTypes::get();
-	if n > max {
-		n = max
+impl frame_system::Config for Test {
+	type RuntimeCall = RuntimeCall;
+	type Nonce = u32;
+	type Block = Block;
+	type Hash = sp_core::H256;
+	type Hashing = BlakeTwo256;
+	type AccountId = AccountId;
+	type Lookup = AccountIdLookup<AccountId, ()>;
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeOrigin = RuntimeOrigin;
+	type BlockHashCount = BlockHashCount;
+	type Version = ();
+	type PalletInfo = PalletInfo;
+	type AccountData = pallet_balances::AccountData<u32>;
+	type OnNewAccount = ();
+	type OnKilledAccount = ();
+	type DbWeight = ();
+	type BaseCallFilter = frame_support::traits::Everything;
+	type SystemWeightInfo = ();
+	type BlockWeights = ();
+	type BlockLength = ();
+	type SS58Prefix = ();
+	type OnSetCode = ();
+	type MaxConsumers = frame_support::traits::ConstU32<16>;
+	type RuntimeTask = ();
+}
+
+impl pallet_balances::Config for Test {
+	type Balance = u32;
+	type DustRemoval = ();
+	type RuntimeEvent = RuntimeEvent;
+	type ExistentialDeposit = ConstU32<1>;
+	type AccountStore = System;
+	type WeightInfo = ();
+	type MaxLocks = ();
+	type MaxReserves = ConstU32<50>;
+	type ReserveIdentifier = [u8; 8];
+	type RuntimeHoldReason = RuntimeHoldReason;
+	type RuntimeFreezeReason = RuntimeFreezeReason;
+	type FreezeIdentifier = ();
+	// Holds are used with COLLATOR_LOCK_ID and DELEGATOR_LOCK_ID
+	type MaxHolds = ConstU32<2>;
+	type MaxFreezes = ConstU32<0>;
+}
+
+parameter_types! {
+	pub Features: PalletFeatures = PalletFeatures::all_enabled();
+	pub const ApprovalsLimit: u32 = 20;
+	pub const ItemAttributesApprovalsLimit: u32 = 20;
+	pub const MaxTips: u32 = 10;
+	pub const MaxDeadlineDuration: BlockNumber = 12 * 30 * DAYS;
+	pub const MaxAttributesPerCall: u32 = 10;
+}
+
+impl pallet_nfts::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type CollectionId = u32;
+	type ItemId = u32;
+	type Currency = Balances;
+	type CreateOrigin = AsEnsureOriginWithArg<frame_system::EnsureSigned<Self::AccountId>>;
+	type ForceOrigin = frame_system::EnsureRoot<Self::AccountId>;
+	type Locker = ();
+	type CollectionDeposit = ConstU32<2>;
+	type ItemDeposit = ConstU32<1>;
+	type MetadataDepositBase = ConstU32<1>;
+	type AttributeDepositBase = ConstU32<1>;
+	type DepositPerByte = ConstU32<1>;
+	type StringLimit = ConstU32<50>;
+	type KeyLimit = ConstU32<50>;
+	type ValueLimit = ConstU32<50>;
+	type WeightInfo = ();
+	type ApprovalsLimit = ApprovalsLimit;
+	type ItemAttributesApprovalsLimit = ItemAttributesApprovalsLimit;
+	type MaxTips = MaxTips;
+	type MaxDeadlineDuration = MaxDeadlineDuration;
+	type MaxAttributesPerCall = MaxAttributesPerCall;
+	type Features = Features;
+	type OffchainSignature = Signature;
+	type OffchainPublic = AccountPublic;
+}
+
+parameter_types! {
+	pub const MinimumPeriod: u64 = 1;
+}
+impl pallet_timestamp::Config for Test {
+	type Moment = u64;
+	type OnTimestampSet = ();
+	type MinimumPeriod = MinimumPeriod;
+	type WeightInfo = ();
+}
+
+parameter_types! {
+	pub const AssetConversionPalletId: PalletId = PalletId(*b"py/ascon");
+
+}
+
+impl pallet_assets::Config<Instance1> for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type Balance = u128;
+	type AssetId = u32;
+	type AssetIdParameter = codec::Compact<u32>;
+	type Currency = Balances;
+	type CreateOrigin = AsEnsureOriginWithArg<frame_system::EnsureSigned<Self::AccountId>>;
+	type ForceOrigin = EnsureRoot<AccountId>;
+	type AssetDeposit = ConstU32<1>;
+	type AssetAccountDeposit = ConstU32<1>;
+	type MetadataDepositBase = ConstU32<1>;
+	type MetadataDepositPerByte = ConstU32<1>;
+	type ApprovalDeposit = ConstU32<1>;
+	type StringLimit = ConstU32<50>;
+	type Freezer = ();
+	type Extra = ();
+	type CallbackHandle = ();
+	type WeightInfo = ();
+	type RemoveItemsLimit = ConstU32<1000>;
+}
+
+parameter_types! {
+	pub const MaxWhitelistUsers: u32 = 1000000;
+}
+
+impl pallet_whitelist::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_whitelist::weights::SubstrateWeight<Test>;
+	type WhitelistOrigin = frame_system::EnsureRoot<Self::AccountId>;
+	type MaxUsersInWhitelist = MaxWhitelistUsers;
+}
+
+parameter_types! {
+	pub const CommunityProjectPalletId: PalletId = PalletId(*b"py/cmprj");
+	pub const MaxNftType: u32 = 4;
+	pub const MaxListedNftProject: u32 = 300000;
+	pub const MaxNftsInCollectionProject: u32 = 10000;
+	pub const MaxOngoingProject: u32 = 10000;
+	pub const MaxNftHolders: u32 = 10000;
+}
+
+/// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
+impl pallet_community_projects::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = weights::SubstrateWeight<Test>;
+	type Currency = Balances;
+	type PalletId = CommunityProjectPalletId;
+	type MaxNftTypes = MaxNftType;
+	type MaxNftInCollection = MaxNftsInCollectionProject;
+	type TimeProvider = Timestamp;
+	type MaxOngoingProjects = MaxOngoingProject;
+	#[cfg(feature = "runtime-benchmarks")]
+	type Helper = NftHelper;
+	type AssetId = u32;
+	type CollectionId = u32;
+	type ItemId = u32;
+	type MinimumRemainingAmount = ConstU32<100>;
+}
+
+// Build genesis storage according to the mock runtime.
+pub fn new_test_ext() -> sp_io::TestExternalities {
+	let mut test = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
+
+	pallet_balances::GenesisConfig::<Test> {
+		balances: vec![
+			([0; 32].into(), 20_000_000),
+			([1; 32].into(), 15_000),
+			([2; 32].into(), 150_000),
+			([3; 32].into(), 5_000),
+			([4; 32].into(), 5_000),
+			((CommunityProjects::account_id()), 140),
+		],
 	}
-	(1..=n)
-		.map(|x| NftDonationTypes::<BalanceOf<Test>> { price: (100 * x).into(), amount: x })
-		.collect::<Vec<NftDonationTypes<BalanceOf<Test>>>>()
-		.try_into()
-		.expect("bound is ensured; qed")
-}
+	.assimilate_storage(&mut test)
+	.unwrap();
 
-fn get_nft_metadata(
-	mut n: u32,
-) -> BoundedVec<
-	BoundedVec<u8, <Test as pallet_nfts::Config>::StringLimit>,
-	<Test as Config>::MaxNftTypes,
-> {
-	let max = <Test as Config>::MaxNftTypes::get();
-	if n > max {
-		n = max
+/* 	pallet_assets::GenesisConfig::<Test, Instance1> {
+		assets: vec![(1, /* account("buyer", SEED, SEED) */ [0; 32].into(), true, 1)], // Genesis assets: id, owner, is_sufficient, min_balance
+		metadata: vec![(1, "XUSD".into(), "XUSD".into(), 0)], // Genesis metadata: id, name, symbol, decimals
+		accounts: vec![
+			(1, [0; 32].into(), 20_000_000),
+			(1, [1; 32].into(), 1_500),
+			(1, [2; 32].into(), 150_000),
+			(1, [3; 32].into(), 5_000),
+			(1, [4; 32].into(), 50),
+			(1, [5; 32].into(), 500),
+		], // Genesis accounts: id, account_id, balance
 	}
-	(1..=n)
-		.map(|_| bvec![22, 22])
-		.collect::<Vec<BoundedVec<u8, <Test as pallet_nfts::Config>::StringLimit>>>()
-		.try_into()
-		.expect("bound is ensured; qed")
-}
+	.assimilate_storage(&mut test)
+	.unwrap(); */
 
-fn run_to_block(n: u64) {
-	while System::block_number() < n {
-		if System::block_number() > 0 {
-			CommunityProjects::on_finalize(System::block_number());
-			System::on_finalize(System::block_number());
-		}
-		System::reset_events();
-		System::set_block_number(System::block_number() + 1);
-		System::on_initialize(System::block_number());
-		CommunityProjects::on_initialize(System::block_number());
-	}
-}
-
-#[test]
-fn list_works() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(3),
-			get_nft_metadata(3),
-			5,
-			400,
-			bvec![22, 22]
-		));
-		//assert_eq!(CommunityProjects::listed_nfts().len(), 6);
-	});
-}
-
-#[test]
-fn list_fails_with_not_enough_metadata() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_noop!(
-			CommunityProjects::list_project(
-				RuntimeOrigin::signed([0; 32].into()),
-				get_project_nfts(3),
-				get_nft_metadata(4),
-				5,
-				400,
-				bvec![22, 22]
-			),
-			Error::<Test>::WrongAmountOfMetadata
-		);
-	});
-}
-
-#[test]
-fn list_fails_with_price_too_high() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_noop!(
-			CommunityProjects::list_project(
-				RuntimeOrigin::signed([0; 32].into()),
-				get_project_nfts(4),
-				get_nft_metadata(4),
-				5,
-				3100,
-				bvec![22, 22]
-			),
-			Error::<Test>::PriceCannotBeReached
-		);
-	});
-}
-
-#[test]
-fn buy_works() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(3),
-			get_nft_metadata(3),
-			5,
-			400,
-			bvec![22, 22]
-		));
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 2, 1));
-		//assert_eq!(CommunityProjects::listed_nfts().len(), 5);
-		assert_eq!(Assets::balance(1, &[1; 32].into()), 1300);
-		assert_eq!(Assets::balance(1, &CommunityProjects::account_id()), 200);
-	});
-}
-
-#[test]
-fn buy_works_multiple_nfts_works() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(3),
-			get_nft_metadata(3),
-			5,
-			600,
-			bvec![22, 22]
-		));
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 3, 3));
-		//assert_eq!(CommunityProjects::listed_nfts().len(), 0);
-		assert_eq!(Assets::balance(1, &[1; 32].into()), 900);
-		assert_eq!(Assets::balance(1, &CommunityProjects::account_id()), 600);
-		assert_eq!(CommunityProjects::listed_nft_types(0, 1), None);
-		assert_eq!(CommunityProjects::listed_nft_types(0, 1), None);
-	});
-}
-
-#[test]
-fn buy_fails_multiple_nfts() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [5; 32].into()));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(3),
-			get_nft_metadata(3),
-			5,
-			600,
-			bvec![22, 22]
-		));
-		assert_noop!(
-			CommunityProjects::buy_nft(RuntimeOrigin::signed([5; 32].into()), 0, 3, 3),
-			Error::<Test>::NotEnoughFunds
-		);
-		assert_eq!(Assets::balance(1, &[5; 32].into()), 500);
-	});
-}
-
-#[test]
-fn buy_fails_nft_not_available() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(3),
-			get_nft_metadata(3),
-			5,
-			400,
-			bvec![22, 22]
-		));
-		assert_noop!(
-			CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 2, 1, 1),
-			Error::<Test>::InvalidIndex
-		);
-	});
-}
-
-#[test]
-fn buy_fails_nft_not_enough_assets() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [4; 32].into()));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(3),
-			get_nft_metadata(3),
-			5,
-			400,
-			bvec![22, 22]
-		));
-		assert_noop!(
-			CommunityProjects::buy_nft(RuntimeOrigin::signed([4; 32].into()), 0, 1, 1),
-			Error::<Test>::NotEnoughFunds
-		);
-		//assert_eq!(CommunityProjects::listed_nfts().len(), 6);
-	});
-}
-
-#[test]
-fn launch_project_works() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(3),
-			get_nft_metadata(3),
-			5,
-			300,
-			bvec![22, 22]
-		));
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 1, 1));
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([2; 32].into()), 0, 2, 1));
-		//assert_eq!(CommunityProjects::listed_nfts().len(), 0);
-	});
-}
-
-#[test]
-fn voting_works() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(3),
-			get_nft_metadata(3),
-			5,
-			300,
-			bvec![22, 22]
-		));
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 2, 1));
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([2; 32].into()), 0, 1, 1));
-		//assert_eq!(CommunityProjects::listed_nfts().len(), 0);
-		run_to_block(11);
-		assert_ok!(CommunityProjects::vote_on_milestone(
-			RuntimeOrigin::signed([2; 32].into()),
-			0,
-			crate::Vote::Yes
-		));
-		assert_eq!(CommunityProjects::ongoing_votes(0).unwrap().yes_votes, 100);
-	});
-}
-
-#[test]
-fn rejecting_vote_works() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(4),
-			get_nft_metadata(4),
-			4,
-			900,
-			bvec![22, 22]
-		));
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 3, 1));
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 3, 1));
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([2; 32].into()), 0, 3, 1));
-		assert_eq!(Assets::balance(1, &[1; 32].into()), 900);
-		assert_eq!(Assets::balance(1, &[2; 32].into()), 149_700);
-		assert_eq!(Assets::balance(1, &CommunityProjects::account_id()), 900);
-		run_to_block(11);
-		assert_ok!(CommunityProjects::vote_on_milestone(
-			RuntimeOrigin::signed([2; 32].into()),
-			0,
-			crate::Vote::Yes
-		));
-		assert_ok!(CommunityProjects::vote_on_milestone(
-			RuntimeOrigin::signed([1; 32].into()),
-			0,
-			crate::Vote::Yes
-		));
-		assert_eq!(CommunityProjects::ongoing_votes(0).unwrap().no_votes, 0);
-		run_to_block(31);
-		assert_ok!(CommunityProjects::vote_on_milestone(
-			RuntimeOrigin::signed([1; 32].into()),
-			0,
-			crate::Vote::No
-		));
-		run_to_block(51);
-		assert_ok!(CommunityProjects::vote_on_milestone(
-			RuntimeOrigin::signed([1; 32].into()),
-			0,
-			crate::Vote::No
-		));
-		run_to_block(71);
-		assert_ok!(CommunityProjects::vote_on_milestone(
-			RuntimeOrigin::signed([1; 32].into()),
-			0,
-			crate::Vote::No
-		));
-		run_to_block(81);
-		assert_eq!(CommunityProjects::ongoing_projects(0), None);
-		assert_ok!(CommunityProjects::claim_refunded_token(
-			RuntimeOrigin::signed([1; 32].into()),
-			0,
-		));
-		assert_ok!(CommunityProjects::claim_refunded_token(
-			RuntimeOrigin::signed([2; 32].into()),
-			0,
-		));
-		assert_eq!(Assets::balance(1, &[1; 32].into()), 1_350);
-		assert_eq!(Assets::balance(1, &[2; 32].into()), 149_925);
-		assert_eq!(Assets::balance(1, &CommunityProjects::account_id()), 0);
-	})
-}
-
-#[test]
-fn voting_fails_with_no_permission() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(3),
-			get_nft_metadata(3),
-			3,
-			300,
-			bvec![22, 22]
-		));
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 3, 1));
-		run_to_block(11);
-		assert_noop!(
-			CommunityProjects::vote_on_milestone(
-				RuntimeOrigin::signed([2; 32].into()),
-				0,
-				crate::Vote::Yes
-			),
-			Error::<Test>::InsufficientPermission
-		);
-	})
-}
-
-#[test]
-fn voting_fails_with_double_voting() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(3),
-			get_nft_metadata(3),
-			3,
-			300,
-			bvec![22, 22]
-		));
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 3, 1));
-		run_to_block(11);
-		assert_ok!(CommunityProjects::vote_on_milestone(
-			RuntimeOrigin::signed([1; 32].into()),
-			0,
-			crate::Vote::Yes
-		));
-		assert_noop!(
-			CommunityProjects::vote_on_milestone(
-				RuntimeOrigin::signed([1; 32].into()),
-				0,
-				crate::Vote::Yes
-			),
-			Error::<Test>::AlreadyVoted
-		);
-	})
-}
-
-#[test]
-fn voting_fails_with_no_ongoing_voting() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(3),
-			get_nft_metadata(3),
-			3,
-			300,
-			bvec![22, 22]
-		));
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 3, 1));
-		assert_noop!(
-			CommunityProjects::vote_on_milestone(
-				RuntimeOrigin::signed([1; 32].into()),
-				0,
-				crate::Vote::Yes
-			),
-			Error::<Test>::NoOngoingVotingPeriod
-		);
-	})
-}
-
-#[test]
-fn set_strikes_works() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(3),
-			get_nft_metadata(3),
-			3,
-			300,
-			bvec![22, 22]
-		));
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 3, 1));
-		run_to_block(11);
-		assert_ok!(CommunityProjects::vote_on_milestone(
-			RuntimeOrigin::signed([1; 32].into()),
-			0,
-			crate::Vote::No
-		));
-		run_to_block(31);
-		assert_ok!(CommunityProjects::vote_on_milestone(
-			RuntimeOrigin::signed([1; 32].into()),
-			0,
-			crate::Vote::No
-		));
-		run_to_block(41);
-		assert_eq!(CommunityProjects::ongoing_projects(0).unwrap().strikes, 2);
-		run_to_block(51);
-		assert_ok!(CommunityProjects::vote_on_milestone(
-			RuntimeOrigin::signed([1; 32].into()),
-			0,
-			crate::Vote::Yes
-		));
-		run_to_block(61);
-		assert_eq!(CommunityProjects::ongoing_projects(0).unwrap().strikes, 0);
-	})
-}
-
-#[test]
-fn distributing_funds_works() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(3),
-			get_nft_metadata(3),
-			3,
-			300,
-			bvec![22, 22]
-		));
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 1, 1));
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([2; 32].into()), 0, 2, 1));
-		//assert_eq!(CommunityProjects::listed_nfts().len(), 0);
-		run_to_block(11);
-		assert_ok!(CommunityProjects::vote_on_milestone(
-			RuntimeOrigin::signed([2; 32].into()),
-			0,
-			crate::Vote::Yes
-		));
-		run_to_block(22);
-		assert_eq!(Assets::balance(1, &[0; 32].into()), 20_000_100);
-		assert_eq!(Assets::balance(1, &CommunityProjects::account_id()), 200);
-	});
-}
-
-#[test]
-fn distributing_funds_for_2_rounds_works() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(3),
-			get_nft_metadata(3),
-			3,
-			300,
-			bvec![22, 22]
-		));
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 1, 1));
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([2; 32].into()), 0, 2, 1));
-		//assert_eq!(CommunityProjects::listed_nfts().len(), 0);
-		run_to_block(11);
-		assert_ok!(CommunityProjects::vote_on_milestone(
-			RuntimeOrigin::signed([2; 32].into()),
-			0,
-			crate::Vote::Yes
-		));
-		run_to_block(22);
-		assert_eq!(Assets::balance(1, &[0; 32].into()), 20_000_100);
-		assert_eq!(Assets::balance(1, &CommunityProjects::account_id()), 200);
-		run_to_block(32);
-		assert_ok!(CommunityProjects::vote_on_milestone(
-			RuntimeOrigin::signed([2; 32].into()),
-			0,
-			crate::Vote::Yes
-		));
-		run_to_block(42);
-		assert_eq!(Assets::balance(1, &[0; 32].into()), 20_000_200);
-		assert_eq!(Assets::balance(1, &CommunityProjects::account_id()), 100);
-	});
-}
-
-#[test]
-fn delete_project_works() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(3),
-			get_nft_metadata(3),
-			1,
-			300,
-			bvec![22, 22]
-		));
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 2, 1));
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([2; 32].into()), 0, 1, 1));
-		run_to_block(11);
-		assert_ok!(CommunityProjects::vote_on_milestone(
-			RuntimeOrigin::signed([2; 32].into()),
-			0,
-			crate::Vote::Yes
-		));
-		run_to_block(22);
-		assert_eq!(Assets::balance(1, &[0; 32].into()), 20_000_300);
-		assert_eq!(Assets::balance(1, &CommunityProjects::account_id()), 0);
-		assert_eq!(CommunityProjects::ongoing_projects(0), None);
-	})
-}
-
-#[test]
-fn create_project_duration_longer_12() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(3),
-			get_nft_metadata(3),
-			24,
-			300,
-			bvec![22, 22]
-		));
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 2, 1));
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([2; 32].into()), 0, 1, 1));
-		run_to_block(18);
-		assert_noop!(
-			CommunityProjects::vote_on_milestone(
-				RuntimeOrigin::signed([2; 32].into()),
-				0,
-				crate::Vote::Yes
-			),
-			Error::<Test>::NoOngoingVotingPeriod
-		);
-		run_to_block(21);
-		assert_ok!(CommunityProjects::vote_on_milestone(
-			RuntimeOrigin::signed([2; 32].into()),
-			0,
-			crate::Vote::Yes
-		));
-		run_to_block(32);
-		assert_eq!(Assets::balance(1, &[0; 32].into()), 20_000_025);
-		assert_eq!(Assets::balance(1, &CommunityProjects::account_id()), 275);
-		run_to_block(52);
-		assert_ok!(CommunityProjects::vote_on_milestone(
-			RuntimeOrigin::signed([2; 32].into()),
-			0,
-			crate::Vote::Yes
-		));
-	})
-}
-
-#[test]
-fn bonding_works() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(3),
-			get_nft_metadata(3),
-			2,
-			320,
-			bvec![22, 22]
-		));
-		assert_eq!(Balances::free_balance(&[0; 32].into()), 19_999_998);
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 2, 1));
-		assert_ok!(CommunityProjects::bond_token(RuntimeOrigin::signed([1; 32].into()), 0, 30));
-		assert_eq!(CommunityProjects::total_bonded(), 30);
-		assert_eq!(
-			CommunityProjects::project_bonding::<u32, AccountId>(0, [1; 32].into()).unwrap(),
-			30
-		);
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([2; 32].into()), 0, 1, 1));
-		run_to_block(11);
-		assert_ok!(CommunityProjects::vote_on_milestone(
-			RuntimeOrigin::signed([2; 32].into()),
-			0,
-			crate::Vote::Yes
-		));
-		run_to_block(31);
-		assert_ok!(CommunityProjects::vote_on_milestone(
-			RuntimeOrigin::signed([2; 32].into()),
-			0,
-			crate::Vote::Yes
-		));
-		assert_eq!(
-			CommunityProjects::project_bonding::<u32, AccountId>(0, [1; 32].into()).unwrap(),
-			30
-		);
-		assert_eq!(CommunityProjects::user_bonded_amount::<AccountId>([1; 32].into()).unwrap(), 30);
-		run_to_block(42);
-		assert_eq!(Assets::balance(1, &[0; 32].into()), 20_000_300);
-		assert_eq!(Balances::free_balance(&[0; 32].into()), 20_000_028);
-		assert_eq!(CommunityProjects::total_bonded(), 30);
-		//assert_eq!(CommunityProjects::project_bonding::<u32, AccountId>(0, [1; 32].into()), None);
-		assert_eq!(CommunityProjects::user_bonded_amount::<AccountId>([1; 32].into()).unwrap(), 30);
-	})
-}
-
-#[test]
-fn bonding_on_more_projects_works() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(3),
-			get_nft_metadata(3),
-			1,
-			320,
-			bvec![22, 22]
-		));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(4),
-			get_nft_metadata(4),
-			2,
-			320,
-			bvec![22, 22]
-		));
-		assert_eq!(Balances::free_balance(&[0; 32].into()), 19_999_996);
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 2, 1));
-		assert_ok!(CommunityProjects::bond_token(RuntimeOrigin::signed([1; 32].into()), 0, 30));
-		assert_ok!(CommunityProjects::bond_token(RuntimeOrigin::signed([1; 32].into()), 1, 10));
-		assert_eq!(CommunityProjects::total_bonded(), 40);
-		assert_eq!(
-			CommunityProjects::project_bonding::<u32, AccountId>(0, [1; 32].into()).unwrap(),
-			30
-		);
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([2; 32].into()), 0, 1, 1));
-		run_to_block(11);
-		assert_ok!(CommunityProjects::vote_on_milestone(
-			RuntimeOrigin::signed([2; 32].into()),
-			0,
-			crate::Vote::Yes
-		));
-		run_to_block(22);
-		assert_eq!(Assets::balance(1, &[0; 32].into()), 20_000_300);
-		assert_eq!(Balances::free_balance(&[0; 32].into()), 20_000_026);
-		assert_eq!(CommunityProjects::total_bonded(), 40);
-		//assert_eq!(CommunityProjects::project_bonding::<u32, AccountId>(0, [1; 32].into()), None);
-		assert_eq!(CommunityProjects::user_bonded_amount::<AccountId>([1; 32].into()).unwrap(), 40);
-	})
-}
-
-#[test]
-fn bonding_fails_not_enough_funds() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(4),
-			get_nft_metadata(4),
-			2,
-			800,
-			bvec![22, 22]
-		));
-		assert_noop!(
-			CommunityProjects::bond_token(RuntimeOrigin::signed([1; 32].into()), 0, 50),
-			Error::<Test>::NotEnoughBondingFundsAvailable
-		);
-	})
-}
-
-#[test]
-fn bonding_fails_over_10_percent() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(4),
-			get_nft_metadata(4),
-			2,
-			200,
-			bvec![22, 22]
-		));
-		assert_noop!(
-			CommunityProjects::bond_token(RuntimeOrigin::signed([1; 32].into()), 0, 30),
-			Error::<Test>::ProjectCanOnlyHave10PercentBonding
-		);
-	})
-}
-
-#[test]
-fn bonding_fails_project_ongoing() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(3),
-			get_nft_metadata(3),
-			2,
-			300,
-			bvec![22, 22]
-		));
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 2, 1));
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([2; 32].into()), 0, 1, 1));
-		assert_noop!(
-			CommunityProjects::bond_token(RuntimeOrigin::signed([1; 32].into()), 0, 30),
-			Error::<Test>::ProjectOngoing
-		);
-	})
-}
-
-#[test]
-fn bonding_fails_user_not_enough_funds() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [6; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(3),
-			get_nft_metadata(3),
-			2,
-			300,
-			bvec![22, 22]
-		));
-		assert_ok!(CommunityProjects::bond_token(RuntimeOrigin::signed([6; 32].into()), 0, 30));
-		assert_eq!(CommunityProjects::total_bonded(), 0);
-	})
-}
-
-#[test]
-fn claim_refunded_token_works() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(3),
-			get_nft_metadata(3),
-			3,
-			300,
-			bvec![22, 22]
-		));
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 1, 1));
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([2; 32].into()), 0, 2, 1));
-		//assert_eq!(CommunityProjects::listed_nfts().len(), 0);
-		run_to_block(11);
-		assert_ok!(CommunityProjects::vote_on_milestone(
-			RuntimeOrigin::signed([2; 32].into()),
-			0,
-			crate::Vote::Yes
-		));
-		run_to_block(22);
-		assert_eq!(Assets::balance(1, &[0; 32].into()), 20_000_100);
-		assert_eq!(Assets::balance(1, &CommunityProjects::account_id()), 200);
-		assert_eq!(Assets::balance(1, &[2; 32].into()), 149_800);
-		run_to_block(100);
-		assert_eq!(CommunityProjects::ended_projects(0).unwrap().project_success, false);
-		assert_ok!(CommunityProjects::claim_refunded_token(
-			RuntimeOrigin::signed([2; 32].into()),
-			0
-		));
-		assert_eq!(Assets::balance(1, &[2; 32].into()), 149_933);
-	})
-}
-
-#[test]
-fn claim_refunded_token_fails() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(3),
-			get_nft_metadata(3),
-			3,
-			300,
-			bvec![22, 22]
-		));
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 1, 1));
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([2; 32].into()), 0, 2, 1));
-		run_to_block(11);
-		assert_ok!(CommunityProjects::vote_on_milestone(
-			RuntimeOrigin::signed([2; 32].into()),
-			0,
-			crate::Vote::Yes
-		));
-		run_to_block(22);
-		assert_eq!(Assets::balance(1, &[0; 32].into()), 20_000_100);
-		assert_eq!(Assets::balance(1, &CommunityProjects::account_id()), 200);
-		assert_eq!(Assets::balance(1, &[2; 32].into()), 149_800);
-		assert_noop!(
-			CommunityProjects::claim_refunded_token(RuntimeOrigin::signed([2; 32].into()), 0),
-			Error::<Test>::InvalidIndex
-		);
-		run_to_block(100);
-		assert_eq!(CommunityProjects::ended_projects(0).unwrap().project_success, false);
-		assert_noop!(
-			CommunityProjects::claim_refunded_token(RuntimeOrigin::signed([3; 32].into()), 0),
-			Error::<Test>::InsufficientPermission
-		);
-	})
-}
-
-#[test]
-fn claim_bonding_for_failed_project_works() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(3),
-			get_nft_metadata(3),
-			2,
-			320,
-			bvec![22, 22]
-		));
-		assert_eq!(Balances::free_balance(&[0; 32].into()), 19_999_998);
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 2, 1));
-		assert_ok!(CommunityProjects::bond_token(RuntimeOrigin::signed([1; 32].into()), 0, 30));
-		assert_eq!(CommunityProjects::total_bonded(), 30);
-		assert_eq!(
-			CommunityProjects::project_bonding::<u32, AccountId>(0, [1; 32].into()).unwrap(),
-			30
-		);
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([2; 32].into()), 0, 1, 1));
-		run_to_block(11);
-		assert_ok!(CommunityProjects::vote_on_milestone(
-			RuntimeOrigin::signed([2; 32].into()),
-			0,
-			crate::Vote::Yes
-		));
-		run_to_block(100);
-		assert_eq!(CommunityProjects::ended_projects(0).unwrap().project_success, false);
-		assert_ok!(CommunityProjects::claim_bonding(RuntimeOrigin::signed([1; 32].into()), 0));
-		assert_eq!(CommunityProjects::user_bonded_amount::<AccountId>([1; 32].into()), None);
-	})
-}
-
-#[test]
-fn claim_bonding_for_succeed_project_works() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(3),
-			get_nft_metadata(3),
-			1,
-			320,
-			bvec![22, 22]
-		));
-		assert_eq!(Balances::free_balance(&[0; 32].into()), 19_999_998);
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 2, 1));
-		assert_ok!(CommunityProjects::bond_token(RuntimeOrigin::signed([1; 32].into()), 0, 30));
-		assert_eq!(CommunityProjects::total_bonded(), 30);
-		assert_eq!(
-			CommunityProjects::project_bonding::<u32, AccountId>(0, [1; 32].into()).unwrap(),
-			30
-		);
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([2; 32].into()), 0, 1, 1));
-		run_to_block(11);
-		assert_ok!(CommunityProjects::vote_on_milestone(
-			RuntimeOrigin::signed([2; 32].into()),
-			0,
-			crate::Vote::Yes
-		));
-		run_to_block(31);
-		assert_eq!(CommunityProjects::ended_projects(0).unwrap().project_success, true);
-		assert_ok!(CommunityProjects::claim_bonding(RuntimeOrigin::signed([1; 32].into()), 0));
-		assert_eq!(CommunityProjects::user_bonded_amount::<AccountId>([1; 32].into()), None);
-	})
-}
-
-#[test]
-fn claim_bonding_for_failed_project_fails() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
-		assert_ok!(CommunityProjects::list_project(
-			RuntimeOrigin::signed([0; 32].into()),
-			get_project_nfts(3),
-			get_nft_metadata(3),
-			2,
-			320,
-			bvec![22, 22]
-		));
-		assert_eq!(Balances::free_balance(&[0; 32].into()), 19_999_998);
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([1; 32].into()), 0, 2, 1));
-		assert_ok!(CommunityProjects::bond_token(RuntimeOrigin::signed([1; 32].into()), 0, 30));
-		assert_eq!(CommunityProjects::total_bonded(), 30);
-		assert_eq!(
-			CommunityProjects::project_bonding::<u32, AccountId>(0, [1; 32].into()).unwrap(),
-			30
-		);
-		assert_ok!(CommunityProjects::buy_nft(RuntimeOrigin::signed([2; 32].into()), 0, 1, 1));
-		run_to_block(11);
-		assert_ok!(CommunityProjects::vote_on_milestone(
-			RuntimeOrigin::signed([2; 32].into()),
-			0,
-			crate::Vote::Yes
-		));
-		assert_noop!(
-			CommunityProjects::claim_bonding(RuntimeOrigin::signed([1; 32].into()), 0),
-			Error::<Test>::InvalidIndex
-		);
-		run_to_block(100);
-		assert_eq!(CommunityProjects::ended_projects(0).unwrap().project_success, false);
-		assert_noop!(
-			CommunityProjects::claim_bonding(RuntimeOrigin::signed([2; 32].into()), 0),
-			Error::<Test>::NoBondingYet
-		);
-	})
+	test.into()
 }
