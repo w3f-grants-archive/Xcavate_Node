@@ -73,8 +73,8 @@ pub mod pallet {
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
 	pub struct VoteStats {
-		pub yes_votes: u8,
-		pub no_votes: u8,
+		pub yes_votes: u32,
+		pub no_votes: u32,
 	}
 
 	#[pallet::config]
@@ -105,7 +105,7 @@ pub mod pallet {
 		type MaxVoter: Get<u32>;
 
 		/// Threshold for inquery votes.
-		type Threshold: Get<u8>;
+		type Threshold: Get<u32>;
 	}
 
 	/// Number of proposals that have been made.

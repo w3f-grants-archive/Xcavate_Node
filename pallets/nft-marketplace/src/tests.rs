@@ -344,7 +344,7 @@ fn relist_a_nft_fails() {
 
 // buy_relisted_token function
 #[test]
-fn buy_single_nft_works() {
+fn buy_relisted_token_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(NftMarketplace::create_new_region(RuntimeOrigin::root()));
@@ -371,29 +371,33 @@ fn buy_single_nft_works() {
 			0,
 			0,
 			1000,
-			1
+			3
 		));
-		assert_ok!(NftMarketplace::buy_relisted_token(RuntimeOrigin::signed([3; 32].into()), 1));
+		assert_ok!(NftMarketplace::buy_relisted_token(RuntimeOrigin::signed([3; 32].into()), 1, 2));
+		assert_eq!(NftMarketplace::token_listings(1).is_some(), true);
+		assert_ok!(NftMarketplace::buy_relisted_token(RuntimeOrigin::signed([3; 32].into()), 1, 1));
+		assert_eq!(NftMarketplace::token_listings(1).is_some(), false);
 		assert_ok!(NftMarketplace::relist_token(
 			RuntimeOrigin::signed([1; 32].into()),
 			0,
 			0,
-			1000,
+			500,
 			1
 		));
-		assert_ok!(NftMarketplace::buy_relisted_token(RuntimeOrigin::signed([3; 32].into()), 2));
+		assert_ok!(NftMarketplace::buy_relisted_token(RuntimeOrigin::signed([3; 32].into()), 2, 1));
 		assert_eq!(NftMarketplace::token_listings(0).is_some(), false);
 		assert_eq!(NftMarketplace::property_owner(0).len(), 2);
-		assert_eq!(NftMarketplace::property_owner_token::<u32, AccountId>(0, [1; 32].into()), 98);
-		assert_eq!(NftMarketplace::property_owner_token::<u32, AccountId>(0, [3; 32].into()), 2);
-		assert_eq!(Balances::free_balance(&([1; 32].into())), 14_001_980);
-		assert_eq!(Balances::free_balance(&([3; 32].into())), 3_000);
-		assert_eq!(Assets::balance(0, &[3; 32].into()), 2);
+		assert_eq!(NftMarketplace::property_owner_token::<u32, AccountId>(0, [1; 32].into()), 96);
+		assert_eq!(NftMarketplace::property_owner_token::<u32, AccountId>(0, [3; 32].into()), 4);
+		assert_eq!(Balances::free_balance(&([1; 32].into())), 14_003_465);
+		assert_eq!(Balances::free_balance(&([3; 32].into())), 1_501);
+		assert_eq!(Assets::balance(0, &[1; 32].into()), 96);
+		assert_eq!(Assets::balance(0, &[3; 32].into()), 4);
 	})
 }
 
 #[test]
-fn buy_single_nft_fails() {
+fn buy_relisted_token_fails() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(NftMarketplace::create_new_region(RuntimeOrigin::root()));
@@ -415,7 +419,7 @@ fn buy_single_nft_fails() {
 		assert_eq!(Balances::free_balance(&NftMarketplace::community_account_id()), 1000);
 		assert_eq!(Balances::free_balance(&([1; 32].into())), 14_000_000);
 		assert_eq!(NftMarketplace::registered_nft_details(0, 0).unwrap().spv_created, true);
-		assert_noop!(NftMarketplace::buy_relisted_token(RuntimeOrigin::signed([3; 32].into()), 1), Error::<Test>::TokenNotForSale);
+		assert_noop!(NftMarketplace::buy_relisted_token(RuntimeOrigin::signed([3; 32].into()), 1, 1), Error::<Test>::TokenNotForSale);
 	})
 }
 
@@ -445,7 +449,7 @@ fn upgrade_price_works() {
 			1
 		));
 		assert_ok!(NftMarketplace::upgrade_listing(RuntimeOrigin::signed([1; 32].into()), 1, 300));
-		assert_eq!(NftMarketplace::token_listings(1).unwrap().price, 300);
+		assert_eq!(NftMarketplace::token_listings(1).unwrap().token_price, 300);
 	})
 }
 
@@ -720,7 +724,7 @@ fn listing_objects_in_different_regions() {
 			1000,
 			100
 		));
-		assert_ok!(NftMarketplace::buy_relisted_token(RuntimeOrigin::signed([2; 32].into()), 3));
+		assert_ok!(NftMarketplace::buy_relisted_token(RuntimeOrigin::signed([2; 32].into()), 3, 100));
 		assert_eq!(Assets::balance(1, &[2; 32].into()), 100);
 		assert_eq!(Assets::balance(2, &[2; 32].into()), 100);
 	})
