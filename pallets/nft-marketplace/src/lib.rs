@@ -839,7 +839,7 @@ pub mod pallet {
 				.ok_or(Error::<T>::MultiplyError)?
 				.checked_mul(&Self::u64_to_balance_option(1/* 000000000000 */)?)
 				.ok_or(Error::<T>::MultiplyError)?;
-			Self::buying_token_process(listing_id, origin, listing_details, price, amount)?;
+			Self::buying_token_process(listing_id, origin.clone(), origin, listing_details, price, amount)?;
 			Ok(())
 		}
 
@@ -853,7 +853,7 @@ pub mod pallet {
 		/// - `amount`: The amount of token that the investor wants to buy.
 		///
 		/// Emits `OfferCreated` event when succesfful.
-		#[pallet::call_index(20)]
+		#[pallet::call_index(6)]
 		#[pallet::weight(0)]
 		pub fn make_offer(
 			origin: OriginFor<T>,
@@ -867,8 +867,13 @@ pub mod pallet {
 				Error::<T>::UserNotWhitelisted
 			);
 			let listing_details = Self::token_listings(listing_id).ok_or(Error::<T>::TokenNotForSale)?;
-			ensure!(Self::token_listings(listing_id).is_some(), Error::<T>::TokenNotForSale);
 			ensure!(listing_details.amount >= amount, Error::<T>::NotEnoughTokenAvailable);
+			let price = offer_price
+				.checked_mul(&Self::u64_to_balance_option(amount.into())?)
+				.ok_or(Error::<T>::MultiplyError)?
+				.checked_mul(&Self::u64_to_balance_option(1/* 000000000000 */)?)
+				.ok_or(Error::<T>::MultiplyError)?;
+			Self::transfer_funds(signer.clone(), Self::account_id(), price)?;
 			let offer_details = OfferDetails {
 				buyer: signer,
 				token_price: offer_price,
@@ -893,7 +898,7 @@ pub mod pallet {
 		/// - `listing_id`: The listing that the investor wants to buy from.
 		/// - `offer_id`: The offer that the seller wants to cancel.
 		/// - `offer`: Enum for offer which is either Accept or Reject.
-		#[pallet::call_index(21)]
+		#[pallet::call_index(7)]
 		#[pallet::weight(0)]
 		pub fn handle_offer(
 			origin: OriginFor<T>,
@@ -910,8 +915,16 @@ pub mod pallet {
 			ensure!(listing_details.seller == signer, Error::<T>::NoPermission);
 			let offer_details = OngoingOffer::<T>::take(listing_id, offer_id).ok_or(Error::<T>::InvalidIndex)?;
 			if offer == Offer::Accept {
-				Self::buying_token_process(listing_id, signer, listing_details, offer_details.token_price, offer_details.amount)?;
-			} 
+				Self::buying_token_process(listing_id, Self::account_id(), offer_details.buyer, listing_details, offer_details.token_price, offer_details.amount)?;
+			} else {
+				let price = offer_details
+					.token_price
+					.checked_mul(&Self::u64_to_balance_option(offer_details.amount.into())?)
+					.ok_or(Error::<T>::MultiplyError)?
+					.checked_mul(&Self::u64_to_balance_option(1/* 000000000000 */)?)
+					.ok_or(Error::<T>::MultiplyError)?;
+				Self::transfer_funds(Self::account_id(), offer_details.buyer, price)?;
+			}
 			Ok(())
 		}
 
@@ -924,7 +937,7 @@ pub mod pallet {
 		/// - `offer_id`: The offer that the seller wants to cancel.
 		///
 		/// Emits `OfferCancelled` event when succesfful.
-		#[pallet::call_index(22)]
+		#[pallet::call_index(8)]
 		#[pallet::weight(0)]
 		pub fn cancel_offer(
 			origin: OriginFor<T>,
@@ -934,6 +947,13 @@ pub mod pallet {
 			let signer = ensure_signed(origin)?;
 			let offer_details = OngoingOffer::<T>::take(listing_id, offer_id).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(offer_details.buyer == signer, Error::<T>::NoPermission);
+			let price = offer_details
+				.token_price
+				.checked_mul(&Self::u64_to_balance_option(offer_details.amount.into())?)
+				.ok_or(Error::<T>::MultiplyError)?
+				.checked_mul(&Self::u64_to_balance_option(1/* 000000000000 */)?)
+				.ok_or(Error::<T>::MultiplyError)?;
+		Self::transfer_funds(Self::account_id(), offer_details.buyer, price)?;
 			Self::deposit_event(Event::<T>::OfferCancelled { listing_id, offer_id});
 			Ok(())
 		}
@@ -947,7 +967,7 @@ pub mod pallet {
 		/// - `new_price`: The new price of the nft.
 		///
 		/// Emits `ListingUpdated` event when succesfful.
-		#[pallet::call_index(6)]
+		#[pallet::call_index(9)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::upgrade_listing())]
 		pub fn upgrade_listing(
 			origin: OriginFor<T>,
@@ -980,7 +1000,7 @@ pub mod pallet {
 		/// - `new_price`: The new price of the object.
 		///
 		/// Emits `ObjectUpdated` event when succesfful.
-		#[pallet::call_index(7)]
+		#[pallet::call_index(10)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::upgrade_object())]
 		pub fn upgrade_object(
 			origin: OriginFor<T>,
@@ -1019,7 +1039,7 @@ pub mod pallet {
 		/// - `listing_id`: The listing that the seller wants to delist.
 		///
 		/// Emits `ListingDelisted` event when succesfful.
-		#[pallet::call_index(8)]
+		#[pallet::call_index(11)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::delist_token())]
 		pub fn delist_token(origin: OriginFor<T>, listing_id: u32) -> DispatchResult {
 			let signer = ensure_signed(origin)?;
@@ -1109,8 +1129,8 @@ pub mod pallet {
 			Ok(())
 		}
 
-		fn buying_token_process(listing_id: u32, account: AccountIdOf<T>, mut listing_details: ListingDetailsType<T>, price: BalanceOf<T>, amount: u32) -> DispatchResult {
-			Self::calculate_fees(price, account.clone(), listing_details.seller.clone())?;
+		fn buying_token_process(listing_id: u32, transfer_from: AccountIdOf<T>, account: AccountIdOf<T>, mut listing_details: ListingDetailsType<T>, price: BalanceOf<T>, amount: u32) -> DispatchResult {
+			Self::calculate_fees(price, transfer_from.clone(), listing_details.seller.clone())?;
 			let user_lookup = <T::Lookup as StaticLookup>::unlookup(account.clone());
 			let asset_id: AssetId2<T> = listing_details.asset_id.into();
 			let token_amount = amount.into();
