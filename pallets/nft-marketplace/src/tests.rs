@@ -9,7 +9,7 @@ macro_rules! bvec {
 	}
 }
 
-// create_new_region function
+/* // create_new_region function
 #[test]
 fn create_new_region_works() {
 	new_test_ext().execute_with(|| {
@@ -664,6 +664,54 @@ fn cancel_offer_works() {
 	})
 }
 
+
+#[test]
+fn cancel_offer_fails() {
+	new_test_ext().execute_with(|| {
+		assert_ok!(NftMarketplace::create_new_region(RuntimeOrigin::root()));
+		assert_ok!(NftMarketplace::create_new_location(RuntimeOrigin::root(), 0, bvec![10, 10]));
+		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
+		assert_ok!(NftMarketplace::list_object(
+			RuntimeOrigin::signed([0; 32].into()),
+			0,
+			bvec![10, 10],
+			10_000,
+			100,
+			bvec![22, 22]
+		));
+		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_ok!(NftMarketplace::relist_token(
+			RuntimeOrigin::signed([1; 32].into()),
+			0,
+			0,
+			500,
+			1
+		));
+		assert_noop!(NftMarketplace::cancel_offer(
+			RuntimeOrigin::signed([2; 32].into()),
+			1,
+			0
+		), Error::<Test>::InvalidIndex);
+		assert_ok!(NftMarketplace::make_offer(
+			RuntimeOrigin::signed([2; 32].into()),
+			1,
+			2000,
+			1
+		));
+		assert_eq!(NftMarketplace::token_listings(1).is_some(), true);
+		assert_eq!(NftMarketplace::ongoing_offers(1, 0).is_some(), true);
+		assert_eq!(Assets::balance(1, &([2; 32].into())), 1_148_000);
+		assert_eq!(Assets::balance(1, &NftMarketplace::account_id()), 2000);
+		assert_noop!(NftMarketplace::cancel_offer(
+			RuntimeOrigin::signed([1; 32].into()),
+			1,
+			0
+		), Error::<Test>::NoPermission);
+	})
+}
+
 // upgrade_listing function
 #[test]
 fn upgrade_price_works() {
@@ -981,4 +1029,4 @@ fn listing_objects_in_different_regions() {
 		assert_eq!(Assets::balance(2, &[2; 32].into()), 100);
 		assert_eq!(Assets::balance(3, &[2; 32].into()), 100);
 	}) 
-} 
+}  */

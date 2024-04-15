@@ -10,7 +10,7 @@ use frame_system::RawOrigin;
 const SEED: u32 = 0;
 use frame_support::assert_ok;
 use frame_support::sp_runtime::traits::Bounded;
-use pallet_whitelist::Pallet as Whitelist;
+use pallet_xcavate_whitelist::Pallet as Whitelist;
 
 type DepositBalanceOf<T> =
 	<<T as pallet::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;

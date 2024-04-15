@@ -10,7 +10,7 @@ const SEED: u32 = 0;
 use frame_support::sp_runtime::traits::Bounded;
 use pallet_community_loan_pool::Pallet as CommunityLoanPool;
 use pallet_community_loan_pool::{BoundedProposedMilestones, ProposedMilestone};
-use pallet_whitelist::Pallet as Whitelist;
+use pallet_xcavate_whitelist::Pallet as Whitelist;
 
 use frame_support::sp_runtime::traits::StaticLookup;
 

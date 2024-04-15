@@ -35,8 +35,7 @@ use frame_system::RawOrigin;
 
 type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
 
-type BalanceOf<T> =
-	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+type BalanceOf<T> = <T as pallet_assets::Config<pallet_assets::Instance1>>::Balance;
 
 type BalanceOf1<T> = <T as pallet_nft_fractionalization::Config>::AssetBalance;
 
@@ -57,19 +56,23 @@ pub mod pallet {
 	pub struct NftHelper;
 
 	#[cfg(feature = "runtime-benchmarks")]
-	pub trait BenchmarkHelper<CollectionId, ItemId> {
+	pub trait BenchmarkHelper<CollectionId, ItemId, AssetId, T> {
 		fn to_collection(i: u32) -> CollectionId;
 		fn to_nft(i: u32) -> ItemId;
+		fn to_asset(i: u32) -> AssetId;
 	}
 
 	#[cfg(feature = "runtime-benchmarks")]
-	impl<CollectionId: From<u32>, ItemId: From<u32>> BenchmarkHelper<CollectionId, ItemId>
-		for NftHelper
+	impl<CollectionId: From<u32>, ItemId: From<u32>, T: Config>
+		BenchmarkHelper<CollectionId, ItemId, AssetId<T>, T> for NftHelper
 	{
 		fn to_collection(i: u32) -> CollectionId {
 			i.into()
 		}
 		fn to_nft(i: u32) -> ItemId {
+			i.into()
+		}
+		fn to_asset(i: u32) -> AssetId<T> {
 			i.into()
 		}
 	}
@@ -172,8 +175,10 @@ pub mod pallet {
 
 		#[cfg(feature = "runtime-benchmarks")]
 		type Helper: crate::BenchmarkHelper<
-			<Self as pallet_nfts::Config>::CollectionId,
-			<Self as pallet_nfts::Config>::ItemId,
+			<Self as pallet::Config>::CollectionId,
+			<Self as pallet::Config>::ItemId,
+			<Self as pallet_assets::Config<Instance1>>::AssetId,
+			Self,
 		>;
 
 		/// The maximum amount of token of a nft.
@@ -854,7 +859,7 @@ pub mod pallet {
 		///
 		/// Emits `OfferCreated` event when succesfful.
 		#[pallet::call_index(6)]
-		#[pallet::weight(0)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::make_offer())]
 		pub fn make_offer(
 			origin: OriginFor<T>,
 			listing_id: u32,
@@ -899,7 +904,7 @@ pub mod pallet {
 		/// - `offer_id`: The offer that the seller wants to cancel.
 		/// - `offer`: Enum for offer which is either Accept or Reject.
 		#[pallet::call_index(7)]
-		#[pallet::weight(0)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::handle_offer())]
 		pub fn handle_offer(
 			origin: OriginFor<T>,
 			listing_id: u32,
@@ -938,7 +943,7 @@ pub mod pallet {
 		///
 		/// Emits `OfferCancelled` event when succesfful.
 		#[pallet::call_index(8)]
-		#[pallet::weight(0)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::cancel_offer())]
 		pub fn cancel_offer(
 			origin: OriginFor<T>,
 			listing_id: u32,
