@@ -5,7 +5,7 @@ use node_template_runtime::{
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use sp_authority_discovery::AuthorityId as AuthorityDiscoveryId;
 use sc_service::ChainType;
-use sp_consensus_aura::sr25519::AuthorityId as AuraId;
+use sp_consensus_babe::AuthorityId as BabeId;
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_core::{sr25519, Pair, Public};
 use sp_runtime::{
@@ -37,17 +37,17 @@ where
 }
 
 /// Generate an Aura authority key.
-pub fn authority_keys_from_seed(s: &str) -> (AccountId, AccountId, AuraId, GrandpaId, ImOnlineId, AuthorityDiscoveryId) {
-	(get_account_id_from_seed::<sr25519::Public>(s), get_account_id_from_seed::<sr25519::Public>(s), get_from_seed::<AuraId>(s), get_from_seed::<GrandpaId>(s), get_from_seed::<ImOnlineId>(s), get_from_seed::<AuthorityDiscoveryId>(s))
+pub fn authority_keys_from_seed(s: &str) -> (AccountId, AccountId, BabeId, GrandpaId, ImOnlineId, AuthorityDiscoveryId) {
+	(get_account_id_from_seed::<sr25519::Public>(s), get_account_id_from_seed::<sr25519::Public>(s), get_from_seed::<BabeId>(s), get_from_seed::<GrandpaId>(s), get_from_seed::<ImOnlineId>(s), get_from_seed::<AuthorityDiscoveryId>(s))
 }
 
 fn session_keys(
-	aura: AuraId,
+	babe: BabeId,
 	grandpa: GrandpaId,
  	im_online: ImOnlineId,
 	authority_discovery: AuthorityDiscoveryId, 
 ) -> SessionKeys {
-	SessionKeys { aura, grandpa, im_online, authority_discovery}
+	SessionKeys { babe, grandpa, im_online, authority_discovery}
 }
 
 pub fn development_config() -> Result<ChainSpec, String> {
@@ -96,7 +96,7 @@ fn testnet_genesis(
 	initial_authorities: Vec<(
 		AccountId,
 		AccountId,
-		AuraId,
+		BabeId,
 		GrandpaId,
  		ImOnlineId,
 		AuthorityDiscoveryId,
@@ -119,11 +119,11 @@ fn testnet_genesis(
 		// "grandpa": {
 		// 	"authorities": initial_authorities.iter().map(|x| (x.1.clone(), 1)).collect::<Vec<_>>(),
 		// },
-  		/* "assets" : {
+  		"assets" : {
 			"assets": vec![(1, root_key.clone(), true, 1)], // Genesis assets: id, owner, is_sufficient, min_balance
 			"metadata": vec![(1, "XUSD".as_bytes(), "XUSD".as_bytes(), 0)], // Genesis metadata: id, name, symbol, decimals
 			"accounts": endowed_accounts.iter().cloned().map(|x| (1, x.0.clone(), 1_000_000)).collect::<Vec<_>>(),
-		},   */
+		},   
 		"sudo": {
 			// Assign network admin rights.
 			"key": Some(root_key),
