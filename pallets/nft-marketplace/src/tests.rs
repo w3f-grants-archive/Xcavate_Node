@@ -9,7 +9,7 @@ macro_rules! bvec {
 	}
 }
 
-/* // create_new_region function
+// create_new_region function
 #[test]
 fn create_new_region_works() {
 	new_test_ext().execute_with(|| {
@@ -1029,4 +1029,4 @@ fn listing_objects_in_different_regions() {
 		assert_eq!(Assets::balance(2, &[2; 32].into()), 100);
 		assert_eq!(Assets::balance(3, &[2; 32].into()), 100);
 	}) 
-}  */
+}  
