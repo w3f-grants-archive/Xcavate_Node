@@ -564,6 +564,7 @@ pub mod pallet {
 		///
 		/// Parameters:
 		/// - `region`: The region where the new location should be created.
+		/// - `location`: The postcode of the new location.
 		///
 		/// Emits `LocationCreated` event when succesfful.
 		#[pallet::call_index(1)]
@@ -588,7 +589,8 @@ pub mod pallet {
 		/// Parameters:
 		/// - `region`: The region where the object is located.
 		/// - `location`: The location where the object is located.
-		/// - `price`: The price of the real estate object that is offered.
+		/// - `token_price`: The price of a single token.
+		/// - `token_amount`: The amount of tokens for a object.
 		/// - `data`: The Metadata of the nft.
 		///
 		/// Emits `ObjectListed` event when succesfful
@@ -762,8 +764,9 @@ pub mod pallet {
 		/// The origin must be Signed and the sender must have sufficient funds free.
 		///
 		/// Parameters:
+		/// - `region`: The region where the object is located.
 		/// - `item_id`: The item id of the nft.
-		/// - `price`: The price of token that are offered.
+		/// - `token_price`: The price of a single token.
 		/// - `amount`: The amount of token of the real estate object that should be listed.
 		///
 		/// Emits `TokenListed` event when succesfful
@@ -825,6 +828,7 @@ pub mod pallet {
 		///
 		/// Parameters:
 		/// - `listing_id`: The listing that the investor wants to buy from.
+		/// - `amount`: The amount of token the investor wants to buy.
 		///
 		/// Emits `TokenBought` event when succesfful.
 		#[pallet::call_index(5)]
