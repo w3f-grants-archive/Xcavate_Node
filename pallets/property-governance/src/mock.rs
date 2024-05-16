@@ -48,7 +48,7 @@ frame_support::construct_runtime!(
 		PropertyManagement: pallet_property_management,
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
 		Assets: pallet_assets::<Instance1>,
-		Whitelist: pallet_whitelist,
+		XcavateWhitelist: pallet_xcavate_whitelist,
 	}
 );
 
@@ -191,9 +191,9 @@ parameter_types! {
 	pub const MaxWhitelistUsers: u32 = 1000000;
 }
 
-impl pallet_whitelist::Config for Test {
+impl pallet_xcavate_whitelist::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_whitelist::weights::SubstrateWeight<Test>;
+	type WeightInfo = pallet_xcavate_whitelist::weights::SubstrateWeight<Test>;
 	type WhitelistOrigin = frame_system::EnsureRoot<Self::AccountId>;
 	type MaxUsersInWhitelist = MaxWhitelistUsers;
 }
@@ -204,6 +204,7 @@ impl pallet_whitelist::Config for Test {
 	pub const MaxNftsInCollection: u32 = 100;
 	pub const TreasuryPalletId: PalletId = PalletId(*b"py/trsry");
 	pub const CommunityProjectPalletId: PalletId = PalletId(*b"py/cmprj");
+	pub const Postcode: u32 = 10;
 }
 
 /// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
@@ -222,6 +223,7 @@ impl pallet_nft_marketplace::Config for Test {
 	type FractionalizeItemId = <Self as pallet_nfts::Config>::ItemId;
 	type AssetId = <Self as pallet_assets::Config<Instance1>>::AssetId;
 	type AssetId2 = u32;
+	type PostcodeLimit = Postcode;
 } 
 
 parameter_types! {
@@ -277,6 +279,21 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 			([4; 32].into(), 5_000),
 			((NftMarketplace::account_id()), 20_000_000),
 		],
+	}
+	.assimilate_storage(&mut test)
+	.unwrap();
+
+	pallet_assets::GenesisConfig::<Test, Instance1> {
+		assets: vec![(1, /* account("buyer", SEED, SEED) */ [0; 32].into(), true, 1)], // Genesis assets: id, owner, is_sufficient, min_balance
+		metadata: vec![(1, "XUSD".into(), "XUSD".into(), 0)], // Genesis metadata: id, name, symbol, decimals
+		accounts: vec![
+			(1, [0; 32].into(), 20_000_000),
+			(1, [1; 32].into(), 1_500_000),
+			(1, [2; 32].into(), 1_150_000),
+			(1, [3; 32].into(), 1_150_000),
+			(1, [4; 32].into(), 50),
+			(1, [5; 32].into(), 500),
+		], // Genesis accounts: id, account_id, balance
 	}
 	.assimilate_storage(&mut test)
 	.unwrap();
