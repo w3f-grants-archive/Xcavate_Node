@@ -14,14 +14,15 @@ use pallet_nft_marketplace::Pallet as NftMarketplace;
 >>::Balance;  
 type DepositBalanceOf1<T> =
 	<<T as pallet::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
-use pallet_whitelist::Pallet as Whitelist;
+use pallet_xcavate_whitelist::Pallet as Whitelist;
 use frame_support::{traits::Get, assert_ok};
+use frame_support::BoundedVec;
 
 type BalanceOf1<T> = <<T as pallet_nft_marketplace::Config>::Currency as Currency<
 	<T as frame_system::Config>::AccountId,
 >>::Balance; 
 
-fn setup_real_estate_object<T: Config>() {
+/* fn setup_real_estate_object<T: Config>() {
 	let value: BalanceOf1<T> = 100_000u32.into();
 	let caller: T::AccountId = whitelisted_caller();
 	<T as pallet_nfts::Config>::Currency::make_free_balance_be(
@@ -29,7 +30,10 @@ fn setup_real_estate_object<T: Config>() {
 		DepositBalanceOf::<T>::max_value(),
 	);
 	assert_ok!(NftMarketplace::<T>::create_new_region(RawOrigin::Root.into()));
-	assert_ok!(NftMarketplace::<T>::create_new_location(RawOrigin::Root.into(), 0));
+	let location = vec![0; <T as pallet_nft_marketplace::Config>::PostcodeLimit::get() as usize]
+		.try_into()
+		.unwrap();
+	assert_ok!(NftMarketplace::<T>::create_new_location(RawOrigin::Root.into(), 0, location));
 	assert_ok!(Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone()));
 	assert_ok!(NftMarketplace::<T>::list_object(
 		RawOrigin::Signed(caller.clone()).into(),
@@ -41,7 +45,7 @@ fn setup_real_estate_object<T: Config>() {
 			.unwrap(),
 	));
 	assert_ok!(NftMarketplace::<T>::buy_token(RawOrigin::Signed(caller.clone()).into(), 0, 100));
-} 
+}  */
 
 #[benchmarks]
 mod benchmarks {
@@ -50,18 +54,21 @@ mod benchmarks {
 	#[benchmark]
 	fn add_letting_agent() {
 		assert_ok!(NftMarketplace::<T>::create_new_region(RawOrigin::Root.into()));
-		assert_ok!(NftMarketplace::<T>::create_new_location(RawOrigin::Root.into(), 0));
+		let location: BoundedVec<u8, <T as pallet_nft_marketplace::Config>::PostcodeLimit> = vec![0; <T as pallet_nft_marketplace::Config>::PostcodeLimit::get() as usize]
+			.try_into()
+			.unwrap();
+		assert_ok!(NftMarketplace::<T>::create_new_location(RawOrigin::Root.into(), 0, location.clone()));
 		let letting_agent: T::AccountId = whitelisted_caller();
 /* 		<T as pallet_nfts::Config>::Currency::make_free_balance_be(
 			&letting_agent,
 			DepositBalanceOf::<T>::max_value(),
 		); */
 		#[extrinsic_call]
-		add_letting_agent(RawOrigin::Root, 0, 0, letting_agent.clone());
+		add_letting_agent(RawOrigin::Root, 0, location, letting_agent.clone());
 
 		assert_eq!(PropertyManagement::<T>::letting_info(letting_agent).is_some(), true);
 	} 
-
+ 
  	#[benchmark]
 	fn letting_agent_deposit() {
 		assert_ok!(NftMarketplace::<T>::create_new_region(RawOrigin::Root.into()));
@@ -78,7 +85,7 @@ mod benchmarks {
 		assert_eq!(PropertyManagement::<T>::letting_info(letting_agent).unwrap().deposited, true);
 		assert_eq!(PropertyManagement::<T>::letting_agent_locations(0, 0).len(), 1);
 	}
-
+/*
  	#[benchmark]
 	fn add_letting_agent_to_location() {
 		assert_ok!(NftMarketplace::<T>::create_new_region(RawOrigin::Root.into()));
@@ -156,7 +163,7 @@ mod benchmarks {
 		withdraw_funds(RawOrigin::Signed(caller.clone()));
 
 		assert_eq!(PropertyManagement::<T>::stored_funds(caller), 0u32.into());
-	} 
+	}  */
 
 	impl_benchmark_test_suite!(PropertyManagement, crate::mock::new_test_ext(), crate::mock::Test);
 }

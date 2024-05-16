@@ -47,7 +47,7 @@ frame_support::construct_runtime!(
 		NftMarketplace: pallet_nft_marketplace,
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
 		Assets: pallet_assets::<Instance1>,
-		Whitelist: pallet_whitelist,
+		XcavateWhitelist: pallet_xcavate_whitelist,
 	}
 );
 
@@ -190,9 +190,9 @@ parameter_types! {
 	pub const MaxWhitelistUsers: u32 = 1000000;
 }
 
-impl pallet_whitelist::Config for Test {
+impl pallet_xcavate_whitelist::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_whitelist::weights::SubstrateWeight<Test>;
+	type WeightInfo = pallet_xcavate_whitelist::weights::SubstrateWeight<Test>;
 	type WhitelistOrigin = frame_system::EnsureRoot<Self::AccountId>;
 	type MaxUsersInWhitelist = MaxWhitelistUsers;
 }
@@ -203,6 +203,7 @@ impl pallet_whitelist::Config for Test {
 	pub const MaxNftsInCollection: u32 = 100;
 	pub const TreasuryPalletId: PalletId = PalletId(*b"py/trsry");
 	pub const CommunityProjectPalletId: PalletId = PalletId(*b"py/cmprj");
+	pub const Postcode: u32 = 10;
 }
 
 /// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
@@ -221,6 +222,7 @@ impl pallet_nft_marketplace::Config for Test {
 	type FractionalizeItemId = <Self as pallet_nfts::Config>::ItemId;
 	type AssetId = <Self as pallet_assets::Config<Instance1>>::AssetId;
 	type AssetId2 = u32;
+	type PostcodeLimit = Postcode;
 } 
 
 parameter_types! {

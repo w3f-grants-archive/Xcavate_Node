@@ -16,7 +16,7 @@ type DepositBalanceOf<T> = <<T as pallet_nfts::Config>::Currency as Currency<
 use frame_support::assert_ok;
 use frame_support::traits::Hooks;
 use pallet_assets::Pallet as Assets;
-use pallet_whitelist::Pallet as Whitelist;
+use pallet_xcavate_whitelist::Pallet as Whitelist;
 
 fn setup_listing<T: Config>(
 	u: u32,

@@ -12,29 +12,35 @@ use pallet_nft_marketplace::Pallet as NftMarketplace;
 type DepositBalanceOf<T> = <<T as pallet_nfts::Config>::Currency as Currency<
 	<T as frame_system::Config>::AccountId,
 >>::Balance;
-use pallet_whitelist::Pallet as Whitelist;
+use pallet_xcavate_whitelist::Pallet as Whitelist;
 use pallet_property_management::Pallet as PropertyManagement;
 use frame_support::{traits::Get, assert_ok};
+use frame_support::BoundedVec;
 
 type BalanceOf1<T> = <<T as pallet_nft_marketplace::Config>::Currency as Currency<
 	<T as frame_system::Config>::AccountId,
 >>::Balance;
+type BalanceOf2<T> = <T as pallet_assets::Config<pallet_assets::Instance1>>::Balance;
 
 fn setup_real_estate_object<T: Config>() {
-	let value: BalanceOf1<T> = 100_000u32.into();
+	let value: BalanceOf2<T> = 100_000u32.into();
 	let caller: T::AccountId = whitelisted_caller();
 	<T as pallet_nfts::Config>::Currency::make_free_balance_be(
 		&caller,
 		DepositBalanceOf::<T>::max_value(),
 	);
 	assert_ok!(NftMarketplace::<T>::create_new_region(RawOrigin::Root.into()));
-	assert_ok!(NftMarketplace::<T>::create_new_location(RawOrigin::Root.into(), 0));
+	let location: BoundedVec<u8, <T as pallet_nft_marketplace::Config>::PostcodeLimit> = vec![0; <T as pallet_nft_marketplace::Config>::PostcodeLimit::get() as usize]
+		.try_into()
+		.unwrap();
+	assert_ok!(NftMarketplace::<T>::create_new_location(RawOrigin::Root.into(), 0, location.clone()));
 	assert_ok!(Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone()));
 	assert_ok!(NftMarketplace::<T>::list_object(
 		RawOrigin::Signed(caller.clone()).into(),
 		0,
-		0,
+		location.clone(),
 		value.into(),
+		100,
 		vec![0; <T as pallet_nfts::Config>::StringLimit::get() as usize]
 			.try_into()
 			.unwrap(),
@@ -45,7 +51,7 @@ fn setup_real_estate_object<T: Config>() {
 		&letting_agent,
 		DepositBalanceOf::<T>::max_value(),
 	);
-	assert_ok!(PropertyManagement::<T>::add_letting_agent(RawOrigin::Root.into(), 0, 0, letting_agent.clone()));
+	assert_ok!(PropertyManagement::<T>::add_letting_agent(RawOrigin::Root.into(), 0, location, letting_agent.clone()));
 	assert_ok!(PropertyManagement::<T>::letting_agent_deposit(RawOrigin::Signed(letting_agent.clone()).into()));
 	assert_ok!(PropertyManagement::<T>::set_letting_agent(RawOrigin::Signed(letting_agent.clone()).into(), 0));	
 }

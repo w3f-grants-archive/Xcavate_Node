@@ -31,7 +31,7 @@ pallet-insecure-randomness-collective-flip = {  default-features = false, git = 
 enumflags2 = { version = "0.7.7" }
 
 # Local dependencies
-pallet-whitelist = { path = "../whitelist", default-features = false }
+pallet-xcavate-whitelist = { path = "../xcavate-whitelist", default-features = false }
 
 [dev-dependencies]
 sp-core = {  git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.6.0" }
@@ -52,7 +52,7 @@ std = [
 	"pallet-timestamp/std",
 	"pallet-transaction-payment/std",
 	"pallet-insecure-randomness-collective-flip/std",
-	"pallet-whitelist/std",
+	"pallet-xcavate-whitelist/std",
 ]
 runtime-benchmarks = ["frame-benchmarking/runtime-benchmarks"]
 try-runtime = ["frame-support/try-runtime"]

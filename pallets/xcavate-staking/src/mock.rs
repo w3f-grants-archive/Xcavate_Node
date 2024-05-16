@@ -49,7 +49,7 @@ frame_support::construct_runtime!(
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
 		Uniques: pallet_nfts::{Pallet, Call, Storage, Event<T>},
 		CommunityLoanPool: pallet_community_loan_pool,
-		Whitelist: pallet_whitelist,
+		XcavateWhitelist: pallet_xcavate_whitelist,
 		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
 		Randomness: pallet_insecure_randomness_collective_flip::{Pallet, Storage},
 		TransactionPayment: pallet_transaction_payment::{Pallet, Storage, Event<T>},
@@ -199,9 +199,9 @@ parameter_types! {
 	pub const MaxWhitelistUsers: u32 = 1000000;
 }
 
-impl pallet_whitelist::Config for Test {
+impl pallet_xcavate_whitelist::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_whitelist::weights::SubstrateWeight<Test>;
+	type WeightInfo = pallet_xcavate_whitelist::weights::SubstrateWeight<Test>;
 	type WhitelistOrigin = frame_system::EnsureRoot<Self::AccountId>;
 	type MaxUsersInWhitelist = MaxWhitelistUsers;
 }

@@ -33,7 +33,7 @@ pallet-nfts = {  default-features = false, git = "https://github.com/paritytech/
 
 # Local dependencies
 pallet-community-loan-pool = { path = "../community-loan-pool", default-features = false }
-pallet-whitelist = { path = "../whitelist", default-features = false }
+pallet-xcavate-whitelist = { path = "../xcavate-whitelist", default-features = false }
 
 [dev-dependencies]
 sp-core = {  git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.6.0" }
@@ -52,7 +52,7 @@ std = [
 	"sp-std/std",
 	"serde",
 	"pallet-community-loan-pool/std",
-	"pallet-whitelist/std",
+	"pallet-xcavate-whitelist/std",
 	"pallet-timestamp/std",
 	"pallet-transaction-payment/std",
 	"pallet-insecure-randomness-collective-flip/std",
