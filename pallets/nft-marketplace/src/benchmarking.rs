@@ -227,7 +227,7 @@ mod benchmarks {
 
 
 	#[benchmark]
-	fn handle_offer(n: crate::Offer) {
+	fn handle_offer() {
 		let (caller, value) = setup_object_listing::<T>();
 		assert_ok!(Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone()));
 		let location = vec![0; <T as pallet::Config>::PostcodeLimit::get() as usize]
@@ -266,7 +266,7 @@ mod benchmarks {
 			user_lookup,
 			amount.into(),
 		));
-		let offer_value: BalanceOf<T> = 100u32.into();
+		let offer_value: BalanceOf<T> = 10u32.into();
 		assert_ok!(NftMarketplace::<T>::make_offer(
 			RawOrigin::Signed(token_buyer).into(), 
 			1, 
@@ -274,7 +274,7 @@ mod benchmarks {
 			10
 		));
 		#[extrinsic_call]
-		handle_offer(RawOrigin::Signed(caller), 1, 0, n);
+		handle_offer(RawOrigin::Signed(caller), 1, 0, crate::Offer::Accept);
 		//assert_eq!(NftMarketplace::<T>::listed_nfts().len(), 0);
 	} 
 

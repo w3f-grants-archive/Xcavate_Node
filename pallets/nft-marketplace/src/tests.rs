@@ -101,6 +101,18 @@ fn list_object_fails() {
 			),
 			Error::<Test>::LocationUnknown
 		);
+		assert_ok!(NftMarketplace::create_new_location(RuntimeOrigin::root(), 0, bvec![10, 10]));
+		assert_noop!(
+			NftMarketplace::list_object(
+				RuntimeOrigin::signed([0; 32].into()),
+				0,
+				bvec![10, 10],
+				10_000,
+				251,
+				bvec![22, 22]
+			),
+			Error::<Test>::TooManyToken
+		);
 	})
 }
  

@@ -503,7 +503,7 @@ impl pallet_xcavate_staking::Config for Runtime {
 
 parameter_types! {
 	pub const NftMarketplacePalletId: PalletId = PalletId(*b"py/nftxc");
-	pub const MaxNftTokens: u32 = 100;
+	pub const MaxNftTokens: u32 = 250;
 	pub const Postcode: u32 = 10;
 }
 

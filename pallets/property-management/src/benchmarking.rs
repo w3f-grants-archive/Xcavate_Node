@@ -72,18 +72,21 @@ mod benchmarks {
  	#[benchmark]
 	fn letting_agent_deposit() {
 		assert_ok!(NftMarketplace::<T>::create_new_region(RawOrigin::Root.into()));
-		assert_ok!(NftMarketplace::<T>::create_new_location(RawOrigin::Root.into(), 0));
+		let location: BoundedVec<u8, <T as pallet_nft_marketplace::Config>::PostcodeLimit> = vec![0; <T as pallet_nft_marketplace::Config>::PostcodeLimit::get() as usize]
+			.try_into()
+			.unwrap();
+		assert_ok!(NftMarketplace::<T>::create_new_location(RawOrigin::Root.into(), 0, location.clone()));
 		let letting_agent: T::AccountId = whitelisted_caller();
 		<T as pallet_nfts::Config>::Currency::make_free_balance_be(
 			&letting_agent,
 			DepositBalanceOf::<T>::max_value(),
 		);
-		assert_ok!(PropertyManagement::<T>::add_letting_agent(RawOrigin::Root.into(), 0, 0, letting_agent.clone()));
+		assert_ok!(PropertyManagement::<T>::add_letting_agent(RawOrigin::Root.into(), 0, location.clone(), letting_agent.clone()));
 		#[extrinsic_call]
 		letting_agent_deposit(RawOrigin::Signed(letting_agent.clone()));
 
 		assert_eq!(PropertyManagement::<T>::letting_info(letting_agent).unwrap().deposited, true);
-		assert_eq!(PropertyManagement::<T>::letting_agent_locations(0, 0).len(), 1);
+		assert_eq!(PropertyManagement::<T>::letting_agent_locations(0, location).len(), 1);
 	}
 /*
  	#[benchmark]
