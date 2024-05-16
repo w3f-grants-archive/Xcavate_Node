@@ -523,7 +523,7 @@ fn handle_offer_works() {
 			0,
 			0,
 			5000,
-			2
+			20
 		));
 		assert_ok!(NftMarketplace::make_offer(
 			RuntimeOrigin::signed([2; 32].into()),
@@ -545,23 +545,24 @@ fn handle_offer_works() {
 			RuntimeOrigin::signed([2; 32].into()),
 			1,
 			2000,
-			1
+			10
 		));
-		assert_eq!(Assets::balance(1, &([2; 32].into())), 1_148_000);
-		assert_eq!(Assets::balance(1, &NftMarketplace::account_id()), 2000);
+		assert_eq!(Assets::balance(1, &([2; 32].into())), 1_130_000);
+		assert_eq!(Assets::balance(1, &NftMarketplace::account_id()), 20000);
 		assert_ok!(NftMarketplace::handle_offer(
 			RuntimeOrigin::signed([1; 32].into()),
 			1,
 			1,
 			crate::Offer::Accept
 		)); 
-		assert_eq!(NftMarketplace::token_listings(1).unwrap().amount, 1);
+		assert_eq!(NftMarketplace::token_listings(1).unwrap().amount, 10);
 		assert_eq!(NftMarketplace::ongoing_offers(1, 1).is_none(), true);
-		assert_eq!(Assets::balance(0, &([1; 32].into())), 98);
-		assert_eq!(Assets::balance(0, &([2; 32].into())), 1);
-		assert_eq!(Assets::balance(0, &NftMarketplace::account_id()), 1);
-		assert_eq!(Assets::balance(1, &([1; 32].into())), 501_980);
-		assert_eq!(Assets::balance(1, &([2; 32].into())), 1_148_000);
+		assert_eq!(Assets::balance(1, &NftMarketplace::account_id()), 0);
+		assert_eq!(Assets::balance(0, &([1; 32].into())), 80);
+		assert_eq!(Assets::balance(0, &([2; 32].into())), 10);
+		assert_eq!(Assets::balance(0, &NftMarketplace::account_id()), 10);
+		assert_eq!(Assets::balance(1, &([1; 32].into())), 519_800);
+		assert_eq!(Assets::balance(1, &([2; 32].into())), 1_130_000);
 	})
 }
 

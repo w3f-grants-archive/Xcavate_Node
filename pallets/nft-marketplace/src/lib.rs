@@ -923,15 +923,15 @@ pub mod pallet {
 			let listing_details = Self::token_listings(listing_id).ok_or(Error::<T>::TokenNotForSale)?;
 			ensure!(listing_details.seller == signer, Error::<T>::NoPermission);
 			let offer_details = OngoingOffer::<T>::take(listing_id, offer_id).ok_or(Error::<T>::InvalidIndex)?;
+			let price = offer_details
+				.token_price
+ 				.checked_mul(&Self::u64_to_balance_option(offer_details.amount.into())?)
+				.ok_or(Error::<T>::MultiplyError)? 
+				.checked_mul(&Self::u64_to_balance_option(1/* 000000000000 */)?)
+				.ok_or(Error::<T>::MultiplyError)?;
 			if offer == Offer::Accept {
-				Self::buying_token_process(listing_id, Self::account_id(), offer_details.buyer, listing_details, offer_details.token_price, offer_details.amount)?;
+				Self::buying_token_process(listing_id, Self::account_id(), offer_details.buyer, listing_details, price, offer_details.amount)?;
 			} else {
-				let price = offer_details
-					.token_price
-					.checked_mul(&Self::u64_to_balance_option(offer_details.amount.into())?)
-					.ok_or(Error::<T>::MultiplyError)?
-					.checked_mul(&Self::u64_to_balance_option(1/* 000000000000 */)?)
-					.ok_or(Error::<T>::MultiplyError)?;
 				Self::transfer_funds(Self::account_id(), offer_details.buyer, price)?;
 			}
 			Ok(())
@@ -1139,6 +1139,7 @@ pub mod pallet {
 		}
 
 		fn buying_token_process(listing_id: u32, transfer_from: AccountIdOf<T>, account: AccountIdOf<T>, mut listing_details: ListingDetailsType<T>, price: BalanceOf<T>, amount: u32) -> DispatchResult {
+			
 			Self::calculate_fees(price, transfer_from.clone(), listing_details.seller.clone())?;
 			let user_lookup = <T::Lookup as StaticLookup>::unlookup(account.clone());
 			let asset_id: AssetId2<T> = listing_details.asset_id.into();
