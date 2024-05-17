@@ -20,6 +20,10 @@ use frame_support::{
 	},
 };
 
+use pallet_assets::Instance1;
+
+use pallet_nft_marketplace::AssetId;
+
 pub type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
 
 pub type NegativeImbalanceOf<T> = <<T as Config>::Currency as Currency<
@@ -37,6 +41,23 @@ pub mod pallet {
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
+
+	#[cfg(feature = "runtime-benchmarks")]
+	pub struct AssetHelper;
+
+	#[cfg(feature = "runtime-benchmarks")]
+	pub trait BenchmarkHelper<AssetId, T> {
+		fn to_asset(i: u32) -> AssetId;
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	impl<T: Config>
+		BenchmarkHelper<AssetId<T>, T> for AssetHelper
+	{
+		fn to_asset(i: u32) -> AssetId<T> {
+			i.into()
+		}
+	}
 
 	pub type ProposalIndex = u32;
 	pub type InqueryIndex = u32;
@@ -78,7 +99,11 @@ pub mod pallet {
 	}
 
 	#[pallet::config]
-	pub trait Config: frame_system::Config + pallet_nft_marketplace::Config + pallet_property_management::Config {
+	pub trait Config: frame_system::Config 
+		+ pallet_nft_marketplace::Config 
+		+ pallet_property_management::Config 
+		+ pallet_assets::Config<Instance1>
+	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
@@ -106,6 +131,12 @@ pub mod pallet {
 
 		/// Threshold for inquery votes.
 		type Threshold: Get<u32>;
+
+		#[cfg(feature = "runtime-benchmarks")]
+		type Helper: crate::BenchmarkHelper<
+			<Self as pallet_assets::Config<Instance1>>::AssetId,
+			Self,
+		>;
 	}
 
 	/// Number of proposals that have been made.

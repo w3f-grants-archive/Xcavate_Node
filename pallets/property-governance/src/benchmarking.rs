@@ -16,6 +16,8 @@ use pallet_xcavate_whitelist::Pallet as Whitelist;
 use pallet_property_management::Pallet as PropertyManagement;
 use frame_support::{traits::Get, assert_ok};
 use frame_support::BoundedVec;
+use frame_support::sp_runtime::traits::StaticLookup;
+use pallet_assets::Pallet as Assets;
 
 type BalanceOf1<T> = <<T as pallet_nft_marketplace::Config>::Currency as Currency<
 	<T as frame_system::Config>::AccountId,
@@ -23,7 +25,7 @@ type BalanceOf1<T> = <<T as pallet_nft_marketplace::Config>::Currency as Currenc
 type BalanceOf2<T> = <T as pallet_assets::Config<pallet_assets::Instance1>>::Balance;
 
 fn setup_real_estate_object<T: Config>() {
-	let value: BalanceOf2<T> = 100_000u32.into();
+	let value: BalanceOf2<T> = 1u32.into();
 	let caller: T::AccountId = whitelisted_caller();
 	<T as pallet_nfts::Config>::Currency::make_free_balance_be(
 		&caller,
@@ -35,6 +37,20 @@ fn setup_real_estate_object<T: Config>() {
 		.unwrap();
 	assert_ok!(NftMarketplace::<T>::create_new_location(RawOrigin::Root.into(), 0, location.clone()));
 	assert_ok!(Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone()));
+	let user_lookup = <T::Lookup as StaticLookup>::unlookup(caller.clone());
+	let asset_id = <T as pallet::Config>::Helper::to_asset(1);
+	assert_ok!(Assets::<T, Instance1>::create(
+		RawOrigin::Signed(caller.clone()).into(),
+		asset_id.clone().into(),
+		user_lookup.clone(),
+		1u32.into(),
+	));
+	assert_ok!(Assets::<T, Instance1>::mint(
+		RawOrigin::Signed(caller.clone()).into(),
+		asset_id.clone().into(),
+		user_lookup,
+		1_000_000u32.into(),
+	));
 	assert_ok!(NftMarketplace::<T>::list_object(
 		RawOrigin::Signed(caller.clone()).into(),
 		0,
