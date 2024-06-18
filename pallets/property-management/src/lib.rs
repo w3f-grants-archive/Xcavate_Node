@@ -29,8 +29,6 @@ use frame_support::sp_runtime::{
 
 use pallet_assets::Instance1;
 
-use pallet_nft_marketplace::AssetId;
-
 type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
 
 pub type BalanceOf<T> = 

@@ -1193,7 +1193,7 @@ pub mod pallet {
 			listing_details.amount = listing_details.amount.checked_sub(amount).ok_or(Error::<T>::ArithmeticUnderflow)?;
 			if listing_details.amount > 0 {
 				TokenListings::<T>::insert(listing_id, listing_details.clone());
-				OngoingOffer::<T>::clear_prefix(listing_id, 2000, None);
+				let _ = OngoingOffer::<T>::clear_prefix(listing_id, 2000, None);
 			}
 			Self::deposit_event(Event::<T>::TokenBought {
 				asset_id: listing_details.asset_id,

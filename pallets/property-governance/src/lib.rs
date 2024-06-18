@@ -22,8 +22,6 @@ use frame_support::{
 
 use pallet_assets::Instance1;
 
-use pallet_nft_marketplace::AssetId;
-
 pub type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
 
 pub type NegativeImbalanceOf<T> = <<T as Config>::Currency as Currency<
