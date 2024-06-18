@@ -503,7 +503,7 @@ impl pallet_xcavate_staking::Config for Runtime {
 
 parameter_types! {
 	pub const NftMarketplacePalletId: PalletId = PalletId(*b"py/nftxc");
-	pub const MaxNftTokens: u32 = 100;
+	pub const MaxNftTokens: u32 = 250;
 	pub const Postcode: u32 = 10;
 }
 
@@ -582,6 +582,8 @@ impl pallet_property_management::Config for Runtime {
 	type WeightInfo = pallet_property_management::weights::SubstrateWeight<Runtime>;
 	type Currency = Balances;
 	type PalletId = PropertyManagementPalletId;
+	#[cfg(feature = "runtime-benchmarks")]
+	type Helper = pallet_property_management::AssetHelper;
 	type AgentOrigin = EnsureRoot<Self::AccountId>;
 	type MinStakingAmount = MinimumStakingAmount;
 	type MaxProperties = MaxProperty;
@@ -608,6 +610,8 @@ impl pallet_property_governance::Config for Runtime {
 	type MinSlashingAmount = MinimumSlashingAmount;
 	type MaxVoter = MaximumVoter;
 	type Threshold = VotingThreshold;
+	#[cfg(feature = "runtime-benchmarks")]
+	type Helper = pallet_property_governance::AssetHelper;
 } 
 
 parameter_types! {

@@ -27,6 +27,10 @@ use frame_support::sp_runtime::{
 	},
 };
 
+use pallet_assets::Instance1;
+
+use pallet_nft_marketplace::AssetId;
+
 type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
 
 pub type BalanceOf<T> = 
@@ -45,6 +49,23 @@ pub mod pallet {
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
 
+	#[cfg(feature = "runtime-benchmarks")]
+	pub struct AssetHelper;
+
+	#[cfg(feature = "runtime-benchmarks")]
+	pub trait BenchmarkHelper<AssetId, T> {
+		fn to_asset(i: u32) -> AssetId;
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	impl<T: Config>
+		BenchmarkHelper<AssetId<T>, T> for AssetHelper
+	{
+		fn to_asset(i: u32) -> AssetId<T> {
+			i.into()
+		}
+	}
+
 	/// Info for the letting agent.
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
@@ -61,6 +82,7 @@ pub mod pallet {
 	pub trait Config: frame_system::Config 
 		+ pallet_xcavate_whitelist::Config 
 		+ pallet_nft_marketplace::Config 
+		+ pallet_assets::Config<Instance1>
 	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
@@ -75,6 +97,12 @@ pub mod pallet {
 		/// The property management's pallet id, used for deriving its sovereign account ID.
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
+
+		#[cfg(feature = "runtime-benchmarks")]
+		type Helper: crate::BenchmarkHelper<
+			<Self as pallet_assets::Config<Instance1>>::AssetId,
+			Self,
+		>;
 
 		/// Origin who can set a new letting agent.
 		type AgentOrigin: EnsureOrigin<Self::RuntimeOrigin>;

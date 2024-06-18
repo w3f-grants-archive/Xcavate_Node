@@ -510,6 +510,8 @@ pub mod pallet {
 		LocationRegistered,
 		/// The location is not registered.
 		LocationUnknown,
+		/// The object can not be divided in so many token.
+		TooManyToken,
 	}
 
 	#[pallet::call]
@@ -609,6 +611,7 @@ pub mod pallet {
 				pallet_xcavate_whitelist::Pallet::<T>::whitelisted_accounts(signer.clone()),
 				Error::<T>::UserNotWhitelisted
 			);
+			ensure!(token_amount <= T::MaxNftToken::get(), Error::<T>::TooManyToken);
 			let collection_id: CollectionId<T> =
 				Self::region_collections(region).ok_or(Error::<T>::RegionUnknown)?;
 			ensure!(Self::location_registration(region, location.clone()), Error::<T>::LocationUnknown);
@@ -719,12 +722,9 @@ pub mod pallet {
 				Error::<T>::SpvAlreadyCreated
 			);
 
-			let price = nft_details
+			let transfer_price = nft_details
 				.token_price
 				.checked_mul(&Self::u64_to_balance_option(amount as u64)?)
-				.ok_or(Error::<T>::MultiplyError)?;
-			let transfer_price = price
-				.checked_mul(&Self::u64_to_balance_option(1/* 000000000000 */)?)
 				.ok_or(Error::<T>::MultiplyError)?;
 			Self::transfer_funds(origin.clone(), Self::account_id(), transfer_price)?;
 			listed_token =
@@ -740,7 +740,7 @@ pub mod pallet {
 				token_of_owner.checked_add(amount).ok_or(Error::<T>::ArithmeticOverflow)?;
 			nft_details.collected_funds = nft_details
 				.collected_funds
-				.checked_add(&price)
+				.checked_add(&transfer_price)
 				.ok_or(Error::<T>::ArithmeticOverflow)?;
 			OngoingObjectListing::<T>::insert(listing_id, nft_details.clone());
 			TokenOwner::<T>::insert(origin.clone(), listing_id, token_of_owner);
@@ -753,7 +753,7 @@ pub mod pallet {
 				asset_id: nft_details.asset_id,
 				buyer: origin.clone(),
 				amount,
-				price,
+				price: transfer_price,
 			});
 			Ok(())
 		}
@@ -845,8 +845,6 @@ pub mod pallet {
 			let price = listing_details
 				.token_price
 				.checked_mul(&Self::u64_to_balance_option(amount.into())?)
-				.ok_or(Error::<T>::MultiplyError)?
-				.checked_mul(&Self::u64_to_balance_option(1/* 000000000000 */)?)
 				.ok_or(Error::<T>::MultiplyError)?;
 			Self::buying_token_process(listing_id, origin.clone(), origin, listing_details, price, amount)?;
 			Ok(())
@@ -879,8 +877,6 @@ pub mod pallet {
 			ensure!(listing_details.amount >= amount, Error::<T>::NotEnoughTokenAvailable);
 			let price = offer_price
 				.checked_mul(&Self::u64_to_balance_option(amount.into())?)
-				.ok_or(Error::<T>::MultiplyError)?
-				.checked_mul(&Self::u64_to_balance_option(1/* 000000000000 */)?)
 				.ok_or(Error::<T>::MultiplyError)?;
 			Self::transfer_funds(signer.clone(), Self::account_id(), price)?;
 			let offer_details = OfferDetails {
@@ -926,8 +922,6 @@ pub mod pallet {
 			let price = offer_details
 				.token_price
  				.checked_mul(&Self::u64_to_balance_option(offer_details.amount.into())?)
-				.ok_or(Error::<T>::MultiplyError)? 
-				.checked_mul(&Self::u64_to_balance_option(1/* 000000000000 */)?)
 				.ok_or(Error::<T>::MultiplyError)?;
 			if offer == Offer::Accept {
 				Self::buying_token_process(listing_id, Self::account_id(), offer_details.buyer, listing_details, price, offer_details.amount)?;
@@ -959,8 +953,6 @@ pub mod pallet {
 			let price = offer_details
 				.token_price
 				.checked_mul(&Self::u64_to_balance_option(offer_details.amount.into())?)
-				.ok_or(Error::<T>::MultiplyError)?
-				.checked_mul(&Self::u64_to_balance_option(1/* 000000000000 */)?)
 				.ok_or(Error::<T>::MultiplyError)?;
 		Self::transfer_funds(Self::account_id(), offer_details.buyer, price)?;
 			Self::deposit_event(Event::<T>::OfferCancelled { listing_id, offer_id});
@@ -1099,10 +1091,7 @@ pub mod pallet {
 
 			let nft_details =
 				OngoingObjectListing::<T>::take(listing_id).ok_or(Error::<T>::InvalidIndex)?;
-			let price = nft_details
-				.collected_funds
-				.checked_mul(&Self::u64_to_balance_option(1/* 000000000000 */)?)
-				.ok_or(Error::<T>::MultiplyError)?;
+			let price = nft_details.collected_funds;
 			Self::calculate_fees(price, Self::account_id(), nft_details.real_estate_developer)?;
 			let origin: OriginFor<T> = RawOrigin::Signed(Self::account_id()).into();
 			let asset_id: AssetId2<T> = nft_details.asset_id.into();
