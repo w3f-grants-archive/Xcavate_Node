@@ -8,9 +8,9 @@ include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
 /// Constant values used within the runtimezz
 pub mod constants;
+use constants::{currency::*, time::*};
 use codec::Decode;
 mod voter_bags;
-use constants::{currency::*, time::*};
 use frame_election_provider_support::{onchain, ExtendedBalance, SequentialPhragmen, VoteWeight};
 use frame_support::genesis_builder_helper::{build_config, create_default_config};
 use frame_support::{
