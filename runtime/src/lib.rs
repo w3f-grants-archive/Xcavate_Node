@@ -596,7 +596,11 @@ parameter_types! {
 	pub const MaxVoteForBlock: u32 = 100;
 	pub const MinimumSlashingAmount: Balance = 10 * DOLLARS;
 	pub const MaximumVoter: u32 = 100;
-	pub const VotingThreshold: u8 = 67;
+	pub const VotingThreshold: u8 = 50;
+	pub const HighVotingThreshold: u8 = 67;
+	pub const LowProposal: Balance = 500 * DOLLARS;
+	pub const HighProposal: Balance = 10_000 * DOLLARS;
+	pub const PropertyGovernancePalletId: PalletId = PalletId(*b"py/gvrnc");
 }
 
 /// Configure the pallet-property-governance in pallets/property-governance.
@@ -610,8 +614,12 @@ impl pallet_property_governance::Config for Runtime {
 	type MinSlashingAmount = MinimumSlashingAmount;
 	type MaxVoter = MaximumVoter;
 	type Threshold = VotingThreshold;
+	type HighThreshold = HighVotingThreshold;
 	#[cfg(feature = "runtime-benchmarks")]
 	type Helper = pallet_property_governance::AssetHelper;
+	type LowProposal = LowProposal;
+	type HighProposal = HighProposal;
+	type PalletId = PropertyGovernancePalletId;
 } 
 
 parameter_types! {

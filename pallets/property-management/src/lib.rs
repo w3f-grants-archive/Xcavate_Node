@@ -244,6 +244,14 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 
+
+
+		// hold the first months of income. Held this in the governance pallet.
+
+		// Net income after letting agent costs and tax would be given to holders. Third party software.
+
+
+
 		/// Adds an account as a letting agent.
 		///
 		/// The origin must be the sudo.

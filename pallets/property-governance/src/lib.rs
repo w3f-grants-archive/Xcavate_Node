@@ -14,10 +14,12 @@ pub mod weights;
 pub use weights::*;
 
 use frame_support::{
-	sp_runtime::Saturating,
+	sp_runtime::{Saturating, traits::AccountIdConversion},
 	traits::{
-	Currency, ReservableCurrency, OnUnbalanced
+	Currency, ReservableCurrency, OnUnbalanced,
+	ExistenceRequirement::KeepAlive,
 	},
+	PalletId,
 };
 
 use pallet_assets::Instance1;
@@ -67,6 +69,18 @@ pub mod pallet {
 	pub struct Proposal<BlockNumber, T: Config> {
 		pub proposer: AccountIdOf<T>,
 		pub asset_id: u32,
+		pub amount: BalanceOf<T>,
+		pub created_at: BlockNumber,
+	}
+	
+	/// Sell proposal with the proposal Details.
+	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
+	#[scale_info(skip_type_params(T))]
+	pub struct SellProposal<BlockNumber, T: Config> {
+		pub proposer: AccountIdOf<T>,
+		pub asset_id: u32,
+		pub amount: BalanceOf<T>,
 		pub created_at: BlockNumber,
 	}	
 
@@ -130,11 +144,22 @@ pub mod pallet {
 		/// Threshold for inquery votes.
 		type Threshold: Get<u32>;
 
+		/// Threshold for high costs inquery votes.
+		type HighThreshold: Get<u32>;
+
 		#[cfg(feature = "runtime-benchmarks")]
 		type Helper: crate::BenchmarkHelper<
 			<Self as pallet_assets::Config<Instance1>>::AssetId,
 			Self,
 		>;
+
+		type LowProposal: Get<BalanceOf<Self>>;
+
+		type HighProposal: Get<BalanceOf<Self>>;
+
+		/// The property governance's pallet id, used for deriving its sovereign account ID.
+		#[pallet::constant]
+		type PalletId: Get<PalletId>;
 	}
 
 	/// Number of proposals that have been made.
@@ -155,6 +180,17 @@ pub mod pallet {
 		Blake2_128Concat,
 		ProposalIndex,
 		Proposal<BlockNumberFor<T>, T>,
+		OptionQuery,
+	>;
+
+	/// Sell proposals that have been made.
+	#[pallet::storage]
+	#[pallet::getter(fn sell_proposals)]
+	pub(super) type SellProposals<T> = StorageMap<
+		_,
+		Blake2_128Concat,
+		ProposalIndex,
+		SellProposal<BlockNumberFor<T>, T>,
 		OptionQuery,
 	>;
 
@@ -214,11 +250,25 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+
+	/// Stores the project keys and round types ending on a given block for sell_property votings.
+	#[pallet::storage]
+	#[pallet::getter(fn sell_property_rounds_expiring)]
+	pub type SellPropertyRoundsExpiring<T: Config> = StorageMap<
+		_,
+		Blake2_128Concat,
+		BlockNumberFor<T>,
+		BoundedVec<InqueryIndex, T::MaxVotesForBlock>,
+		ValueQuery,
+	>;
+
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
 		/// New proposal has been created.
 		Proposed {proposal_id: ProposalIndex, asset_id: u32, proposer: AccountIdOf<T>},
+		/// New proposal has been created.
+		SellProposed {proposal_id: ProposalIndex, asset_id: u32, proposer: AccountIdOf<T>},
 		/// A new inquery has been made.
 		Inquery {inquery_id: InqueryIndex, asset_id: u32, proposer: AccountIdOf<T>},
 		/// Voted on proposal.
@@ -241,6 +291,10 @@ pub mod pallet {
 		AlreadyVoted,
 		/// The assets details could not be found.
 		NoAssetFound,
+		/// There is no letting agent for this property.
+		NoLettingAgentFound,
+		/// The pallet has not enough funds.
+		NotEnoughFunds,
 	}
 
 	#[pallet::hooks]
@@ -252,8 +306,20 @@ pub mod pallet {
 			// checks if there is a voting for a proposal ending in this block.
 			ended_votings.iter().for_each(|item| {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
-				let _ = <OngoingVotes<T>>::take(item);
-				let _ = <Proposals<T>>::take(item);
+				let voting_results = <OngoingVotes<T>>::take(item);
+				let proposals = <Proposals<T>>::take(item);
+				if let Some(proposal) = proposals {
+					if let Some(voting_result) = voting_results {
+						let required_threshold = if proposal.amount >= <T as Config>::HighProposal::get() {
+							<T as Config>::HighThreshold::get()
+						} else {
+							<T as Config>::Threshold::get()
+						};
+						if voting_result.yes_votes > voting_result.no_votes && required_threshold < voting_result.yes_votes.saturating_add(voting_result.no_votes) {
+							let _ = Self::execute_proposal(proposal);
+						}
+					}
+				}
 			});
 
 			let ended_inquery_votings = InqueryRoundsExpiring::<T>::take(n);
@@ -273,6 +339,10 @@ pub mod pallet {
 		}
 	}
 
+
+	// delete this
+
+
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		/// Creates a proposal for a real estate object.
@@ -286,10 +356,9 @@ pub mod pallet {
 		/// Emits `Proposed` event when succesfful.
 		#[pallet::call_index(0)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::propose())]
-		pub fn propose(origin: OriginFor<T>, asset_id: u32) -> DispatchResult {
+		pub fn propose(origin: OriginFor<T>, asset_id: u32, amount: BalanceOf<T>, data: BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit> ) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
-			let onwer_list = pallet_nft_marketplace::Pallet::<T>::property_owner(asset_id);
-			ensure!(onwer_list.contains(&origin), Error::<T>::NoPermission);
+			ensure!(pallet_property_management::Pallet::<T>::letting_storage(asset_id).ok_or(Error::<T>::NoLettingAgentFound)? == origin.clone(), Error::<T>::NoPermission);
 			let proposal_id = Self::proposal_count().saturating_add(1);
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
 			let expiry_block =
@@ -297,6 +366,7 @@ pub mod pallet {
 			let proposal = Proposal {
 				proposer: origin.clone(),
 				asset_id,
+				amount,
 				created_at: current_block_number,
 			};
 			RoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
@@ -314,6 +384,51 @@ pub mod pallet {
 			});
 			Ok(())
 		}
+
+		// Letting can propose a propsal e.g. funding for new thing that costs x amount of funds
+		// Asking only for repairs 
+
+		// One months of rental income is hold back, like treasury
+
+		// cost over certain amount needs certain threashold and costs under certain amount no voting
+
+
+
+		// property holder want to sell the property as a whole. SPV would be desolved. Token would be put together
+		// for the nft and nft would be released. Vote happend. If would be approved. Outstanding tax payed etc. Once nft sold token would be burned.
+		// Different area on the marketplace for this. 
+		#[pallet::call_index(10)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::propose())]
+		pub fn sell_property(origin: OriginFor<T>, asset_id: u32, amount: BalanceOf<T>) -> DispatchResult {
+			let origin = ensure_signed(origin)?;
+			let owner_list = pallet_nft_marketplace::Pallet::<T>::property_owner(asset_id);
+			ensure!(owner_list.contains(&origin), Error::<T>::NoPermission);
+			let proposal_id = Self::proposal_count().saturating_add(1);
+			let current_block_number = <frame_system::Pallet<T>>::block_number();
+			let expiry_block =
+				current_block_number.saturating_add(<T as Config>::VotingTime::get());
+			let proposal = SellProposal {
+				proposer: origin.clone(),
+				asset_id,
+				amount,
+				created_at: current_block_number,
+			};
+			SellPropertyRoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
+				keys.try_push(proposal_id).map_err(|_| Error::<T>::TooManyProposals)?;
+				Ok::<(), DispatchError>(())
+			})?;
+			let vote_stats = VoteStats { yes_votes: 0, no_votes: 0};
+
+			SellProposals::<T>::insert(proposal_id, proposal);
+			OngoingVotes::<T>::insert(proposal_id, vote_stats);
+			Self::deposit_event(Event::SellProposed {
+				proposal_id, 
+				asset_id, 
+				proposer: origin,
+			});
+			Ok(())
+		}
+
 
 		/// Creates an inquery against the letting agent of the real estate object.
 		/// Only one of the owner of the property can propose.
@@ -431,6 +546,11 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
+
+		pub fn account_id() -> AccountIdOf<T> {
+			<T as pallet::Config>::PalletId::get().into_account_truncating()
+		}
+		
 		/// Changes the letting agent of a given real estate object.
 		fn change_letting_agent(inquery_id: InqueryIndex) -> DispatchResult {
 			let inquery = Inqueries::<T>::take(inquery_id).ok_or(Error::<T>::NotOngoing)?;
@@ -440,6 +560,19 @@ pub mod pallet {
 			let asset_details = pallet_nft_marketplace::Pallet::<T>::asset_id_details(inquery.asset_id).ok_or(Error::<T>::NoAssetFound)?;
 			let _ = pallet_property_management::Pallet::<T>::remove_bad_letting_agent(asset_details.region, asset_details.location.clone(), letting_agent);
 			let _ = pallet_property_management::Pallet::<T>::selects_letting_agent(asset_details.region, asset_details.location, inquery.asset_id);
+			Ok(())
+		}
+
+		fn execute_proposal(proposal: Proposal<BlockNumberFor<T>, T>) -> DispatchResult {
+			let letting_agent = pallet_property_management::Pallet::<T>::letting_storage(proposal.asset_id).unwrap();
+			let proposal_amount = proposal.amount;
+			<T as pallet::Config>::Currency::transfer(
+				&Self::account_id(), 
+				&letting_agent, 
+				proposal_amount, 
+				KeepAlive,
+			)
+			.map_err(|_| Error::<T>::NotEnoughFunds)?;
 			Ok(())
 		}
 	}
