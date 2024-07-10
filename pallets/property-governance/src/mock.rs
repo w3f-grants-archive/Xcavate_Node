@@ -250,7 +250,9 @@ parameter_types! {
 	pub const PropertyVotingTime: BlockNumber = 30;
 	pub const MaxVoteForBlock: u32 = 100;
 	pub const MaximumVoter: u32 = 100;
-	pub const VotingThreshold: u8 = 67;
+	pub const VotingThreshold: u8 = 51;
+	pub const HighVotingThreshold: u8 = 67;
+	pub const PropertyGovernancePalletId: PalletId = PalletId(*b"py/gvrnc");
 }
 
 /// Configure the pallet-property-governance in pallets/property-governance.
@@ -264,8 +266,12 @@ impl pallet_property_governance::Config for Test {
 	type MinSlashingAmount = ConstU32<100>;
 	type MaxVoter = MaximumVoter;
 	type Threshold = VotingThreshold;
+	type HighThreshold = HighVotingThreshold;
 	#[cfg(feature = "runtime-benchmarks")]
 	type Helper = AssetHelper;
+	type LowProposal = ConstU32<500>;
+	type HighProposal = ConstU32<10000>;
+	type PalletId = PropertyGovernancePalletId;
 }
 
 // Build genesis storage according to the mock runtime.
@@ -280,6 +286,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 			([3; 32].into(), 1_005_000),
 			([4; 32].into(), 5_000),
 			((NftMarketplace::account_id()), 20_000_000),
+			((PropertyGovernance::account_id()), 500_000),
 		],
 	}
 	.assimilate_storage(&mut test)

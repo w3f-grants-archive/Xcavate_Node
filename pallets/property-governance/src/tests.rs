@@ -41,9 +41,50 @@ fn propose_works() {
 			bvec![22, 22]
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
-		assert_ok!(PropertyGovernance::propose(RuntimeOrigin::signed([1; 32].into()), 0));
+		assert_ok!(PropertyManagement::add_letting_agent(
+			RuntimeOrigin::root(),
+			0,
+			bvec![10, 10],
+			[0; 32].into(),
+		));
+		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([0; 32].into())));
+		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0));
+		assert_eq!(PropertyManagement::letting_storage(0).unwrap(), [0; 32].into());
+		assert_ok!(PropertyGovernance::propose(RuntimeOrigin::signed([0; 32].into()), 0, 1000, bvec![10, 10]));
 		assert_eq!(PropertyGovernance::proposals(1).unwrap().asset_id, 0);
 		assert_eq!(PropertyGovernance::ongoing_votes(1).is_some(), true);
+	});
+}
+
+#[test]
+fn proposal_with_low_amount_works() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(NftMarketplace::create_new_region(RuntimeOrigin::root()));
+		assert_ok!(NftMarketplace::create_new_location(RuntimeOrigin::root(), 0, bvec![10, 10]));
+		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [3; 32].into()));
+		assert_ok!(NftMarketplace::list_object(
+			RuntimeOrigin::signed([0; 32].into()),
+			0,
+			bvec![10, 10],
+			10_000,
+			100,
+			bvec![22, 22]
+		));
+		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_ok!(PropertyManagement::add_letting_agent(
+			RuntimeOrigin::root(),
+			0,
+			bvec![10, 10],
+			[4; 32].into(),
+		));
+		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([4; 32].into())));
+		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([4; 32].into()), 0));
+		assert_eq!(PropertyManagement::letting_storage(0).unwrap(), [4; 32].into());
+		assert_ok!(PropertyGovernance::propose(RuntimeOrigin::signed([4; 32].into()), 0, 500, bvec![10, 10]));
+		assert_eq!(Balances::free_balance(&([4; 32].into())), 5400);
 	});
 }
 
@@ -64,7 +105,17 @@ fn propose_fails() {
 			bvec![22, 22]
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
-		assert_noop!(PropertyGovernance::propose(RuntimeOrigin::signed([2; 32].into()), 0), Error::<Test>::NoPermission);
+		assert_noop!(PropertyGovernance::propose(RuntimeOrigin::signed([2; 32].into()), 0, 1000, bvec![10, 10]), Error::<Test>::NoLettingAgentFound);
+		assert_ok!(PropertyManagement::add_letting_agent(
+			RuntimeOrigin::root(),
+			0,
+			bvec![10, 10],
+			[0; 32].into(),
+		));
+		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([0; 32].into())));
+		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0));
+		assert_eq!(PropertyManagement::letting_storage(0).unwrap(), [0; 32].into());
+		assert_noop!(PropertyGovernance::propose(RuntimeOrigin::signed([2; 32].into()), 0, 1000, bvec![10, 10]), Error::<Test>::NoPermission);
 	});
 }
 
@@ -112,7 +163,16 @@ fn vote_on_proposal_works() {
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 20));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([2; 32].into()), 0, 10));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([3; 32].into()), 0, 40));
-		assert_ok!(PropertyGovernance::propose(RuntimeOrigin::signed([1; 32].into()), 0));
+		assert_ok!(PropertyManagement::add_letting_agent(
+			RuntimeOrigin::root(),
+			0,
+			bvec![10, 10],
+			[0; 32].into(),
+		));
+		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([0; 32].into())));
+		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0));
+		assert_eq!(PropertyManagement::letting_storage(0).unwrap(), [0; 32].into());
+		assert_ok!(PropertyGovernance::propose(RuntimeOrigin::signed([0; 32].into()), 0, 1000, bvec![10, 10]));
 		assert_ok!(PropertyGovernance::vote_on_proposal(RuntimeOrigin::signed([1; 32].into()), 1, crate::Vote::Yes));
 		assert_ok!(PropertyGovernance::vote_on_proposal(RuntimeOrigin::signed([2; 32].into()), 1, crate::Vote::Yes));
 		assert_ok!(PropertyGovernance::vote_on_proposal(RuntimeOrigin::signed([3; 32].into()), 1, crate::Vote::No));
@@ -138,7 +198,16 @@ fn proposal_pass() {
 			bvec![22, 22]
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
-		assert_ok!(PropertyGovernance::propose(RuntimeOrigin::signed([1; 32].into()), 0));
+		assert_ok!(PropertyManagement::add_letting_agent(
+			RuntimeOrigin::root(),
+			0,
+			bvec![10, 10],
+			[0; 32].into(),
+		));
+		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([0; 32].into())));
+		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0));
+		assert_eq!(PropertyManagement::letting_storage(0).unwrap(), [0; 32].into());
+		assert_ok!(PropertyGovernance::propose(RuntimeOrigin::signed([0; 32].into()), 0, 1000, bvec![10, 10]));
 		assert_ok!(PropertyGovernance::vote_on_proposal(RuntimeOrigin::signed([1; 32].into()), 1, crate::Vote::Yes));
 		assert_eq!(PropertyGovernance::proposals(1).is_some(), true);
 		run_to_block(31);
@@ -163,7 +232,16 @@ fn proposal_not_pass() {
 			bvec![22, 22]
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
-		assert_ok!(PropertyGovernance::propose(RuntimeOrigin::signed([1; 32].into()), 0));
+		assert_ok!(PropertyManagement::add_letting_agent(
+			RuntimeOrigin::root(),
+			0,
+			bvec![10, 10],
+			[0; 32].into(),
+		));
+		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([0; 32].into())));
+		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0));
+		assert_eq!(PropertyManagement::letting_storage(0).unwrap(), [0; 32].into());
+		assert_ok!(PropertyGovernance::propose(RuntimeOrigin::signed([0; 32].into()), 0, 1000, bvec![10, 10]));
 		assert_ok!(PropertyGovernance::vote_on_proposal(RuntimeOrigin::signed([1; 32].into()), 1, crate::Vote::No));
 		assert_eq!(PropertyGovernance::proposals(1).is_some(), true);
 		run_to_block(31);
@@ -188,8 +266,17 @@ fn vote_on_proposal_fails() {
 			bvec![22, 22]
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_ok!(PropertyManagement::add_letting_agent(
+			RuntimeOrigin::root(),
+			0,
+			bvec![10, 10],
+			[0; 32].into(),
+		));
+		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([0; 32].into())));
+		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0));
+		assert_eq!(PropertyManagement::letting_storage(0).unwrap(), [0; 32].into());
 		assert_noop!(PropertyGovernance::vote_on_proposal(RuntimeOrigin::signed([1; 32].into()), 1, crate::Vote::Yes), Error::<Test>::NotOngoing);
-		assert_ok!(PropertyGovernance::propose(RuntimeOrigin::signed([1; 32].into()), 0));
+		assert_ok!(PropertyGovernance::propose(RuntimeOrigin::signed([0; 32].into()), 0, 1000, bvec![10, 10]));
 		assert_ok!(PropertyGovernance::vote_on_proposal(RuntimeOrigin::signed([1; 32].into()), 1, crate::Vote::Yes));
 		assert_noop!(PropertyGovernance::vote_on_proposal(RuntimeOrigin::signed([2; 32].into()), 1, crate::Vote::Yes), Error::<Test>::NoPermission);
 		assert_noop!(PropertyGovernance::vote_on_proposal(RuntimeOrigin::signed([1; 32].into()), 1, crate::Vote::Yes), Error::<Test>::AlreadyVoted);

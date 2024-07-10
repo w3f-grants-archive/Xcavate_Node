@@ -596,7 +596,7 @@ parameter_types! {
 	pub const MaxVoteForBlock: u32 = 100;
 	pub const MinimumSlashingAmount: Balance = 10 * DOLLARS;
 	pub const MaximumVoter: u32 = 100;
-	pub const VotingThreshold: u8 = 50;
+	pub const VotingThreshold: u8 = 51;
 	pub const HighVotingThreshold: u8 = 67;
 	pub const LowProposal: Balance = 500 * DOLLARS;
 	pub const HighProposal: Balance = 10_000 * DOLLARS;

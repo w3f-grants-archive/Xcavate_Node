@@ -275,6 +275,8 @@ pub mod pallet {
 		VotedOnProposal { proposal_id: ProposalIndex, voter: AccountIdOf<T>, vote: Vote},
 		/// Voted on inquery.
 		VotedOnInquery { inquery_id: InqueryIndex, voter: AccountIdOf<T>, vote: Vote},
+		/// The proposal has been executed.
+		ProposalExecuted { asset_id: u32, amount: BalanceOf<T> }
 	}
 
 	#[pallet::error]
@@ -339,10 +341,6 @@ pub mod pallet {
 		}
 	}
 
-
-	// delete this
-
-
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		/// Creates a proposal for a real estate object.
@@ -359,16 +357,24 @@ pub mod pallet {
 		pub fn propose(origin: OriginFor<T>, asset_id: u32, amount: BalanceOf<T>, data: BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit> ) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			ensure!(pallet_property_management::Pallet::<T>::letting_storage(asset_id).ok_or(Error::<T>::NoLettingAgentFound)? == origin.clone(), Error::<T>::NoPermission);
-			let proposal_id = Self::proposal_count().saturating_add(1);
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
-			let expiry_block =
-				current_block_number.saturating_add(<T as Config>::VotingTime::get());
 			let proposal = Proposal {
 				proposer: origin.clone(),
 				asset_id,
 				amount,
 				created_at: current_block_number,
 			};
+			
+			// Check if the amount is less than LowProposal
+			if amount <= <T as Config>::LowProposal::get() {
+				// Execute the proposal immediately
+				Self::execute_proposal(proposal)?;
+				return Ok(());
+			}
+			
+			let proposal_id = Self::proposal_count().saturating_add(1);
+			let expiry_block =
+				current_block_number.saturating_add(<T as Config>::VotingTime::get());
 			RoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
 				keys.try_push(proposal_id).map_err(|_| Error::<T>::TooManyProposals)?;
 				Ok::<(), DispatchError>(())
@@ -389,9 +395,6 @@ pub mod pallet {
 		// Asking only for repairs 
 
 		// One months of rental income is hold back, like treasury
-
-		// cost over certain amount needs certain threashold and costs under certain amount no voting
-
 
 
 		// property holder want to sell the property as a whole. SPV would be desolved. Token would be put together
@@ -573,6 +576,10 @@ pub mod pallet {
 				KeepAlive,
 			)
 			.map_err(|_| Error::<T>::NotEnoughFunds)?;
+			Self::deposit_event(Event::ProposalExecuted {
+				asset_id: proposal.asset_id,
+				amount: proposal.amount,
+			});
 			Ok(())
 		}
 	}
