@@ -574,6 +574,7 @@ parameter_types! {
 	pub const MaxProperty: u32 = 1000;
 	pub const MaxLettingAgent: u32 = 100;
 	pub const MaxLocation: u32 = 100;
+	pub const PropertyReserves: Balance = 1000 * DOLLARS;
 }
 
 /// Configure the pallet-property-management in pallets/property-management.
@@ -589,6 +590,8 @@ impl pallet_property_management::Config for Runtime {
 	type MaxProperties = MaxProperty;
 	type MaxLettingAgents = MaxLettingAgent;
 	type MaxLocations = MaxLocation;
+	type GovernanceId = PropertyGovernancePalletId;
+	type PropertyReserve = PropertyReserves;
 }
 
 parameter_types! {

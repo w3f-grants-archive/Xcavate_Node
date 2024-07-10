@@ -205,6 +205,12 @@ pub mod pallet {
 		OptionQuery,
 	>;
 
+	/// Mapping of asset id to the stored balance for a property.
+	#[pallet::storage]
+	#[pallet::getter(fn property_reserve)]
+	pub(super) type PropertyReserve<T> = 
+		StorageMap<_, Blake2_128Concat, u32, BalanceOf<T>, OptionQuery>;
+
 	/// Mapping of ongoing votes.
 	#[pallet::storage]
 	#[pallet::getter(fn ongoing_votes)]

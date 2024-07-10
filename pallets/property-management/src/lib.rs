@@ -25,6 +25,7 @@ use frame_support::sp_runtime::{
 	traits::{
 	AccountIdConversion, CheckedMul, CheckedAdd, CheckedDiv, Zero,
 	},
+	Saturating,
 };
 
 use pallet_assets::Instance1;
@@ -119,6 +120,13 @@ pub mod pallet {
 		/// The maximum amount of locations a letting agent can be assigned to.
 		#[pallet::constant]
 		type MaxLocations: Get<u32>;
+
+		/// The Governance's pallet id, used for deriving its sovereign account ID.
+		#[pallet::constant]
+		type GovernanceId: Get<PalletId>;
+
+		/// The reserve a property needs to have.
+		type PropertyReserve: Get<BalanceOf<Self>>;
 	}
 
 	pub type LocationId<T> = BoundedVec<u8, <T as pallet_nft_marketplace::Config>::PostcodeLimit>;
@@ -144,6 +152,13 @@ pub mod pallet {
 		BalanceOf<T>,
 		ValueQuery,
 	>;
+
+
+	/// Mapping of asset id to the stored balance for a property.
+	#[pallet::storage]
+	#[pallet::getter(fn property_reserve)]
+	pub(super) type PropertyReserve<T> = 
+		StorageMap<_, Blake2_128Concat, u32, BalanceOf<T>, ValueQuery>;
 
 	/// Mapping from account to letting agent info
 	#[pallet::storage]
@@ -389,10 +404,27 @@ pub mod pallet {
 			)
 			.map_err(|_| Error::<T>::NotEnoughFunds)?;
 			let owner_list = pallet_nft_marketplace::Pallet::<T>::property_owner(asset_id);
+			let mut governance_amount = BalanceOf::<T>::zero();
+
+			if Self::property_reserve(asset_id) < <T as pallet::Config>::PropertyReserve::get() {
+				let missing_amount = <T as pallet::Config>::PropertyReserve::get().saturating_sub(Self::property_reserve(asset_id));
+				governance_amount = amount.saturating_sub(missing_amount);
+		
+				if governance_amount > BalanceOf::<T>::zero() {
+					<T as pallet::Config>::Currency::transfer(
+						&Self::account_id(), 
+						&Self::governance_account_id(), 
+						governance_amount, 
+						KeepAlive,
+					).map_err(|_| Error::<T>::NotEnoughFunds)?;
+				}
+			}
+		
+			let remaining_amount = amount.saturating_sub(governance_amount);
 			for owner in owner_list {
 				let token_amount = pallet_nft_marketplace::Pallet::<T>::property_owner_token(asset_id, owner.clone());
 				let amount_for_owner = Self::u64_to_balance_option(token_amount as u64)?
-					.checked_mul(&amount)
+					.checked_mul(&remaining_amount)
 					.ok_or(Error::<T>::MultiplyError)?
 					.checked_div(&Self::u64_to_balance_option(100)?)
 					.ok_or(Error::<T>::DivisionError)?;
@@ -402,7 +434,7 @@ pub mod pallet {
 			};
 			Self::deposit_event(Event::<T>::IncomeDistributed {
 				asset_id,
-				amount,
+				amount: remaining_amount,
 			});
 			Ok(())
 		}
@@ -437,6 +469,10 @@ pub mod pallet {
 		/// Get the account id of the pallet
 		pub fn account_id() -> AccountIdOf<T> {
 			<T as pallet::Config>::PalletId::get().into_account_truncating()
+		}
+
+		pub fn governance_account_id() -> AccountIdOf<T> {
+			<T as pallet::Config>::GovernanceId::get().into_account_truncating()
 		}
 
 		/// Converts a u64 to a balance.
