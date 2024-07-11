@@ -254,6 +254,8 @@ pub mod pallet {
 		NotDeposited,
 		/// The letting agent is already registered.
 		LettingAgentExists,
+		/// The property does not have enough reserves to make this proposal.
+		NotEnoughReserves,
 	}
 
 	#[pallet::call]
@@ -405,19 +407,27 @@ pub mod pallet {
 			.map_err(|_| Error::<T>::NotEnoughFunds)?;
 			let owner_list = pallet_nft_marketplace::Pallet::<T>::property_owner(asset_id);
 			let mut governance_amount = BalanceOf::<T>::zero();
-
-			if Self::property_reserve(asset_id) < <T as pallet::Config>::PropertyReserve::get() {
-				let missing_amount = <T as pallet::Config>::PropertyReserve::get().saturating_sub(Self::property_reserve(asset_id));
-				governance_amount = amount.saturating_sub(missing_amount);
+			let property_reserve = Self::property_reserve(asset_id);
+			let required_reserve = <T as pallet::Config>::PropertyReserve::get();
+			
+			if property_reserve < required_reserve {
+				let missing_amount = required_reserve.saturating_sub(property_reserve);
 		
+				governance_amount = core::cmp::min(amount, missing_amount);
+			
+				let remaining_amount = amount.saturating_sub(governance_amount);
+			
 				if governance_amount > BalanceOf::<T>::zero() {
 					<T as pallet::Config>::Currency::transfer(
-						&Self::account_id(), 
-						&Self::governance_account_id(), 
-						governance_amount, 
+						&Self::account_id(),
+						&Self::governance_account_id(),
+						governance_amount,
 						KeepAlive,
 					).map_err(|_| Error::<T>::NotEnoughFunds)?;
 				}
+			
+				let new_property_reserve = property_reserve.checked_add(&governance_amount).ok_or(Error::<T>::ArithmeticOverflow)?;
+				PropertyReserve::<T>::insert(asset_id, new_property_reserve);
 			}
 		
 			let remaining_amount = amount.saturating_sub(governance_amount);
@@ -503,6 +513,14 @@ pub mod pallet {
 			let index = letting_agents.iter().position(|x| *x == agent).ok_or(Error::<T>::AgentNotFound)?;
 			letting_agents.remove(index);
 			LettingAgentLocations::<T>::insert(region, location, letting_agents);
+			Ok(())
+		}
+
+		pub fn decrease_reserves(asset_id: u32, amount: BalanceOf<T>) -> DispatchResult {
+			let mut property_reserve = Self::property_reserve(asset_id);
+			ensure!(property_reserve >= amount, Error::<T>::NotEnoughReserves);
+			property_reserve = property_reserve.saturating_sub(amount);
+			PropertyReserve::<T>::insert(asset_id, property_reserve);
 			Ok(())
 		}
 	}

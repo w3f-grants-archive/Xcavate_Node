@@ -230,6 +230,7 @@ parameter_types! {
 	pub const MaxProperty: u32 = 100;
 	pub const MaxLettingAgent: u32 = 100;
 	pub const MaxLocation: u32 = 100;
+	pub const PropertyGovernancePalletId: PalletId = PalletId(*b"py/gvrnc");
 }
 
 /// Configure the pallet-property-management in pallets/property-management.
@@ -245,6 +246,8 @@ impl pallet_property_management::Config for Test {
 	type MaxProperties = MaxProperty;
 	type MaxLettingAgents = MaxLettingAgent;
 	type MaxLocations = MaxLocation;
+	type GovernanceId = PropertyGovernancePalletId;
+	type PropertyReserve = ConstU32<3000>;
 }
 
 // Build genesis storage according to the mock runtime.

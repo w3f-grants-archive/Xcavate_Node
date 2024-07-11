@@ -244,6 +244,8 @@ impl pallet_property_management::Config for Test {
 	type MaxProperties = MaxProperty;
 	type MaxLettingAgents = MaxLettingAgent;
 	type MaxLocations = MaxLocation;
+	type GovernanceId = PropertyGovernancePalletId;
+	type PropertyReserve = ConstU32<3000>;
 }
 
 parameter_types! {
@@ -270,7 +272,7 @@ impl pallet_property_governance::Config for Test {
 	#[cfg(feature = "runtime-benchmarks")]
 	type Helper = AssetHelper;
 	type LowProposal = ConstU32<500>;
-	type HighProposal = ConstU32<10000>;
+	type HighProposal = ConstU32<2000>;
 	type PalletId = PropertyGovernancePalletId;
 }
 
@@ -287,6 +289,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 			([4; 32].into(), 5_000),
 			((NftMarketplace::account_id()), 20_000_000),
 			((PropertyGovernance::account_id()), 500_000),
+			((PropertyManagement::account_id()), 1),
 		],
 	}
 	.assimilate_storage(&mut test)

@@ -71,6 +71,7 @@ pub mod pallet {
 		pub asset_id: u32,
 		pub amount: BalanceOf<T>,
 		pub created_at: BlockNumber,
+		pub proposal_info:  BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>,
 	}
 	
 	/// Sell proposal with the proposal Details.
@@ -205,12 +206,6 @@ pub mod pallet {
 		OptionQuery,
 	>;
 
-	/// Mapping of asset id to the stored balance for a property.
-	#[pallet::storage]
-	#[pallet::getter(fn property_reserve)]
-	pub(super) type PropertyReserve<T> = 
-		StorageMap<_, Blake2_128Concat, u32, BalanceOf<T>, OptionQuery>;
-
 	/// Mapping of ongoing votes.
 	#[pallet::storage]
 	#[pallet::getter(fn ongoing_votes)]
@@ -303,6 +298,10 @@ pub mod pallet {
 		NoLettingAgentFound,
 		/// The pallet has not enough funds.
 		NotEnoughFunds,
+		/// The property does not have enough reserves to make this proposal.
+		NotEnoughReserves,
+		/// Error during converting types.
+		ConversionError,
 	}
 
 	#[pallet::hooks]
@@ -363,12 +362,21 @@ pub mod pallet {
 		pub fn propose(origin: OriginFor<T>, asset_id: u32, amount: BalanceOf<T>, data: BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit> ) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			ensure!(pallet_property_management::Pallet::<T>::letting_storage(asset_id).ok_or(Error::<T>::NoLettingAgentFound)? == origin.clone(), Error::<T>::NoPermission);
+			ensure!(
+				pallet_property_management::Pallet::<T>::property_reserve(asset_id) 
+					>= TryInto::<u64>::try_into(amount)
+						.map_err(|_| Error::<T>::ConversionError)?
+						.try_into()
+						.map_err(|_| Error::<T>::ConversionError)?,
+				Error::<T>::NotEnoughReserves
+			);
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
 			let proposal = Proposal {
 				proposer: origin.clone(),
 				asset_id,
 				amount,
 				created_at: current_block_number,
+				proposal_info: data,
 			};
 			
 			// Check if the amount is less than LowProposal
@@ -389,6 +397,7 @@ pub mod pallet {
 
 			Proposals::<T>::insert(proposal_id, proposal);
 			OngoingVotes::<T>::insert(proposal_id, vote_stats);
+			ProposalCount::<T>::put(proposal_id);
 			Self::deposit_event(Event::Proposed {
 				proposal_id, 
 				asset_id, 
@@ -396,11 +405,6 @@ pub mod pallet {
 			});
 			Ok(())
 		}
-
-		// Letting can propose a propsal e.g. funding for new thing that costs x amount of funds
-		// Asking only for repairs 
-
-		// One months of rental income is hold back, like treasury
 
 
 		// property holder want to sell the property as a whole. SPV would be desolved. Token would be put together
@@ -586,6 +590,10 @@ pub mod pallet {
 				asset_id: proposal.asset_id,
 				amount: proposal.amount,
 			});
+			pallet_property_management::Pallet::<T>::decrease_reserves(proposal.asset_id, TryInto::<u64>::try_into(proposal_amount)
+			.map_err(|_| Error::<T>::ConversionError)?
+			.try_into()
+			.map_err(|_| Error::<T>::ConversionError)?);
 			Ok(())
 		}
 	}

@@ -367,11 +367,12 @@ fn distribute_income_works() {
 		));
 		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([4; 32].into())));
 		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0));
-		assert_ok!(PropertyManagement::distribute_income(RuntimeOrigin::signed([4; 32].into()), 0, 200));
+		assert_ok!(PropertyManagement::distribute_income(RuntimeOrigin::signed([4; 32].into()), 0, 3200));
+		assert_eq!(PropertyManagement::property_reserve(0), 3000);
 		assert_eq!(PropertyManagement::stored_funds::<AccountId>([1; 32].into()), 40);
 		assert_eq!(PropertyManagement::stored_funds::<AccountId>([2; 32].into()), 60);
 		assert_eq!(PropertyManagement::stored_funds::<AccountId>([3; 32].into()), 100);
-		assert_eq!(Balances::free_balance(&([4; 32].into())), 4700);
+		assert_eq!(Balances::free_balance(&([4; 32].into())), 1700);
 	});
 }
 
@@ -431,12 +432,14 @@ fn withdraw_funds_works() {
 		));
 		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([4; 32].into())));
 		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0));
-		assert_ok!(PropertyManagement::distribute_income(RuntimeOrigin::signed([4; 32].into()), 0, 200));
+		assert_ok!(PropertyManagement::distribute_income(RuntimeOrigin::signed([4; 32].into()), 0, 3200));
+		assert_eq!(PropertyManagement::property_reserve(0), 3000);
 		assert_eq!(PropertyManagement::stored_funds::<AccountId>([1; 32].into()), 200);
-		assert_eq!(Balances::free_balance(&([4; 32].into())), 4700);
+		assert_eq!(Balances::free_balance(&([4; 32].into())), 1700);
 		assert_eq!(Balances::free_balance(&PropertyManagement::account_id()), 5200);
 		assert_ok!(PropertyManagement::withdraw_funds(RuntimeOrigin::signed([1; 32].into())));
 		assert_eq!(Balances::free_balance(&PropertyManagement::account_id()), 5000);
+		assert_eq!(Balances::free_balance(&PropertyManagement::governance_account_id()), 3000);
 		assert_eq!(Balances::free_balance(&([1; 32].into())), 15_000_200);
 	});
 }
@@ -466,7 +469,7 @@ fn withdraw_funds_fails() {
 		));
 		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([4; 32].into())));
 		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0));
-		assert_ok!(PropertyManagement::distribute_income(RuntimeOrigin::signed([4; 32].into()), 0, 200));
+		assert_ok!(PropertyManagement::distribute_income(RuntimeOrigin::signed([4; 32].into()), 0, 3200));
 		assert_eq!(PropertyManagement::stored_funds::<AccountId>([1; 32].into()), 200);
 		assert_noop!(PropertyManagement::withdraw_funds(RuntimeOrigin::signed([2; 32].into())), Error::<Test>::UserHasNoFundsStored);
 	});
