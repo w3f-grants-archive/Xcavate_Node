@@ -9,8 +9,8 @@ use frame_benchmarking::v2::*;
 use frame_support::sp_runtime::traits::Bounded;
 use frame_support::traits::Get;
 use frame_system::RawOrigin;
-use pallet_xcavate_whitelist::Pallet as Whitelist;
 use pallet_assets::Pallet as Assets;
+use pallet_xcavate_whitelist::Pallet as Whitelist;
 type DepositBalanceOf<T> = <<T as pallet_nfts::Config>::Currency as Currency<
 	<T as frame_system::Config>::AccountId,
 >>::Balance;
@@ -79,7 +79,7 @@ mod benchmarks {
 		);
 	}
 
- 	#[benchmark]
+	#[benchmark]
 	fn buy_token() {
 		let (caller, value) = setup_object_listing::<T>();
 		assert_ok!(Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone()));
@@ -127,14 +127,18 @@ mod benchmarks {
 				.try_into()
 				.unwrap(),
 		));
-		assert_ok!(NftMarketplace::<T>::buy_token(RawOrigin::Signed(caller.clone()).into(), 0, 100));
+		assert_ok!(NftMarketplace::<T>::buy_token(
+			RawOrigin::Signed(caller.clone()).into(),
+			0,
+			100
+		));
 		let listing_value: BalanceOf<T> = 2_000u32.into();
 		#[extrinsic_call]
 		relist_token(RawOrigin::Signed(caller), 0, 0.into(), listing_value, 80);
 		//assert_eq!(NftMarketplace::<T>::listed_nfts().len(), 1);
 	}
 
- 	#[benchmark]
+	#[benchmark]
 	fn buy_relisted_token() {
 		let (caller, value) = setup_object_listing::<T>();
 		assert_ok!(Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone()));
@@ -151,7 +155,11 @@ mod benchmarks {
 				.try_into()
 				.unwrap(),
 		));
-		assert_ok!(NftMarketplace::<T>::buy_token(RawOrigin::Signed(caller.clone()).into(), 0, 100));
+		assert_ok!(NftMarketplace::<T>::buy_token(
+			RawOrigin::Signed(caller.clone()).into(),
+			0,
+			100
+		));
 		let listing_value: BalanceOf<T> = 2u32.into();
 		assert_ok!(NftMarketplace::<T>::relist_token(
 			RawOrigin::Signed(caller.clone()).into(),
@@ -177,7 +185,7 @@ mod benchmarks {
 		#[extrinsic_call]
 		buy_relisted_token(RawOrigin::Signed(nft_buyer), 1, 1);
 		//assert_eq!(NftMarketplace::<T>::listed_nfts().len(), 0);
-	} 
+	}
 
 	#[benchmark]
 	fn make_offer() {
@@ -196,7 +204,11 @@ mod benchmarks {
 				.try_into()
 				.unwrap(),
 		));
-		assert_ok!(NftMarketplace::<T>::buy_token(RawOrigin::Signed(caller.clone()).into(), 0, 100));
+		assert_ok!(NftMarketplace::<T>::buy_token(
+			RawOrigin::Signed(caller.clone()).into(),
+			0,
+			100
+		));
 		let listing_value: BalanceOf<T> = 2u32.into();
 		assert_ok!(NftMarketplace::<T>::relist_token(
 			RawOrigin::Signed(caller.clone()).into(),
@@ -223,8 +235,7 @@ mod benchmarks {
 		#[extrinsic_call]
 		make_offer(RawOrigin::Signed(token_buyer), 1, offer_value, 10);
 		//assert_eq!(NftMarketplace::<T>::listed_nfts().len(), 0);
-	} 
-
+	}
 
 	#[benchmark]
 	fn handle_offer() {
@@ -243,7 +254,11 @@ mod benchmarks {
 				.try_into()
 				.unwrap(),
 		));
-		assert_ok!(NftMarketplace::<T>::buy_token(RawOrigin::Signed(caller.clone()).into(), 0, 100));
+		assert_ok!(NftMarketplace::<T>::buy_token(
+			RawOrigin::Signed(caller.clone()).into(),
+			0,
+			100
+		));
 		let listing_value: BalanceOf<T> = 2u32.into();
 		assert_ok!(NftMarketplace::<T>::relist_token(
 			RawOrigin::Signed(caller.clone()).into(),
@@ -268,15 +283,15 @@ mod benchmarks {
 		));
 		let offer_value: BalanceOf<T> = 10u32.into();
 		assert_ok!(NftMarketplace::<T>::make_offer(
-			RawOrigin::Signed(token_buyer).into(), 
-			1, 
-			offer_value, 
+			RawOrigin::Signed(token_buyer).into(),
+			1,
+			offer_value,
 			10
 		));
 		#[extrinsic_call]
 		handle_offer(RawOrigin::Signed(caller), 1, 0, crate::Offer::Accept);
 		//assert_eq!(NftMarketplace::<T>::listed_nfts().len(), 0);
-	} 
+	}
 
 	#[benchmark]
 	fn cancel_offer() {
@@ -295,7 +310,11 @@ mod benchmarks {
 				.try_into()
 				.unwrap(),
 		));
-		assert_ok!(NftMarketplace::<T>::buy_token(RawOrigin::Signed(caller.clone()).into(), 0, 100));
+		assert_ok!(NftMarketplace::<T>::buy_token(
+			RawOrigin::Signed(caller.clone()).into(),
+			0,
+			100
+		));
 		let listing_value: BalanceOf<T> = 2u32.into();
 		assert_ok!(NftMarketplace::<T>::relist_token(
 			RawOrigin::Signed(caller.clone()).into(),
@@ -320,15 +339,15 @@ mod benchmarks {
 		));
 		let offer_value: BalanceOf<T> = 100u32.into();
 		assert_ok!(NftMarketplace::<T>::make_offer(
-			RawOrigin::Signed(token_buyer.clone()).into(), 
-			1, 
-			offer_value, 
+			RawOrigin::Signed(token_buyer.clone()).into(),
+			1,
+			offer_value,
 			10
 		));
 		#[extrinsic_call]
 		cancel_offer(RawOrigin::Signed(token_buyer), 1, 0);
 		//assert_eq!(NftMarketplace::<T>::listed_nfts().len(), 0);
-	} 
+	}
 
 	#[benchmark]
 	fn upgrade_listing() {
@@ -347,7 +366,11 @@ mod benchmarks {
 				.try_into()
 				.unwrap(),
 		));
-		assert_ok!(NftMarketplace::<T>::buy_token(RawOrigin::Signed(caller.clone()).into(), 0, 100));
+		assert_ok!(NftMarketplace::<T>::buy_token(
+			RawOrigin::Signed(caller.clone()).into(),
+			0,
+			100
+		));
 		let listing_value: BalanceOf<T> = 2_000u32.into();
 		assert_ok!(NftMarketplace::<T>::relist_token(
 			RawOrigin::Signed(caller.clone()).into(),
@@ -390,7 +413,7 @@ mod benchmarks {
 		let new_price: BalanceOf<T> = 300_000u32.into();
 		#[extrinsic_call]
 		upgrade_object(RawOrigin::Signed(caller), 0, new_price);
-		assert_eq!(NftMarketplace::<T>::ongoing_object_listing(0).unwrap().token_price,new_price); 
+		assert_eq!(NftMarketplace::<T>::ongoing_object_listing(0).unwrap().token_price, new_price);
 	}
 
 	#[benchmark]
@@ -410,7 +433,11 @@ mod benchmarks {
 				.try_into()
 				.unwrap(),
 		));
-		assert_ok!(NftMarketplace::<T>::buy_token(RawOrigin::Signed(caller.clone()).into(), 0, 100));
+		assert_ok!(NftMarketplace::<T>::buy_token(
+			RawOrigin::Signed(caller.clone()).into(),
+			0,
+			100
+		));
 		let listing_value: BalanceOf<T> = 2_000u32.into();
 		assert_ok!(NftMarketplace::<T>::relist_token(
 			RawOrigin::Signed(caller.clone()).into(),
@@ -438,7 +465,7 @@ mod benchmarks {
 	fn create_new_region() {
 		#[extrinsic_call]
 		create_new_region(RawOrigin::Root);
-	} 
+	}
 
 	impl_benchmark_test_suite!(NftMarketplace, crate::mock::new_test_ext(), crate::mock::Test);
 }

@@ -5,8 +5,8 @@ use super::*;
 #[allow(unused)]
 use crate::Pallet as Whitelist;
 use frame_benchmarking::v2::*;
-use frame_system::RawOrigin;
 use frame_support::assert_ok;
+use frame_system::RawOrigin;
 
 #[benchmarks]
 mod benchmarks {

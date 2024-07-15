@@ -14,11 +14,8 @@ pub mod weights;
 pub use weights::*;
 
 use frame_support::{
-	sp_runtime::{Saturating, traits::AccountIdConversion},
-	traits::{
-	Currency, ReservableCurrency, OnUnbalanced,
-	ExistenceRequirement::KeepAlive,
-	},
+	sp_runtime::{traits::AccountIdConversion, Saturating},
+	traits::{Currency, ExistenceRequirement::KeepAlive, OnUnbalanced, ReservableCurrency},
 	PalletId,
 };
 
@@ -27,10 +24,10 @@ use pallet_assets::Instance1;
 pub type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
 
 pub type NegativeImbalanceOf<T> = <<T as Config>::Currency as Currency<
-<T as frame_system::Config>::AccountId,
+	<T as frame_system::Config>::AccountId,
 >>::NegativeImbalance;
 
-pub type BalanceOf<T> = 
+pub type BalanceOf<T> =
 	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
 #[frame_support::pallet]
@@ -51,9 +48,7 @@ pub mod pallet {
 	}
 
 	#[cfg(feature = "runtime-benchmarks")]
-	impl<T: Config>
-		BenchmarkHelper<AssetId<T>, T> for AssetHelper
-	{
+	impl<T: Config> BenchmarkHelper<AssetId<T>, T> for AssetHelper {
 		fn to_asset(i: u32) -> AssetId<T> {
 			i.into()
 		}
@@ -71,9 +66,9 @@ pub mod pallet {
 		pub asset_id: u32,
 		pub amount: BalanceOf<T>,
 		pub created_at: BlockNumber,
-		pub proposal_info:  BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>,
+		pub proposal_info: BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>,
 	}
-	
+
 	/// Sell proposal with the proposal Details.
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
@@ -83,7 +78,7 @@ pub mod pallet {
 		pub asset_id: u32,
 		pub amount: BalanceOf<T>,
 		pub created_at: BlockNumber,
-	}	
+	}
 
 	/// Inquery with the inquery Details.
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
@@ -93,7 +88,7 @@ pub mod pallet {
 		pub proposer: AccountIdOf<T>,
 		pub asset_id: u32,
 		pub created_at: BlockNumber,
-	}	
+	}
 
 	/// Vote enum.
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
@@ -112,9 +107,10 @@ pub mod pallet {
 	}
 
 	#[pallet::config]
-	pub trait Config: frame_system::Config 
-		+ pallet_nft_marketplace::Config 
-		+ pallet_property_management::Config 
+	pub trait Config:
+		frame_system::Config
+		+ pallet_nft_marketplace::Config
+		+ pallet_property_management::Config
 		+ pallet_assets::Config<Instance1>
 	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
@@ -124,8 +120,7 @@ pub mod pallet {
 		type WeightInfo: WeightInfo;
 
 		/// The reservable currency type.
-		type Currency: Currency<Self::AccountId>
-			+ ReservableCurrency<Self::AccountId>;
+		type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
 
 		/// The amount of time given to vote for a proposal.
 		type VotingTime: Get<BlockNumberFor<Self>>;
@@ -161,7 +156,15 @@ pub mod pallet {
 		/// The property governance's pallet id, used for deriving its sovereign account ID.
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
+
+		/// Asset id type from pallet assets.
+		type AssetId: IsType<<Self as pallet_assets::Config<Instance1>>::AssetId>
+			+ Parameter
+			+ From<u32>
+			+ Ord
+			+ Copy;
 	}
+	pub type AssetId<T> = <T as Config>::AssetId;
 
 	/// Number of proposals that have been made.
 	#[pallet::storage]
@@ -176,13 +179,8 @@ pub mod pallet {
 	/// Proposals that have been made.
 	#[pallet::storage]
 	#[pallet::getter(fn proposals)]
-	pub(super) type Proposals<T> = StorageMap<
-		_,
-		Blake2_128Concat,
-		ProposalIndex,
-		Proposal<BlockNumberFor<T>, T>,
-		OptionQuery,
-	>;
+	pub(super) type Proposals<T> =
+		StorageMap<_, Blake2_128Concat, ProposalIndex, Proposal<BlockNumberFor<T>, T>, OptionQuery>;
 
 	/// Sell proposals that have been made.
 	#[pallet::storage]
@@ -198,37 +196,42 @@ pub mod pallet {
 	/// Inqueries that have been made.
 	#[pallet::storage]
 	#[pallet::getter(fn inqueries)]
-	pub(super) type Inqueries<T> = StorageMap<
-		_,
-		Blake2_128Concat,
-		InqueryIndex,
-		Inquery<BlockNumberFor<T>, T>,
-		OptionQuery,
-	>;
+	pub(super) type Inqueries<T> =
+		StorageMap<_, Blake2_128Concat, InqueryIndex, Inquery<BlockNumberFor<T>, T>, OptionQuery>;
 
 	/// Mapping of ongoing votes.
 	#[pallet::storage]
 	#[pallet::getter(fn ongoing_votes)]
-	pub(super) type OngoingVotes<T> = 
+	pub(super) type OngoingVotes<T> =
 		StorageMap<_, Blake2_128Concat, ProposalIndex, VoteStats, OptionQuery>;
-	
+
 	/// Mapping from proposal to vector of users who voted.
 	#[pallet::storage]
 	#[pallet::getter(fn proposal_voter)]
-	pub(super) type ProposalVoter<T: Config> = 
-		StorageMap<_, Blake2_128Concat, ProposalIndex, BoundedVec<AccountIdOf<T>, T::MaxVoter>, ValueQuery>;
+	pub(super) type ProposalVoter<T: Config> = StorageMap<
+		_,
+		Blake2_128Concat,
+		ProposalIndex,
+		BoundedVec<AccountIdOf<T>, T::MaxVoter>,
+		ValueQuery,
+	>;
 
 	/// Mapping of ongoing votes about inqueries.
 	#[pallet::storage]
 	#[pallet::getter(fn ongoing_inquery_votes)]
-	pub(super) type OngoingInqueryVotes<T> = 
+	pub(super) type OngoingInqueryVotes<T> =
 		StorageMap<_, Blake2_128Concat, InqueryIndex, VoteStats, OptionQuery>;
 
 	/// Mapping from inquery to vector of users who voted.
 	#[pallet::storage]
 	#[pallet::getter(fn inquery_voter)]
-	pub(super) type InqueryVoter<T: Config> = 
-		StorageMap<_, Blake2_128Concat, InqueryIndex, BoundedVec<AccountIdOf<T>, T::MaxVoter>, ValueQuery>;
+	pub(super) type InqueryVoter<T: Config> = StorageMap<
+		_,
+		Blake2_128Concat,
+		InqueryIndex,
+		BoundedVec<AccountIdOf<T>, T::MaxVoter>,
+		ValueQuery,
+	>;
 
 	/// Stores the project keys and round types ending on a given block for proposal votings.
 	#[pallet::storage]
@@ -251,7 +254,6 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
-
 	/// Stores the project keys and round types ending on a given block for sell_property votings.
 	#[pallet::storage]
 	#[pallet::getter(fn sell_property_rounds_expiring)]
@@ -267,17 +269,17 @@ pub mod pallet {
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
 		/// New proposal has been created.
-		Proposed {proposal_id: ProposalIndex, asset_id: u32, proposer: AccountIdOf<T>},
+		Proposed { proposal_id: ProposalIndex, asset_id: u32, proposer: AccountIdOf<T> },
 		/// New proposal has been created.
-		SellProposed {proposal_id: ProposalIndex, asset_id: u32, proposer: AccountIdOf<T>},
+		SellProposed { proposal_id: ProposalIndex, asset_id: u32, proposer: AccountIdOf<T> },
 		/// A new inquery has been made.
-		Inquery {inquery_id: InqueryIndex, asset_id: u32, proposer: AccountIdOf<T>},
+		Inquery { inquery_id: InqueryIndex, asset_id: u32, proposer: AccountIdOf<T> },
 		/// Voted on proposal.
-		VotedOnProposal { proposal_id: ProposalIndex, voter: AccountIdOf<T>, vote: Vote},
+		VotedOnProposal { proposal_id: ProposalIndex, voter: AccountIdOf<T>, vote: Vote },
 		/// Voted on inquery.
-		VotedOnInquery { inquery_id: InqueryIndex, voter: AccountIdOf<T>, vote: Vote},
+		VotedOnInquery { inquery_id: InqueryIndex, voter: AccountIdOf<T>, vote: Vote },
 		/// The proposal has been executed.
-		ProposalExecuted { asset_id: u32, amount: BalanceOf<T> }
+		ProposalExecuted { asset_id: u32, amount: BalanceOf<T> },
 	}
 
 	#[pallet::error]
@@ -317,12 +319,16 @@ pub mod pallet {
 				let proposals = <Proposals<T>>::take(item);
 				if let Some(proposal) = proposals {
 					if let Some(voting_result) = voting_results {
-						let required_threshold = if proposal.amount >= <T as Config>::HighProposal::get() {
-							<T as Config>::HighThreshold::get()
-						} else {
-							<T as Config>::Threshold::get()
-						};
-						if voting_result.yes_votes > voting_result.no_votes && required_threshold < voting_result.yes_votes.saturating_add(voting_result.no_votes) {
+						let required_threshold =
+							if proposal.amount >= <T as Config>::HighProposal::get() {
+								<T as Config>::HighThreshold::get()
+							} else {
+								<T as Config>::Threshold::get()
+							};
+						if voting_result.yes_votes > voting_result.no_votes
+							&& required_threshold
+								< voting_result.yes_votes.saturating_add(voting_result.no_votes)
+						{
 							let _ = Self::execute_proposal(proposal);
 						}
 					}
@@ -335,13 +341,16 @@ pub mod pallet {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
 				let voting_results = <OngoingInqueryVotes<T>>::take(item);
 				if let Some(voting_result) = voting_results {
-					if voting_result.yes_votes > voting_result.no_votes && <T as Config>::Threshold::get() < voting_result.yes_votes.saturating_add(voting_result.no_votes) {
+					if voting_result.yes_votes > voting_result.no_votes
+						&& <T as Config>::Threshold::get()
+							< voting_result.yes_votes.saturating_add(voting_result.no_votes)
+					{
 						let _ = Self::change_letting_agent(*item);
 					} else {
 						Inqueries::<T>::take(*item);
 					}
 				}
-			});	
+			});
 			weight
 		}
 	}
@@ -359,11 +368,21 @@ pub mod pallet {
 		/// Emits `Proposed` event when succesfful.
 		#[pallet::call_index(0)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::propose())]
-		pub fn propose(origin: OriginFor<T>, asset_id: u32, amount: BalanceOf<T>, data: BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit> ) -> DispatchResult {
+		pub fn propose(
+			origin: OriginFor<T>,
+			asset_id: u32,
+			amount: BalanceOf<T>,
+			data: BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>,
+		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
-			ensure!(pallet_property_management::Pallet::<T>::letting_storage(asset_id).ok_or(Error::<T>::NoLettingAgentFound)? == origin.clone(), Error::<T>::NoPermission);
 			ensure!(
-				pallet_property_management::Pallet::<T>::property_reserve(asset_id) 
+				pallet_property_management::Pallet::<T>::letting_storage(asset_id)
+					.ok_or(Error::<T>::NoLettingAgentFound)?
+					== origin.clone(),
+				Error::<T>::NoPermission
+			);
+			ensure!(
+				pallet_property_management::Pallet::<T>::property_reserve(asset_id)
 					>= TryInto::<u64>::try_into(amount)
 						.map_err(|_| Error::<T>::ConversionError)?
 						.try_into()
@@ -378,14 +397,14 @@ pub mod pallet {
 				created_at: current_block_number,
 				proposal_info: data,
 			};
-			
+
 			// Check if the amount is less than LowProposal
 			if amount <= <T as Config>::LowProposal::get() {
 				// Execute the proposal immediately
 				Self::execute_proposal(proposal)?;
 				return Ok(());
 			}
-			
+
 			let proposal_id = Self::proposal_count().saturating_add(1);
 			let expiry_block =
 				current_block_number.saturating_add(<T as Config>::VotingTime::get());
@@ -393,26 +412,25 @@ pub mod pallet {
 				keys.try_push(proposal_id).map_err(|_| Error::<T>::TooManyProposals)?;
 				Ok::<(), DispatchError>(())
 			})?;
-			let vote_stats = VoteStats { yes_votes: 0, no_votes: 0};
+			let vote_stats = VoteStats { yes_votes: 0, no_votes: 0 };
 
 			Proposals::<T>::insert(proposal_id, proposal);
 			OngoingVotes::<T>::insert(proposal_id, vote_stats);
 			ProposalCount::<T>::put(proposal_id);
-			Self::deposit_event(Event::Proposed {
-				proposal_id, 
-				asset_id, 
-				proposer: origin,
-			});
+			Self::deposit_event(Event::Proposed { proposal_id, asset_id, proposer: origin });
 			Ok(())
 		}
 
-
 		// property holder want to sell the property as a whole. SPV would be desolved. Token would be put together
 		// for the nft and nft would be released. Vote happend. If would be approved. Outstanding tax payed etc. Once nft sold token would be burned.
-		// Different area on the marketplace for this. 
+		// Different area on the marketplace for this.
 		#[pallet::call_index(10)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::propose())]
-		pub fn sell_property(origin: OriginFor<T>, asset_id: u32, amount: BalanceOf<T>) -> DispatchResult {
+		pub fn sell_property(
+			origin: OriginFor<T>,
+			asset_id: u32,
+			amount: BalanceOf<T>,
+		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let owner_list = pallet_nft_marketplace::Pallet::<T>::property_owner(asset_id);
 			ensure!(owner_list.contains(&origin), Error::<T>::NoPermission);
@@ -430,18 +448,13 @@ pub mod pallet {
 				keys.try_push(proposal_id).map_err(|_| Error::<T>::TooManyProposals)?;
 				Ok::<(), DispatchError>(())
 			})?;
-			let vote_stats = VoteStats { yes_votes: 0, no_votes: 0};
+			let vote_stats = VoteStats { yes_votes: 0, no_votes: 0 };
 
 			SellProposals::<T>::insert(proposal_id, proposal);
 			OngoingVotes::<T>::insert(proposal_id, vote_stats);
-			Self::deposit_event(Event::SellProposed {
-				proposal_id, 
-				asset_id, 
-				proposer: origin,
-			});
+			Self::deposit_event(Event::SellProposed { proposal_id, asset_id, proposer: origin });
 			Ok(())
 		}
-
 
 		/// Creates an inquery against the letting agent of the real estate object.
 		/// Only one of the owner of the property can propose.
@@ -454,7 +467,10 @@ pub mod pallet {
 		/// Emits `Inquery` event when succesfful.
 		#[pallet::call_index(1)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::inquery_against_letting_agent())]
-		pub fn inquery_against_letting_agent(origin: OriginFor<T>, asset_id: u32) -> DispatchResult {
+		pub fn inquery_against_letting_agent(
+			origin: OriginFor<T>,
+			asset_id: u32,
+		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let owner_list = pallet_nft_marketplace::Pallet::<T>::property_owner(asset_id);
 			ensure!(owner_list.contains(&origin), Error::<T>::NoPermission);
@@ -462,24 +478,17 @@ pub mod pallet {
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
 			let expiry_block =
 				current_block_number.saturating_add(<T as Config>::VotingTime::get());
-			let inquery = Inquery {
-				proposer: origin.clone(),
-				asset_id,
-				created_at: current_block_number,
-			};
+			let inquery =
+				Inquery { proposer: origin.clone(), asset_id, created_at: current_block_number };
 			InqueryRoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
 				keys.try_push(inquery_id).map_err(|_| Error::<T>::TooManyProposals)?;
 				Ok::<(), DispatchError>(())
 			})?;
-			let vote_stats = VoteStats { yes_votes: 0, no_votes: 0};
+			let vote_stats = VoteStats { yes_votes: 0, no_votes: 0 };
 
 			Inqueries::<T>::insert(inquery_id, inquery);
 			OngoingInqueryVotes::<T>::insert(inquery_id, vote_stats);
-			Self::deposit_event(Event::Inquery {
-				inquery_id, 
-				asset_id, 
-				proposer: origin,
-			});
+			Self::deposit_event(Event::Inquery { inquery_id, asset_id, proposer: origin });
 			Ok(())
 		}
 
@@ -494,14 +503,22 @@ pub mod pallet {
 		/// Emits `VotedOnProposal` event when succesfful.
 		#[pallet::call_index(2)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::vote_on_proposal())]
-		pub fn vote_on_proposal(origin: OriginFor<T>, proposal_id: ProposalIndex, vote: Vote) -> DispatchResult {
+		pub fn vote_on_proposal(
+			origin: OriginFor<T>,
+			proposal_id: ProposalIndex,
+			vote: Vote,
+		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let proposal = Self::proposals(proposal_id).ok_or(Error::<T>::NotOngoing)?;
 			let owner_list = pallet_nft_marketplace::Pallet::<T>::property_owner(proposal.asset_id);
 			ensure!(owner_list.contains(&origin), Error::<T>::NoPermission);
 			ensure!(!Self::proposal_voter(proposal_id).contains(&origin), Error::<T>::AlreadyVoted);
-			let voting_power = pallet_nft_marketplace::Pallet::<T>::property_owner_token(proposal.asset_id, origin.clone());
-			let mut current_vote = Self::ongoing_votes(proposal_id).ok_or(Error::<T>::NotOngoing)?;
+			let voting_power = pallet_nft_marketplace::Pallet::<T>::property_owner_token(
+				proposal.asset_id,
+				origin.clone(),
+			);
+			let mut current_vote =
+				Self::ongoing_votes(proposal_id).ok_or(Error::<T>::NotOngoing)?;
 			if vote == Vote::Yes {
 				current_vote.yes_votes += voting_power;
 			} else {
@@ -512,12 +529,8 @@ pub mod pallet {
 				keys.try_push(origin.clone()).map_err(|_| Error::<T>::TooManyVotes)?;
 				Ok::<(), DispatchError>(())
 			})?;
-			Self::deposit_event(Event::VotedOnProposal{
-				proposal_id, 
-				voter: origin, 
-				vote,
-			});
-			Ok(())	
+			Self::deposit_event(Event::VotedOnProposal { proposal_id, voter: origin, vote });
+			Ok(())
 		}
 
 		/// Lets owner of the real estate object vote on an inquery.
@@ -531,14 +544,22 @@ pub mod pallet {
 		/// Emits `VotedOnInquery` event when succesfful.
 		#[pallet::call_index(3)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::vote_on_letting_agent_inquery())]
-		pub fn vote_on_letting_agent_inquery(origin: OriginFor<T>, inquery_id: InqueryIndex, vote: Vote) -> DispatchResult {
+		pub fn vote_on_letting_agent_inquery(
+			origin: OriginFor<T>,
+			inquery_id: InqueryIndex,
+			vote: Vote,
+		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let inquery = Self::inqueries(inquery_id).ok_or(Error::<T>::NotOngoing)?;
 			let owner_list = pallet_nft_marketplace::Pallet::<T>::property_owner(inquery.asset_id);
 			ensure!(owner_list.contains(&origin), Error::<T>::NoPermission);
 			ensure!(!Self::inquery_voter(inquery_id).contains(&origin), Error::<T>::AlreadyVoted);
-			let voting_power = pallet_nft_marketplace::Pallet::<T>::property_owner_token(inquery.asset_id, origin.clone());
-			let mut current_vote = Self::ongoing_inquery_votes(inquery_id).ok_or(Error::<T>::NotOngoing)?;
+			let voting_power = pallet_nft_marketplace::Pallet::<T>::property_owner_token(
+				inquery.asset_id,
+				origin.clone(),
+			);
+			let mut current_vote =
+				Self::ongoing_inquery_votes(inquery_id).ok_or(Error::<T>::NotOngoing)?;
 			if vote == Vote::Yes {
 				current_vote.yes_votes += voting_power;
 			} else {
@@ -549,40 +570,50 @@ pub mod pallet {
 				keys.try_push(origin.clone()).map_err(|_| Error::<T>::TooManyVotes)?;
 				Ok::<(), DispatchError>(())
 			})?;
-			Self::deposit_event(Event::VotedOnInquery{
-				inquery_id,
-				voter: origin,
-				vote,
-			});
-			Ok(())	
+			Self::deposit_event(Event::VotedOnInquery { inquery_id, voter: origin, vote });
+			Ok(())
 		}
 	}
 
 	impl<T: Config> Pallet<T> {
-
 		pub fn account_id() -> AccountIdOf<T> {
 			<T as pallet::Config>::PalletId::get().into_account_truncating()
 		}
-		
+
 		/// Changes the letting agent of a given real estate object.
 		fn change_letting_agent(inquery_id: InqueryIndex) -> DispatchResult {
 			let inquery = Inqueries::<T>::take(inquery_id).ok_or(Error::<T>::NotOngoing)?;
-			let letting_agent = pallet_property_management::Pallet::<T>::letting_storage(inquery.asset_id).unwrap();
+			let letting_agent =
+				pallet_property_management::Pallet::<T>::letting_storage(inquery.asset_id).unwrap();
 			let amount = <T as Config>::MinSlashingAmount::get();
-			<T as pallet::Config>::Slash::on_unbalanced(<T as pallet::Config>::Currency::slash_reserved(&letting_agent, amount).0);
-			let asset_details = pallet_nft_marketplace::Pallet::<T>::asset_id_details(inquery.asset_id).ok_or(Error::<T>::NoAssetFound)?;
-			let _ = pallet_property_management::Pallet::<T>::remove_bad_letting_agent(asset_details.region, asset_details.location.clone(), letting_agent);
-			let _ = pallet_property_management::Pallet::<T>::selects_letting_agent(asset_details.region, asset_details.location, inquery.asset_id);
+			<T as pallet::Config>::Slash::on_unbalanced(
+				<T as pallet::Config>::Currency::slash_reserved(&letting_agent, amount).0,
+			);
+			let asset_details =
+				pallet_nft_marketplace::Pallet::<T>::asset_id_details(inquery.asset_id)
+					.ok_or(Error::<T>::NoAssetFound)?;
+			let _ = pallet_property_management::Pallet::<T>::remove_bad_letting_agent(
+				asset_details.region,
+				asset_details.location.clone(),
+				letting_agent,
+			);
+			let _ = pallet_property_management::Pallet::<T>::selects_letting_agent(
+				asset_details.region,
+				asset_details.location,
+				inquery.asset_id,
+			);
 			Ok(())
 		}
 
 		fn execute_proposal(proposal: Proposal<BlockNumberFor<T>, T>) -> DispatchResult {
-			let letting_agent = pallet_property_management::Pallet::<T>::letting_storage(proposal.asset_id).unwrap();
+			let letting_agent =
+				pallet_property_management::Pallet::<T>::letting_storage(proposal.asset_id)
+					.unwrap();
 			let proposal_amount = proposal.amount;
 			<T as pallet::Config>::Currency::transfer(
-				&Self::account_id(), 
-				&letting_agent, 
-				proposal_amount, 
+				&Self::account_id(),
+				&letting_agent,
+				proposal_amount,
 				KeepAlive,
 			)
 			.map_err(|_| Error::<T>::NotEnoughFunds)?;
@@ -590,10 +621,13 @@ pub mod pallet {
 				asset_id: proposal.asset_id,
 				amount: proposal.amount,
 			});
-			pallet_property_management::Pallet::<T>::decrease_reserves(proposal.asset_id, TryInto::<u64>::try_into(proposal_amount)
-			.map_err(|_| Error::<T>::ConversionError)?
-			.try_into()
-			.map_err(|_| Error::<T>::ConversionError)?);
+			pallet_property_management::Pallet::<T>::decrease_reserves(
+				proposal.asset_id,
+				TryInto::<u64>::try_into(proposal_amount)
+					.map_err(|_| Error::<T>::ConversionError)?
+					.try_into()
+					.map_err(|_| Error::<T>::ConversionError)?,
+			);
 			Ok(())
 		}
 	}

@@ -94,7 +94,10 @@ mod benchmarks {
 		let alice: T::AccountId = account("alice", SEED, SEED);
 		assert_ok!(CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), alice));
 		let bob: T::AccountId = account("bob", SEED, SEED);
-		assert_ok!(CommunityLoanPool::<T>::add_committee_member(RawOrigin::Root.into(), bob.clone()));
+		assert_ok!(CommunityLoanPool::<T>::add_committee_member(
+			RawOrigin::Root.into(),
+			bob.clone()
+		));
 		let (caller, value, beneficiary_lookup, developer_experience, loan_term) =
 			setup_proposal::<T>(SEED);
 		assert_ok!(Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone()));

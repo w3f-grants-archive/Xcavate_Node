@@ -74,8 +74,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn buy_nft() {
-		let (caller, _, metadatas, duration, value, single_metadata) =
-			setup_listing::<T>(SEED);
+		let (caller, _, metadatas, duration, value, single_metadata) = setup_listing::<T>(SEED);
 		assert_ok!(Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), caller.clone()));
 		let many_project_types = get_project_nfts_many::<T>(4);
 		assert_ok!(CommunityProjects::<T>::list_project(
@@ -179,7 +178,12 @@ mod benchmarks {
 			amount2,
 		));
 		assert_eq!(Assets::<T, Instance1>::balance(asset_id, buyer.clone()), amount2);
-		assert_ok!(CommunityProjects::<T>::buy_nft(RawOrigin::Signed(buyer.clone()).into(), 0.into(), 1, 1));
+		assert_ok!(CommunityProjects::<T>::buy_nft(
+			RawOrigin::Signed(buyer.clone()).into(),
+			0.into(),
+			1,
+			1
+		));
 		run_to_block::<T>(11u32.into());
 		#[extrinsic_call]
 		vote_on_milestone(RawOrigin::Signed(buyer), 0.into(), crate::Vote::Yes);
@@ -224,7 +228,12 @@ mod benchmarks {
 			amount2,
 		));
 		assert_eq!(Assets::<T, Instance1>::balance(asset_id, buyer.clone()), amount2);
-		assert_ok!(CommunityProjects::<T>::buy_nft(RawOrigin::Signed(buyer.clone()).into(), 0.into(), 1, 1));
+		assert_ok!(CommunityProjects::<T>::buy_nft(
+			RawOrigin::Signed(buyer.clone()).into(),
+			0.into(),
+			1,
+			1
+		));
 		run_to_block::<T>(100u32.into());
 		assert_eq!(
 			CommunityProjects::<T>::ended_projects::<<T as pallet::Config>::CollectionId>(
@@ -294,7 +303,12 @@ mod benchmarks {
 			0.into(),
 			amount,
 		));
-		assert_ok!(CommunityProjects::<T>::buy_nft(RawOrigin::Signed(buyer.clone()).into(), 0.into(), 1, 1));
+		assert_ok!(CommunityProjects::<T>::buy_nft(
+			RawOrigin::Signed(buyer.clone()).into(),
+			0.into(),
+			1,
+			1
+		));
 		run_to_block::<T>(100u32.into());
 		assert_eq!(
 			CommunityProjects::<T>::ended_projects::<<T as pallet::Config>::CollectionId>(

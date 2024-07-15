@@ -184,7 +184,7 @@ impl pallet_xcavate_whitelist::Config for Test {
 	type WeightInfo = pallet_xcavate_whitelist::weights::SubstrateWeight<Test>;
 	type WhitelistOrigin = frame_system::EnsureRoot<Self::AccountId>;
 	type MaxUsersInWhitelist = MaxWhitelistUsers;
-}  
+}
 
 parameter_types! {
 	pub const CommunityProjectPalletId: PalletId = PalletId(*b"py/cmprj");
@@ -230,7 +230,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 	.assimilate_storage(&mut test)
 	.unwrap();
 
- 	pallet_assets::GenesisConfig::<Test, Instance1> {
+	pallet_assets::GenesisConfig::<Test, Instance1> {
 		assets: vec![(1, /* account("buyer", SEED, SEED) */ [0; 32].into(), true, 1)], // Genesis assets: id, owner, is_sufficient, min_balance
 		metadata: vec![(1, "XUSD".into(), "XUSD".into(), 0)], // Genesis metadata: id, name, symbol, decimals
 		accounts: vec![
@@ -243,7 +243,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 		], // Genesis accounts: id, account_id, balance
 	}
 	.assimilate_storage(&mut test)
-	.unwrap(); 
+	.unwrap();
 
 	test.into()
 }

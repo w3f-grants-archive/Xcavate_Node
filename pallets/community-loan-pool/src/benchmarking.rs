@@ -53,7 +53,7 @@ mod benchmarks {
 		assert_eq!(CommunityLoanPool::<T>::proposals(1).is_some(), true);
 	}
 
- 	#[benchmark]
+	#[benchmark]
 	fn add_committee_member() {
 		let alice = account("alice", SEED, SEED);
 		#[extrinsic_call]
@@ -173,7 +173,7 @@ mod benchmarks {
 		withdraw(RawOrigin::Signed(beneficiary), 1, withdraw_value);
 		assert_eq!(CommunityLoanPool::<T>::loans(1).unwrap().borrowed_amount, withdraw_value);
 	}
-/*
+	/*
 	#[benchmark]
 	fn repay() {
 		let alice = account("alice", SEED, SEED);
@@ -345,7 +345,7 @@ mod benchmarks {
 			RawOrigin::Signed(bob.clone()).into(),
 			proposal_id,
 			crate::Vote::Yes,
-		)); 
+		));
 		run_to_block::<T>(30u32.into());
 		let beneficiary: T::AccountId = account("beneficiary", SEED, SEED);
 		Whitelist::<T>::add_to_whitelist(RawOrigin::Root.into(), beneficiary.clone());

@@ -133,7 +133,7 @@ pub mod opaque {
 			// pub aura: Aura,
 			pub aura: Aura,
 			pub grandpa: Grandpa,
- 			pub im_online: ImOnline,
+			 pub im_online: ImOnline,
 			pub authority_discovery: AuthorityDiscovery,
 		}
 	}
@@ -521,10 +521,10 @@ impl pallet_nft_marketplace::Config for Runtime {
 	type ItemId = u32;
 	type TreasuryId = TreasuryPalletId;
 	type CommunityProjectsId = CommunityProjectPalletId;
- 	type FractionalizeCollectionId = <Self as pallet_nfts::Config>::CollectionId;
+	type FractionalizeCollectionId = <Self as pallet_nfts::Config>::CollectionId;
 	type FractionalizeItemId = <Self as pallet_nfts::Config>::ItemId;
 	type AssetId = <Self as pallet_assets::Config<Instance1>>::AssetId;
-	type AssetId2 = u32; 
+	type AssetId2 = u32;
 	type PostcodeLimit = Postcode;
 }
 
@@ -592,6 +592,7 @@ impl pallet_property_management::Config for Runtime {
 	type MaxLocations = MaxLocation;
 	type GovernanceId = PropertyGovernancePalletId;
 	type PropertyReserve = PropertyReserves;
+	type AssetId = <Self as pallet_assets::Config<Instance1>>::AssetId;
 }
 
 parameter_types! {
@@ -612,7 +613,7 @@ impl pallet_property_governance::Config for Runtime {
 	type WeightInfo = pallet_property_governance::weights::SubstrateWeight<Runtime>;
 	type Currency = Balances;
 	type VotingTime = PropertyVotingTime;
-	type MaxVotesForBlock =  MaxVoteForBlock;
+	type MaxVotesForBlock = MaxVoteForBlock;
 	type Slash = ();
 	type MinSlashingAmount = MinimumSlashingAmount;
 	type MaxVoter = MaximumVoter;
@@ -623,7 +624,8 @@ impl pallet_property_governance::Config for Runtime {
 	type LowProposal = LowProposal;
 	type HighProposal = HighProposal;
 	type PalletId = PropertyGovernancePalletId;
-} 
+	type AssetId = <Self as pallet_assets::Config<Instance1>>::AssetId;
+}
 
 parameter_types! {
 	pub Features: PalletFeatures = PalletFeatures::all_enabled();
