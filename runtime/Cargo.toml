@@ -95,8 +95,6 @@ frame-benchmarking = {  default-features = false, git = "https://github.com/pari
 frame-system-benchmarking = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", optional = true, tag = "polkadot-v1.6.0" }
 
 # Local Dependencies
-pallet-community-loan-pool = {  default-features = false, path = "../pallets/community-loan-pool" }
-pallet-xcavate-staking = {  default-features = false, path = "../pallets/xcavate-staking" }
 pallet-nft-marketplace = {  default-features = false, path = "../pallets/nft-marketplace" }
 pallet-community-projects = {  default-features = false, path = "../pallets/community-projects" }
 pallet-xcavate-whitelist = {  default-features = false, path = "../pallets/xcavate-whitelist" }
@@ -127,8 +125,6 @@ std = [
 	"pallet-im-online/std",
 	"pallet-grandpa/std",
 	"pallet-sudo/std",
-	"pallet-community-loan-pool/std",
-	"pallet-xcavate-staking/std",
 	"pallet-nft-marketplace/std",
 	"pallet-community-projects/std",
 	"pallet-xcavate-whitelist/std",
@@ -200,8 +196,6 @@ runtime-benchmarks = [
 	"pallet-timestamp/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
 
-	"pallet-community-loan-pool/runtime-benchmarks",
-	"pallet-xcavate-staking/runtime-benchmarks",
 	"pallet-nft-marketplace/runtime-benchmarks",
 	"pallet-community-projects/runtime-benchmarks",
 	"pallet-xcavate-whitelist/runtime-benchmarks",
@@ -243,8 +237,6 @@ try-runtime = [
 	"pallet-timestamp/try-runtime",
 	"pallet-transaction-payment/try-runtime",
 
-	"pallet-community-loan-pool/try-runtime",
-	"pallet-xcavate-staking/try-runtime",
 	"pallet-nft-marketplace/try-runtime",
 	"pallet-community-projects/try-runtime",
 	"pallet-xcavate-whitelist/try-runtime",

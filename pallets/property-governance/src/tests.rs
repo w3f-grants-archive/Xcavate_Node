@@ -308,6 +308,63 @@ fn proposal_pass() {
 }
 
 #[test]
+fn proposal_pass_2() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(NftMarketplace::create_new_region(RuntimeOrigin::root()));
+		assert_ok!(NftMarketplace::create_new_location(RuntimeOrigin::root(), 0, bvec![10, 10]));
+		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(NftMarketplace::list_object(
+			RuntimeOrigin::signed([0; 32].into()),
+			0,
+			bvec![10, 10],
+			10_000,
+			100,
+			bvec![22, 22]
+		));
+		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_ok!(PropertyManagement::add_letting_agent(
+			RuntimeOrigin::root(),
+			0,
+			bvec![10, 10],
+			[0; 32].into(),
+		));
+		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed(
+			[0; 32].into()
+		)));
+		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0));
+		assert_eq!(PropertyManagement::letting_storage(0).unwrap(), [0; 32].into());
+		assert_ok!(PropertyManagement::distribute_income(
+			RuntimeOrigin::signed([0; 32].into()),
+			0,
+			1000
+		));
+		assert_ok!(PropertyGovernance::propose(
+			RuntimeOrigin::signed([0; 32].into()),
+			0,
+			10000,
+			bvec![10, 10]
+		));
+		assert_ok!(PropertyGovernance::vote_on_proposal(
+			RuntimeOrigin::signed([1; 32].into()),
+			1,
+			crate::Vote::Yes
+		));
+		assert_eq!(PropertyGovernance::proposals(1).is_some(), true);
+		assert_eq!(Balances::free_balance(&([0; 32].into())), 19_998_900);
+		assert_eq!(Balances::free_balance(&PropertyGovernance::account_id()), 501_000);
+		assert_eq!(PropertyManagement::property_reserve(0), 1000);
+		run_to_block(31);
+		assert_eq!(Balances::free_balance(&([0; 32].into())), 19_999_900);
+		assert_eq!(Balances::free_balance(&PropertyGovernance::account_id()), 500_000);
+		assert_eq!(PropertyManagement::property_reserve(0), 0);
+		assert_eq!(PropertyGovernance::proposals(1).is_none(), true);
+		assert_eq!(PropertyManagement::property_debts(0), 9_000);
+	});
+}
+
+#[test]
 fn proposal_not_pass() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);

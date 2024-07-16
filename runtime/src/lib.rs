@@ -452,56 +452,6 @@ impl pallet_sudo::Config for Runtime {
 }
 
 parameter_types! {
-	pub const CommunityLoanPalletId: PalletId = PalletId(*b"py/loana");
-	pub const MaxLoans: u32 = 1000;
-	pub const VotingTime: BlockNumber = 10;
-	pub const MaximumCommitteeMembers: u32 = 10;
-	pub const MaxMilestones: u32 = 10;
-}
-
-/// Configure the pallet-community-loan-pool in pallets/community-loan-pool.
-impl pallet_community_loan_pool::Config for Runtime {
-	type PalletId = CommunityLoanPalletId;
-	type Currency = Balances;
-	type CommitteeOrigin = EitherOfDiverse<
-		EnsureRoot<AccountId>,
-		pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>,
-	>;
-	type RuntimeEvent = RuntimeEvent;
-	type ProposalBond = ProposalBond;
-	type ProposalBondMinimum = ProposalBondMinimum;
-	type ProposalBondMaximum = ();
-	type OnSlash = ();
-	type MaxOngoingLoans = MaxLoans;
-	type TimeProvider = Timestamp;
-	type WeightInfo = pallet_community_loan_pool::weights::SubstrateWeight<Runtime>;
-	#[cfg(feature = "runtime-benchmarks")]
-	type Helper = pallet_community_loan_pool::NftHelper;
-	type VotingTime = VotingTime;
-	type MaxCommitteeMembers = MaximumCommitteeMembers;
-	type MaxMilestonesPerProject = MaxMilestones;
-	type CollectionId = u32;
-	type ItemId = u32;
-}
-
-parameter_types! {
-	pub const MinimumRemainingAmount: Balance = DOLLARS;
-	pub const MaxStaker: u32 = 5000;
-	pub const RewardsDistributing: BlockNumber = 1;
-}
-
-/// Configure the pallet-xcavate-staking in pallets/xcavate-staking.
-impl pallet_xcavate_staking::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_xcavate_staking::weights::SubstrateWeight<Runtime>;
-	type Currency = Balances;
-	type MinimumRemainingAmount = MinimumRemainingAmount;
-	type MaxStakers = MaxStaker;
-	type TimeProvider = Timestamp;
-	type RewardsDistributingTime = RewardsDistributing;
-}
-
-parameter_types! {
 	pub const NftMarketplacePalletId: PalletId = PalletId(*b"py/nftxc");
 	pub const MaxNftTokens: u32 = 250;
 	pub const Postcode: u32 = 10;
@@ -529,6 +479,7 @@ impl pallet_nft_marketplace::Config for Runtime {
 }
 
 parameter_types! {
+	pub const MinimumRemainingAmount: Balance = DOLLARS;
 	pub const CommunityProjectPalletId: PalletId = PalletId(*b"py/cmprj");
 	pub const MaxNftType: u32 = 4;
 	pub const MaxNftsInCollectionProject: u32 = 100;
@@ -602,8 +553,8 @@ parameter_types! {
 	pub const MaximumVoter: u32 = 100;
 	pub const VotingThreshold: u8 = 51;
 	pub const HighVotingThreshold: u8 = 67;
-	pub const LowProposal: Balance = 500 * DOLLARS;
-	pub const HighProposal: Balance = 10_000 * DOLLARS;
+	pub const LowProposal: Balance = 500 * CENTS;
+	pub const HighProposal: Balance = 10_000 * CENTS;
 	pub const PropertyGovernancePalletId: PalletId = PalletId(*b"py/gvrnc");
 }
 
@@ -644,10 +595,6 @@ parameter_types! {
 
 	pub const UserStringLimit: u32 = 5;
 
-}
-
-ord_parameter_types! {
-	pub const CollectionCreationOrigin: AccountId = AccountIdConversion::<AccountId>::into_account_truncating(&CommunityLoanPalletId::get());
 }
 
 impl pallet_nfts::Config for Runtime {
@@ -1539,8 +1486,6 @@ construct_runtime!(
 		Balances: pallet_balances,
 		TransactionPayment: pallet_transaction_payment,
 		Sudo: pallet_sudo,
-		CommunityLoanPool: pallet_community_loan_pool,
-		XcavateStaking: pallet_xcavate_staking,
 		NftMarketplace: pallet_nft_marketplace,
 		CommunityProject: pallet_community_projects,
 		XcavateWhitelist: pallet_xcavate_whitelist,
@@ -1637,8 +1582,6 @@ mod benches {
 		[frame_system, SystemBench::<Runtime>]
 		[pallet_balances, Balances]
 		[pallet_timestamp, Timestamp]
-		[pallet_community_loan_pool, CommunityLoanPool]
-		[pallet_xcavate_staking, XcavateStaking]
 		[pallet_nft_marketplace, NftMarketplace]
 		[pallet_community_projects, CommunityProject]
 		[pallet_xcavate_whitelist, XcavateWhitelist]

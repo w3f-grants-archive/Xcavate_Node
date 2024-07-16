@@ -381,14 +381,6 @@ pub mod pallet {
 					== origin.clone(),
 				Error::<T>::NoPermission
 			);
-			ensure!(
-				pallet_property_management::Pallet::<T>::property_reserve(asset_id)
-					>= TryInto::<u64>::try_into(amount)
-						.map_err(|_| Error::<T>::ConversionError)?
-						.try_into()
-						.map_err(|_| Error::<T>::ConversionError)?,
-				Error::<T>::NotEnoughReserves
-			);
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
 			let proposal = Proposal {
 				proposer: origin.clone(),
@@ -399,7 +391,9 @@ pub mod pallet {
 			};
 
 			// Check if the amount is less than LowProposal
-			if amount <= <T as Config>::LowProposal::get() {
+			if amount.saturating_mul(
+				Self::u64_to_balance_option(1000000000000)?,
+			) <= <T as Config>::LowProposal::get() {
 				// Execute the proposal immediately
 				Self::execute_proposal(proposal)?;
 				return Ok(());
@@ -608,27 +602,80 @@ pub mod pallet {
 		fn execute_proposal(proposal: Proposal<BlockNumberFor<T>, T>) -> DispatchResult {
 			let letting_agent =
 				pallet_property_management::Pallet::<T>::letting_storage(proposal.asset_id)
-					.unwrap();
+					.ok_or(Error::<T>::NoLettingAgentFound)?;
+		
+			let property_reserves_balances = pallet_property_management::Pallet::<T>::property_reserve(proposal.asset_id);
+			let property_reserves: BalanceOf<T> = TryInto::<u64>::try_into(property_reserves_balances)
+				.map_err(|_| Error::<T>::ConversionError)?
+				.try_into()
+				.map_err(|_| Error::<T>::ConversionError)?;
 			let proposal_amount = proposal.amount;
-			<T as pallet::Config>::Currency::transfer(
-				&Self::account_id(),
-				&letting_agent,
-				proposal_amount,
-				KeepAlive,
-			)
-			.map_err(|_| Error::<T>::NotEnoughFunds)?;
+		
+			// Check if the property reserves cover the proposal amount
+			if property_reserves >= proposal_amount {
+				// Transfer the full proposal amount from the reserves
+				<T as pallet::Config>::Currency::transfer(
+					&Self::account_id(),
+					&letting_agent,
+					proposal_amount.saturating_mul(
+						Self::u64_to_balance_option(1000000000000)?,
+					),
+					KeepAlive,
+				).map_err(|_| Error::<T>::NotEnoughFunds)?;
+		
+				// Decrease the reserves by the proposal amount
+				pallet_property_management::Pallet::<T>::decrease_reserves(
+					proposal.asset_id,
+					TryInto::<u64>::try_into(proposal_amount)
+					.map_err(|_| Error::<T>::ConversionError)?
+					.try_into()
+					.map_err(|_| Error::<T>::ConversionError)?,
+				);
+			} else {
+				// Transfer only the available property reserves
+				<T as pallet::Config>::Currency::transfer(
+					&Self::account_id(),
+					&letting_agent,
+					property_reserves.saturating_mul(
+						Self::u64_to_balance_option(1000000000000)?,
+					),
+					KeepAlive,
+				).map_err(|_| Error::<T>::NotEnoughFunds)?;
+		
+				// Calculate the remaining amount needed
+				let remaining_amount = proposal_amount.saturating_sub(property_reserves);
+		
+				// Increase the property debts by the remaining amount
+				pallet_property_management::Pallet::<T>::increase_debts(
+					proposal.asset_id,
+					TryInto::<u64>::try_into(remaining_amount)
+					.map_err(|_| Error::<T>::ConversionError)?
+					.try_into()
+					.map_err(|_| Error::<T>::ConversionError)?,
+				);
+		
+				// Set the reserves to zero
+				pallet_property_management::Pallet::<T>::decrease_reserves(
+					proposal.asset_id,
+					TryInto::<u64>::try_into(property_reserves)
+					.map_err(|_| Error::<T>::ConversionError)?
+					.try_into()
+					.map_err(|_| Error::<T>::ConversionError)?,
+				);
+			}
+		
+			// Emit event for proposal execution
 			Self::deposit_event(Event::ProposalExecuted {
 				asset_id: proposal.asset_id,
 				amount: proposal.amount,
 			});
-			pallet_property_management::Pallet::<T>::decrease_reserves(
-				proposal.asset_id,
-				TryInto::<u64>::try_into(proposal_amount)
-					.map_err(|_| Error::<T>::ConversionError)?
-					.try_into()
-					.map_err(|_| Error::<T>::ConversionError)?,
-			);
+		
 			Ok(())
+		}
+
+		/// Converts a u64 to a balance.
+		pub fn u64_to_balance_option(input: u64) -> Result<BalanceOf<T>, Error<T>> {
+			input.try_into().map_err(|_| Error::<T>::ConversionError)
 		}
 	}
 }

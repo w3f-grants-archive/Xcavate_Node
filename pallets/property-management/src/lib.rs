@@ -150,6 +150,12 @@ pub mod pallet {
 	pub(super) type PropertyReserve<T> =
 		StorageMap<_, Blake2_128Concat, u32, BalanceOf<T>, ValueQuery>;
 
+	/// Mapping of asset id to the stored debts for a property.
+	#[pallet::storage]
+	#[pallet::getter(fn property_debts)]
+	pub(super) type PropertyDebts<T> =
+		StorageMap<_, Blake2_128Concat, u32, BalanceOf<T>, ValueQuery>;
+
 	/// Mapping from account to letting agent info
 	#[pallet::storage]
 	#[pallet::getter(fn letting_info)]
@@ -199,7 +205,6 @@ pub mod pallet {
 		UserHasNoFundsStored,
 		/// The pallet has not enough funds.
 		NotEnoughFunds,
-		NotEnoughFunds1,
 		/// The letting agent already has too many assigned properties.
 		TooManyAssignedProperties,
 		/// No letting agent could be selected.
@@ -265,7 +270,7 @@ pub mod pallet {
 				Error::<T>::LocationUnknown
 			);
 			ensure!(
-				Self::letting_info(letting_agent.clone()).is_none(),
+				!<LettingInfo<T>>::contains_key(letting_agent.clone()),
 				Error::<T>::LettingAgentExists
 			);
 			let mut letting_info = LettingAgentInfo {
@@ -394,6 +399,8 @@ pub mod pallet {
 			Ok(())
 		}
 
+		// create debt for outstanding payments
+
 		/// Lets the letting agent distribute the income for a property.
 		///
 		/// The origin must be Signed and the sender must have sufficient funds free.
@@ -411,69 +418,95 @@ pub mod pallet {
 			amount: BalanceOf<T>,
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
-			ensure!(
-				Self::letting_storage(asset_id).ok_or(Error::<T>::NoLettingAgentFound)?
-					== origin.clone(),
-				Error::<T>::NoPermission
-			);
+			let letting_agent = Self::letting_storage(asset_id).ok_or(Error::<T>::NoLettingAgentFound)?;
+			ensure!(letting_agent == origin, Error::<T>::NoPermission);
+		
+			let scaled_amount = amount
+				.checked_mul(&Self::u64_to_balance_option(1)?)  // Modify the scale factor if needed
+				.ok_or(Error::<T>::MultiplyError)?;
+		
 			<T as pallet::Config>::Currency::transfer(
 				&origin,
 				&Self::account_id(),
-				amount
-					.checked_mul(&Self::u64_to_balance_option(1 /* 000000000000 */)?)
-					.ok_or(Error::<T>::MultiplyError)?,
+				scaled_amount.saturating_mul(
+					Self::u64_to_balance_option(1000000000000)?,
+				),
 				KeepAlive,
-			)
-			.map_err(|_| Error::<T>::NotEnoughFunds)?;
+			).map_err(|_| Error::<T>::NotEnoughFunds)?;
+		
 			let owner_list = pallet_nft_marketplace::Pallet::<T>::property_owner(asset_id);
 			let mut governance_amount = BalanceOf::<T>::zero();
 			let property_reserve = Self::property_reserve(asset_id);
 			let property_price = pallet_nft_marketplace::Pallet::<T>::asset_id_details(asset_id)
 				.ok_or(Error::<T>::NoObjectFound)?
 				.price;
-
-			let propery_price_converted: BalanceOf<T> = TryInto::<u64>::try_into(property_price)
+		
+			let property_price_converted: BalanceOf<T> = TryInto::<u64>::try_into(property_price)
 				.map_err(|_| Error::<T>::ConversionError)?
 				.try_into()
 				.map_err(|_| Error::<T>::ConversionError)?;
-
-			let required_reserve = propery_price_converted
+		
+			let required_reserve = property_price_converted
 				.checked_div(&Self::u64_to_balance_option(25)?)
 				.ok_or(Error::<T>::DivisionError)?
 				.checked_div(&Self::u64_to_balance_option(12)?)
 				.ok_or(Error::<T>::DivisionError)?;
-
+		
+			let property_debts = Self::property_debts(asset_id);
+		
+			// Pay property debts first
+			let amount_to_pay_debts = core::cmp::min(amount, property_debts);
+			if amount_to_pay_debts > BalanceOf::<T>::zero() {
+				<T as pallet::Config>::Currency::transfer(
+					&Self::account_id(),
+					&letting_agent,
+					amount_to_pay_debts.saturating_mul(
+						Self::u64_to_balance_option(1000000000000)?,
+					),
+					KeepAlive,
+				).map_err(|_| Error::<T>::NotEnoughFunds)?;
+		
+				governance_amount = amount_to_pay_debts;
+			}
+		
+			// Calculate remaining amount after paying debts
+			let remaining_amount = amount.saturating_sub(governance_amount);
+		
+			// Fill property reserves with remaining amount
 			if property_reserve < required_reserve {
 				let missing_amount = required_reserve.saturating_sub(property_reserve);
-
-				governance_amount = core::cmp::min(amount, missing_amount);
-
-				let remaining_amount = amount.saturating_sub(governance_amount);
-
-				if governance_amount > BalanceOf::<T>::zero() {
+				let reserve_amount = core::cmp::min(remaining_amount, missing_amount);
+		
+				if reserve_amount > BalanceOf::<T>::zero() {
 					<T as pallet::Config>::Currency::transfer(
 						&Self::account_id(),
 						&Self::governance_account_id(),
-						governance_amount,
+						reserve_amount.saturating_mul(
+							Self::u64_to_balance_option(1000000000000)?,
+						),
 						KeepAlive,
-					)
-					.map_err(|_| Error::<T>::NotEnoughFunds1)?;
+					).map_err(|_| Error::<T>::NotEnoughFunds)?;
+		
+					let new_property_reserve = property_reserve
+						.checked_add(&reserve_amount)
+						.ok_or(Error::<T>::ArithmeticOverflow)?;
+					PropertyReserve::<T>::insert(asset_id, new_property_reserve);
 				}
-
-				let new_property_reserve = property_reserve
-					.checked_add(&governance_amount)
+		
+				governance_amount = governance_amount
+					.checked_add(&reserve_amount)
 					.ok_or(Error::<T>::ArithmeticOverflow)?;
-				PropertyReserve::<T>::insert(asset_id, new_property_reserve);
 			}
-
-			let remaining_amount = amount.saturating_sub(governance_amount);
+		
+			// Distribute remaining amount to property owners
+			let final_remaining_amount = amount.saturating_sub(governance_amount);
 			for owner in owner_list {
 				let token_amount = pallet_nft_marketplace::Pallet::<T>::property_owner_token(
 					asset_id,
 					owner.clone(),
 				);
 				let amount_for_owner = Self::u64_to_balance_option(token_amount as u64)?
-					.checked_mul(&remaining_amount)
+					.checked_mul(&final_remaining_amount)
 					.ok_or(Error::<T>::MultiplyError)?
 					.checked_div(&Self::u64_to_balance_option(100)?)
 					.ok_or(Error::<T>::DivisionError)?;
@@ -483,9 +516,10 @@ pub mod pallet {
 					.ok_or(Error::<T>::ArithmeticOverflow)?;
 				StoredFunds::<T>::insert(owner, old_funds);
 			}
+		
 			Self::deposit_event(Event::<T>::IncomeDistributed {
 				asset_id,
-				amount: remaining_amount,
+				amount: final_remaining_amount,
 			});
 			Ok(())
 		}
@@ -499,19 +533,21 @@ pub mod pallet {
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::withdraw_funds())]
 		pub fn withdraw_funds(origin: OriginFor<T>) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
+			let amount = StoredFunds::<T>::take(origin.clone());
 			ensure!(
-				!Self::stored_funds(origin.clone()).is_zero(),
+				!amount.is_zero(),
 				Error::<T>::UserHasNoFundsStored
 			);
-			let user_funds = StoredFunds::<T>::take(origin.clone());
 			<T as pallet::Config>::Currency::transfer(
 				&Self::account_id(),
 				&origin,
-				user_funds,
+				amount.saturating_mul(
+					Self::u64_to_balance_option(1000000000000)?,
+				),
 				KeepAlive,
 			)
 			.map_err(|_| Error::<T>::NotEnoughFunds)?;
-			Self::deposit_event(Event::<T>::WithdrawFunds { who: origin, amount: user_funds });
+			Self::deposit_event(Event::<T>::WithdrawFunds { who: origin, amount });
 			Ok(())
 		}
 	}
@@ -580,6 +616,13 @@ pub mod pallet {
 			ensure!(property_reserve >= amount, Error::<T>::NotEnoughReserves);
 			property_reserve = property_reserve.saturating_sub(amount);
 			PropertyReserve::<T>::insert(asset_id, property_reserve);
+			Ok(())
+		}
+
+		pub fn increase_debts(asset_id: u32, amount: BalanceOf<T>) -> DispatchResult {
+			let mut property_debts = Self::property_debts(asset_id);
+			property_debts = property_debts.saturating_add(amount);
+			PropertyDebts::<T>::insert(asset_id, property_debts);
 			Ok(())
 		}
 	}
