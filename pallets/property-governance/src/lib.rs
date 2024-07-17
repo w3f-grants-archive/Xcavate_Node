@@ -80,14 +80,15 @@ pub mod pallet {
 		pub created_at: BlockNumber,
 	}
 
-	/// Inquery with the inquery Details.
+	/// Challenge with the challenge Details.
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
 	#[scale_info(skip_type_params(T))]
-	pub struct Inquery<BlockNumber, T: Config> {
+	pub struct Challenge<BlockNumber, T: Config> {
 		pub proposer: AccountIdOf<T>,
 		pub asset_id: u32,
 		pub created_at: BlockNumber,
+		pub state: ChallengeState,
 	}
 
 	/// Vote enum.
@@ -96,6 +97,16 @@ pub mod pallet {
 	pub enum Vote {
 		Yes,
 		No,
+	}
+
+	/// challenge state of the challenge voting.
+	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
+	pub enum ChallengeState {
+		First,
+		Second,
+		Third,
+		Fourth,
 	}
 
 	/// Voting stats.
@@ -171,7 +182,7 @@ pub mod pallet {
 	#[pallet::getter(fn proposal_count)]
 	pub(super) type ProposalCount<T> = StorageValue<_, ProposalIndex, ValueQuery>;
 
-	/// Number of inqueries that have been made.
+	/// Number of Challenges that have been made.
 	#[pallet::storage]
 	#[pallet::getter(fn inquery_count)]
 	pub(super) type InqueryCount<T> = StorageValue<_, ProposalIndex, ValueQuery>;
@@ -193,11 +204,11 @@ pub mod pallet {
 		OptionQuery,
 	>;
 
-	/// Inqueries that have been made.
+	/// Challenges that have been made.
 	#[pallet::storage]
-	#[pallet::getter(fn inqueries)]
-	pub(super) type Inqueries<T> =
-		StorageMap<_, Blake2_128Concat, InqueryIndex, Inquery<BlockNumberFor<T>, T>, OptionQuery>;
+	#[pallet::getter(fn challenges)]
+	pub(super) type Challenges<T> =
+		StorageMap<_, Blake2_128Concat, InqueryIndex, Challenge<BlockNumberFor<T>, T>, OptionQuery>;
 
 	/// Mapping of ongoing votes.
 	#[pallet::storage]
@@ -216,19 +227,21 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
-	/// Mapping of ongoing votes about inqueries.
+	/// Mapping of ongoing votes about challenges.
 	#[pallet::storage]
-	#[pallet::getter(fn ongoing_inquery_votes)]
-	pub(super) type OngoingInqueryVotes<T> =
-		StorageMap<_, Blake2_128Concat, InqueryIndex, VoteStats, OptionQuery>;
+	#[pallet::getter(fn ongoing_challenge_votes)]
+	pub(super) type OngoingChallengeVotes<T> =
+		StorageDoubleMap<_, Blake2_128Concat, InqueryIndex, Blake2_128Concat, ChallengeState, VoteStats, OptionQuery>;
 
 	/// Mapping from inquery to vector of users who voted.
 	#[pallet::storage]
 	#[pallet::getter(fn inquery_voter)]
-	pub(super) type InqueryVoter<T: Config> = StorageMap<
+	pub(super) type InqueryVoter<T: Config> = StorageDoubleMap<
 		_,
 		Blake2_128Concat,
 		InqueryIndex,
+		Blake2_128Concat,
+		ChallengeState,
 		BoundedVec<AccountIdOf<T>, T::MaxVoter>,
 		ValueQuery,
 	>;
@@ -339,16 +352,51 @@ pub mod pallet {
 			// checks if there is a voting for an inquery ending in this block.
 			ended_inquery_votings.iter().for_each(|item| {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
-				let voting_results = <OngoingInqueryVotes<T>>::take(item);
-				if let Some(voting_result) = voting_results {
-					if voting_result.yes_votes > voting_result.no_votes
-						&& <T as Config>::Threshold::get()
-							< voting_result.yes_votes.saturating_add(voting_result.no_votes)
-					{
-						let _ = Self::change_letting_agent(*item);
-					} else {
-						Inqueries::<T>::take(*item);
+				let challenge = Self::challenges(item);
+				if let Some(mut challenge) = challenge {
+					if challenge.state == ChallengeState::Second {
+						challenge.state = ChallengeState::Third;
+						let vote_stats = VoteStats { yes_votes: 0, no_votes: 0 };
+						OngoingChallengeVotes::<T>::insert(item, challenge.state.clone(), vote_stats);
+						Challenges::<T>::insert(item, challenge.clone());
+						let current_block_number = <frame_system::Pallet<T>>::block_number();
+						let expiry_block =
+							current_block_number.saturating_add(<T as Config>::VotingTime::get());
+						InqueryRoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
+							keys.try_push(*item).map_err(|_| Error::<T>::TooManyProposals)?;
+							Ok::<(), DispatchError>(())
+						});
+					} 
+					else {
+						let voting_results = <OngoingChallengeVotes<T>>::take(item, challenge.state.clone());
+						if let Some(voting_result) = voting_results {
+							if voting_result.yes_votes > voting_result.no_votes
+								&& <T as Config>::Threshold::get()
+									< voting_result.yes_votes.saturating_add(voting_result.no_votes)
+							{
+								if challenge.state == ChallengeState::First {
+									challenge.state = ChallengeState::Second;
+									Challenges::<T>::insert(item, challenge.clone());
+									let current_block_number = <frame_system::Pallet<T>>::block_number();
+									let expiry_block =
+										current_block_number.saturating_add(<T as Config>::VotingTime::get());
+									InqueryRoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
+										keys.try_push(*item).map_err(|_| Error::<T>::TooManyProposals)?;
+										Ok::<(), DispatchError>(())
+									});
+								} 
+								if challenge.state == ChallengeState::Third {
+									let _ = Self::slash_letting_agent(*item);
+								} 
+								if challenge.state == ChallengeState::Fourth {
+									let _ = Self::change_letting_agent(*item);
+								} 
+							} else {
+								Challenges::<T>::take(*item);
+							}
+						}
 					}
+					
 				}
 			});
 			weight
@@ -392,7 +440,7 @@ pub mod pallet {
 
 			// Check if the amount is less than LowProposal
 			if amount.saturating_mul(
-				Self::u64_to_balance_option(1000000000000)?,
+				Self::u64_to_balance_option(1/* 000000000000 */)?,
 			) <= <T as Config>::LowProposal::get() {
 				// Execute the proposal immediately
 				Self::execute_proposal(proposal)?;
@@ -415,40 +463,12 @@ pub mod pallet {
 			Ok(())
 		}
 
-		// property holder want to sell the property as a whole. SPV would be desolved. Token would be put together
-		// for the nft and nft would be released. Vote happend. If would be approved. Outstanding tax payed etc. Once nft sold token would be burned.
-		// Different area on the marketplace for this.
-		#[pallet::call_index(10)]
-		#[pallet::weight(<T as pallet::Config>::WeightInfo::propose())]
-		pub fn sell_property(
-			origin: OriginFor<T>,
-			asset_id: u32,
-			amount: BalanceOf<T>,
-		) -> DispatchResult {
-			let origin = ensure_signed(origin)?;
-			let owner_list = pallet_nft_marketplace::Pallet::<T>::property_owner(asset_id);
-			ensure!(owner_list.contains(&origin), Error::<T>::NoPermission);
-			let proposal_id = Self::proposal_count().saturating_add(1);
-			let current_block_number = <frame_system::Pallet<T>>::block_number();
-			let expiry_block =
-				current_block_number.saturating_add(<T as Config>::VotingTime::get());
-			let proposal = SellProposal {
-				proposer: origin.clone(),
-				asset_id,
-				amount,
-				created_at: current_block_number,
-			};
-			SellPropertyRoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
-				keys.try_push(proposal_id).map_err(|_| Error::<T>::TooManyProposals)?;
-				Ok::<(), DispatchError>(())
-			})?;
-			let vote_stats = VoteStats { yes_votes: 0, no_votes: 0 };
 
-			SellProposals::<T>::insert(proposal_id, proposal);
-			OngoingVotes::<T>::insert(proposal_id, vote_stats);
-			Self::deposit_event(Event::SellProposed { proposal_id, asset_id, proposer: origin });
-			Ok(())
-		}
+
+		// First voting for challenging the letting agent. Time period for the letting agent to explain himself
+		// then another voting if they should vote him out. Third vote for kicking the letting agent out.
+
+
 
 		/// Creates an inquery against the letting agent of the real estate object.
 		/// Only one of the owner of the property can propose.
@@ -461,7 +481,7 @@ pub mod pallet {
 		/// Emits `Inquery` event when succesfful.
 		#[pallet::call_index(1)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::inquery_against_letting_agent())]
-		pub fn inquery_against_letting_agent(
+		pub fn challenge_against_letting_agent(
 			origin: OriginFor<T>,
 			asset_id: u32,
 		) -> DispatchResult {
@@ -473,15 +493,15 @@ pub mod pallet {
 			let expiry_block =
 				current_block_number.saturating_add(<T as Config>::VotingTime::get());
 			let inquery =
-				Inquery { proposer: origin.clone(), asset_id, created_at: current_block_number };
+				Challenge { proposer: origin.clone(), asset_id, created_at: current_block_number, state: ChallengeState::First };
 			InqueryRoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
 				keys.try_push(inquery_id).map_err(|_| Error::<T>::TooManyProposals)?;
 				Ok::<(), DispatchError>(())
 			})?;
 			let vote_stats = VoteStats { yes_votes: 0, no_votes: 0 };
+			OngoingChallengeVotes::<T>::insert(inquery_id, inquery.state.clone(), vote_stats);
+			Challenges::<T>::insert(inquery_id, inquery);
 
-			Inqueries::<T>::insert(inquery_id, inquery);
-			OngoingInqueryVotes::<T>::insert(inquery_id, vote_stats);
 			Self::deposit_event(Event::Inquery { inquery_id, asset_id, proposer: origin });
 			Ok(())
 		}
@@ -544,23 +564,23 @@ pub mod pallet {
 			vote: Vote,
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
-			let inquery = Self::inqueries(inquery_id).ok_or(Error::<T>::NotOngoing)?;
+			let inquery = Self::challenges(inquery_id).ok_or(Error::<T>::NotOngoing)?;
 			let owner_list = pallet_nft_marketplace::Pallet::<T>::property_owner(inquery.asset_id);
 			ensure!(owner_list.contains(&origin), Error::<T>::NoPermission);
-			ensure!(!Self::inquery_voter(inquery_id).contains(&origin), Error::<T>::AlreadyVoted);
+			ensure!(!Self::inquery_voter(inquery_id, inquery.state.clone()).contains(&origin), Error::<T>::AlreadyVoted);
 			let voting_power = pallet_nft_marketplace::Pallet::<T>::property_owner_token(
 				inquery.asset_id,
 				origin.clone(),
 			);
 			let mut current_vote =
-				Self::ongoing_inquery_votes(inquery_id).ok_or(Error::<T>::NotOngoing)?;
+				Self::ongoing_challenge_votes(inquery_id, inquery.state.clone()).ok_or(Error::<T>::NotOngoing)?;
 			if vote == Vote::Yes {
 				current_vote.yes_votes += voting_power;
 			} else {
 				current_vote.no_votes += voting_power;
 			};
-			OngoingInqueryVotes::<T>::insert(inquery_id, current_vote);
-			InqueryVoter::<T>::try_mutate(inquery_id, |keys| {
+			OngoingChallengeVotes::<T>::insert(inquery_id, inquery.state.clone(), current_vote);
+			InqueryVoter::<T>::try_mutate(inquery_id, inquery.state, |keys| {
 				keys.try_push(origin.clone()).map_err(|_| Error::<T>::TooManyVotes)?;
 				Ok::<(), DispatchError>(())
 			})?;
@@ -574,15 +594,33 @@ pub mod pallet {
 			<T as pallet::Config>::PalletId::get().into_account_truncating()
 		}
 
-		/// Changes the letting agent of a given real estate object.
-		fn change_letting_agent(inquery_id: InqueryIndex) -> DispatchResult {
-			let inquery = Inqueries::<T>::take(inquery_id).ok_or(Error::<T>::NotOngoing)?;
+		fn slash_letting_agent(inquery_id: InqueryIndex) -> DispatchResult {
+			let mut challenge = Challenges::<T>::take(inquery_id).ok_or(Error::<T>::NotOngoing)?;
 			let letting_agent =
-				pallet_property_management::Pallet::<T>::letting_storage(inquery.asset_id).unwrap();
+				pallet_property_management::Pallet::<T>::letting_storage(challenge.asset_id).unwrap();
 			let amount = <T as Config>::MinSlashingAmount::get();
 			<T as pallet::Config>::Slash::on_unbalanced(
 				<T as pallet::Config>::Currency::slash_reserved(&letting_agent, amount).0,
 			);
+			challenge.state = ChallengeState::Fourth;
+			let vote_stats = VoteStats { yes_votes: 0, no_votes: 0 };
+			OngoingChallengeVotes::<T>::insert(inquery_id, challenge.state.clone(), vote_stats);
+			Challenges::<T>::insert(inquery_id, challenge.clone()); 
+			let current_block_number = <frame_system::Pallet<T>>::block_number();
+			let expiry_block =
+				current_block_number.saturating_add(<T as Config>::VotingTime::get());
+			InqueryRoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
+				keys.try_push(inquery_id).map_err(|_| Error::<T>::TooManyProposals)?;
+				Ok::<(), DispatchError>(())
+			})?;
+			Ok(())
+		}
+
+		/// Changes the letting agent of a given real estate object.
+		fn change_letting_agent(inquery_id: InqueryIndex) -> DispatchResult {
+			let inquery = Challenges::<T>::take(inquery_id).ok_or(Error::<T>::NotOngoing)?;
+			let letting_agent =
+				pallet_property_management::Pallet::<T>::letting_storage(inquery.asset_id).unwrap();
 			let asset_details =
 				pallet_nft_marketplace::Pallet::<T>::asset_id_details(inquery.asset_id)
 					.ok_or(Error::<T>::NoAssetFound)?;
@@ -618,7 +656,7 @@ pub mod pallet {
 					&Self::account_id(),
 					&letting_agent,
 					proposal_amount.saturating_mul(
-						Self::u64_to_balance_option(1000000000000)?,
+						Self::u64_to_balance_option(1/* 000000000000 */)?,
 					),
 					KeepAlive,
 				).map_err(|_| Error::<T>::NotEnoughFunds)?;
@@ -637,7 +675,7 @@ pub mod pallet {
 					&Self::account_id(),
 					&letting_agent,
 					property_reserves.saturating_mul(
-						Self::u64_to_balance_option(1000000000000)?,
+						Self::u64_to_balance_option(1/* 000000000000 */)?,
 					),
 					KeepAlive,
 				).map_err(|_| Error::<T>::NotEnoughFunds)?;

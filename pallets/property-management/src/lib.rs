@@ -429,7 +429,7 @@ pub mod pallet {
 				&origin,
 				&Self::account_id(),
 				scaled_amount.saturating_mul(
-					Self::u64_to_balance_option(1000000000000)?,
+					Self::u64_to_balance_option(1/* 000000000000 */)?,
 				),
 				KeepAlive,
 			).map_err(|_| Error::<T>::NotEnoughFunds)?;
@@ -461,7 +461,7 @@ pub mod pallet {
 					&Self::account_id(),
 					&letting_agent,
 					amount_to_pay_debts.saturating_mul(
-						Self::u64_to_balance_option(1000000000000)?,
+						Self::u64_to_balance_option(1/* 000000000000 */)?,
 					),
 					KeepAlive,
 				).map_err(|_| Error::<T>::NotEnoughFunds)?;
@@ -482,7 +482,7 @@ pub mod pallet {
 						&Self::account_id(),
 						&Self::governance_account_id(),
 						reserve_amount.saturating_mul(
-							Self::u64_to_balance_option(1000000000000)?,
+							Self::u64_to_balance_option(1/* 000000000000 */)?,
 						),
 						KeepAlive,
 					).map_err(|_| Error::<T>::NotEnoughFunds)?;
@@ -542,7 +542,7 @@ pub mod pallet {
 				&Self::account_id(),
 				&origin,
 				amount.saturating_mul(
-					Self::u64_to_balance_option(1000000000000)?,
+					Self::u64_to_balance_option(1/* 000000000000 */)?,
 				),
 				KeepAlive,
 			)
