@@ -2,7 +2,6 @@
 members = [
     "node",
     "runtime",
-    "pallets/community-projects",
     "pallets/nft-marketplace",
     "pallets/property-governance",
     "pallets/property-management",

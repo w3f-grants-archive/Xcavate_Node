@@ -452,6 +452,7 @@ impl pallet_sudo::Config for Runtime {
 }
 
 parameter_types! {
+	pub const CommunityProjectPalletId: PalletId = PalletId(*b"py/cmprj");
 	pub const NftMarketplacePalletId: PalletId = PalletId(*b"py/nftxc");
 	pub const MaxNftTokens: u32 = 250;
 	pub const Postcode: u32 = 10;
@@ -476,32 +477,6 @@ impl pallet_nft_marketplace::Config for Runtime {
 	type AssetId = <Self as pallet_assets::Config<Instance1>>::AssetId;
 	type AssetId2 = u32;
 	type PostcodeLimit = Postcode;
-}
-
-parameter_types! {
-	pub const MinimumRemainingAmount: Balance = DOLLARS;
-	pub const CommunityProjectPalletId: PalletId = PalletId(*b"py/cmprj");
-	pub const MaxNftType: u32 = 4;
-	pub const MaxNftsInCollectionProject: u32 = 100;
-	pub const MaxOngoingProject: u32 = 250;
-}
-
-/// Configure the pallet-community-projects in pallets/community-projects.
-impl pallet_community_projects::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_community_projects::weights::SubstrateWeight<Runtime>;
-	type Currency = Balances;
-	type PalletId = CommunityProjectPalletId;
-	type MaxNftTypes = MaxNftType;
-	type MaxNftInCollection = MaxNftsInCollectionProject;
-	#[cfg(feature = "runtime-benchmarks")]
-	type Helper = pallet_community_projects::NftHelper;
-	type TimeProvider = Timestamp;
-	type MaxOngoingProjects = MaxOngoingProject;
-	type AssetId = u32;
-	type CollectionId = u32;
-	type ItemId = u32;
-	type MinimumRemainingAmount = MinimumRemainingAmount;
 }
 
 parameter_types! {
@@ -1487,7 +1462,6 @@ construct_runtime!(
 		TransactionPayment: pallet_transaction_payment,
 		Sudo: pallet_sudo,
 		NftMarketplace: pallet_nft_marketplace,
-		CommunityProject: pallet_community_projects,
 		XcavateWhitelist: pallet_xcavate_whitelist,
 		PropertyManagement: pallet_property_management,
 		PropertyGovernance: pallet_property_governance,
@@ -1583,7 +1557,6 @@ mod benches {
 		[pallet_balances, Balances]
 		[pallet_timestamp, Timestamp]
 		[pallet_nft_marketplace, NftMarketplace]
-		[pallet_community_projects, CommunityProject]
 		[pallet_xcavate_whitelist, XcavateWhitelist]
 		[pallet_property_management, PropertyManagement]
 		[pallet_property_governance, PropertyGovernance]

@@ -96,7 +96,6 @@ frame-system-benchmarking = {  default-features = false, git = "https://github.c
 
 # Local Dependencies
 pallet-nft-marketplace = {  default-features = false, path = "../pallets/nft-marketplace" }
-pallet-community-projects = {  default-features = false, path = "../pallets/community-projects" }
 pallet-xcavate-whitelist = {  default-features = false, path = "../pallets/xcavate-whitelist" }
 pallet-property-management = {  default-features = false, path = "../pallets/property-management" }
 pallet-property-governance = {  default-features = false, path = "../pallets/property-governance" }
@@ -126,7 +125,6 @@ std = [
 	"pallet-grandpa/std",
 	"pallet-sudo/std",
 	"pallet-nft-marketplace/std",
-	"pallet-community-projects/std",
 	"pallet-xcavate-whitelist/std",
 	"pallet-property-management/std",
 	"pallet-property-governance/std",
@@ -197,7 +195,6 @@ runtime-benchmarks = [
 	"sp-runtime/runtime-benchmarks",
 
 	"pallet-nft-marketplace/runtime-benchmarks",
-	"pallet-community-projects/runtime-benchmarks",
 	"pallet-xcavate-whitelist/runtime-benchmarks",
 	"pallet-property-governance/runtime-benchmarks",
 	"pallet-property-management/runtime-benchmarks",
@@ -238,7 +235,6 @@ try-runtime = [
 	"pallet-transaction-payment/try-runtime",
 
 	"pallet-nft-marketplace/try-runtime",
-	"pallet-community-projects/try-runtime",
 	"pallet-xcavate-whitelist/try-runtime",
 	"pallet-property-management/try-runtime",
 	"pallet-nfts/try-runtime",

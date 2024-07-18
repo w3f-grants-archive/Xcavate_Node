@@ -362,7 +362,7 @@ pub mod pallet {
 						let current_block_number = <frame_system::Pallet<T>>::block_number();
 						let expiry_block =
 							current_block_number.saturating_add(<T as Config>::VotingTime::get());
-						InqueryRoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
+						let _ = InqueryRoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
 							keys.try_push(*item).map_err(|_| Error::<T>::TooManyProposals)?;
 							Ok::<(), DispatchError>(())
 						});
@@ -380,7 +380,7 @@ pub mod pallet {
 									let current_block_number = <frame_system::Pallet<T>>::block_number();
 									let expiry_block =
 										current_block_number.saturating_add(<T as Config>::VotingTime::get());
-									InqueryRoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
+									let _ = InqueryRoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
 										keys.try_push(*item).map_err(|_| Error::<T>::TooManyProposals)?;
 										Ok::<(), DispatchError>(())
 									});
@@ -668,7 +668,7 @@ pub mod pallet {
 					.map_err(|_| Error::<T>::ConversionError)?
 					.try_into()
 					.map_err(|_| Error::<T>::ConversionError)?,
-				);
+				)?;
 			} else {
 				// Transfer only the available property reserves
 				<T as pallet::Config>::Currency::transfer(
@@ -690,7 +690,7 @@ pub mod pallet {
 					.map_err(|_| Error::<T>::ConversionError)?
 					.try_into()
 					.map_err(|_| Error::<T>::ConversionError)?,
-				);
+				)?;
 		
 				// Set the reserves to zero
 				pallet_property_management::Pallet::<T>::decrease_reserves(
@@ -699,7 +699,7 @@ pub mod pallet {
 					.map_err(|_| Error::<T>::ConversionError)?
 					.try_into()
 					.map_err(|_| Error::<T>::ConversionError)?,
-				);
+				)?;
 			}
 		
 			// Emit event for proposal execution

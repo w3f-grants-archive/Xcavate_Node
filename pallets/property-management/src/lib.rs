@@ -19,7 +19,7 @@ use frame_support::{
 };
 
 use frame_support::sp_runtime::{
-	traits::{AccountIdConversion, CheckedAdd, CheckedDiv, CheckedMul, Zero},
+	traits::{AccountIdConversion, CheckedAdd, CheckedDiv, CheckedMul, Zero, CheckedSub},
 	Saturating,
 };
 
@@ -201,6 +201,7 @@ pub mod pallet {
 		/// Error by multiplying a number.
 		MultiplyError,
 		ArithmeticOverflow,
+		ArithmeticUnderflow,
 		/// The caller has no funds stored.
 		UserHasNoFundsStored,
 		/// The pallet has not enough funds.
@@ -465,6 +466,9 @@ pub mod pallet {
 					),
 					KeepAlive,
 				).map_err(|_| Error::<T>::NotEnoughFunds)?;
+				let new_debts = property_debts.checked_sub(&amount_to_pay_debts)
+					.ok_or(Error::<T>::ArithmeticUnderflow)?;
+				PropertyDebts::<T>::insert(asset_id, new_debts);
 		
 				governance_amount = amount_to_pay_debts;
 			}

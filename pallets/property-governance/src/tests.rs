@@ -361,6 +361,15 @@ fn proposal_pass_2() {
 		assert_eq!(PropertyManagement::property_reserve(0), 0);
 		assert_eq!(PropertyGovernance::proposals(1).is_none(), true);
 		assert_eq!(PropertyManagement::property_debts(0), 9_000);
+		assert_eq!(PropertyManagement::stored_funds::<AccountId>([1; 32].into()), 0);
+		assert_ok!(PropertyManagement::distribute_income(
+			RuntimeOrigin::signed([0; 32].into()),
+			0,
+			3000
+		));
+		assert_eq!(PropertyManagement::property_debts(0), 6000);
+		assert_eq!(PropertyManagement::property_reserve(0), 0);
+		assert_eq!(PropertyManagement::stored_funds::<AccountId>([1; 32].into()), 0);
 	});
 }
 
