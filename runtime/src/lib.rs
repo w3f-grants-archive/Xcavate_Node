@@ -522,7 +522,7 @@ impl pallet_property_management::Config for Runtime {
 }
 
 parameter_types! {
-	pub const PropertyVotingTime: BlockNumber = 30;
+	pub const PropertyVotingTime: BlockNumber = 20;
 	pub const MaxVoteForBlock: u32 = 100;
 	pub const MinimumSlashingAmount: Balance = 10 * DOLLARS;
 	pub const MaximumVoter: u32 = 100;
