@@ -25,9 +25,6 @@ use frame_support::BoundedVec;
 use frame_support::sp_runtime::traits::StaticLookup;
 use pallet_assets::Pallet as Assets;
 
-type BalanceOf1<T> = <<T as pallet_nft_marketplace::Config>::Currency as Currency<
-	<T as frame_system::Config>::AccountId,
->>::Balance;
 type BalanceOf2<T> = <T as pallet_assets::Config<pallet_assets::Instance1>>::Balance;
 
 fn setup_real_estate_object<T: Config>() -> T::AccountId {
@@ -114,17 +111,8 @@ mod benchmarks {
 		assert_eq!(PropertyGovernance::<T>::proposals(1).is_some(), false);
 	}
 
- 	#[benchmark]
-	fn sell_property() {
-		let letting_agent = setup_real_estate_object::<T>();
-		#[extrinsic_call]
-		sell_property(RawOrigin::Signed(letting_agent.clone()), 0, 1500_u32.into());
-		
-		assert_eq!(PropertyGovernance::<T>::sell_proposals(1).is_some(), true);
-	}
-
   	#[benchmark]
-	fn inquery_against_letting_agent() {
+	fn challenge_against_letting_agent() {
 		let _ = setup_real_estate_object::<T>();
 		let caller: T::AccountId = whitelisted_caller();
 		<T as pallet_nfts::Config>::Currency::make_free_balance_be(
@@ -132,9 +120,9 @@ mod benchmarks {
 			DepositBalanceOf::<T>::max_value(),
 		);
 		#[extrinsic_call]
-		inquery_against_letting_agent(RawOrigin::Signed(caller.clone()), 0);
+		challenge_against_letting_agent(RawOrigin::Signed(caller.clone()), 0);
 
-		assert_eq!(PropertyGovernance::<T>::inqueries(1).is_some(), true);
+		assert_eq!(PropertyGovernance::<T>::challenges(1).is_some(), true);
 	}
 
 	#[benchmark]
@@ -164,19 +152,19 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn vote_on_letting_agent_inquery() {
+	fn vote_on_letting_agent_challenge() {
 		let _ = setup_real_estate_object::<T>();
 		let caller: T::AccountId = whitelisted_caller();
 		<T as pallet_nfts::Config>::Currency::make_free_balance_be(
 			&caller,
 			DepositBalanceOf::<T>::max_value(),
 		);
-		assert_ok!{PropertyGovernance::<T>::inquery_against_letting_agent(RawOrigin::Signed(caller.clone()).into(), 0)};
+		assert_ok!{PropertyGovernance::<T>::challenge_against_letting_agent(RawOrigin::Signed(caller.clone()).into(), 0)};
 		#[extrinsic_call]
-		vote_on_letting_agent_inquery(RawOrigin::Signed(caller.clone()), 1, crate::Vote::Yes);
+		vote_on_letting_agent_challenge(RawOrigin::Signed(caller.clone()), 1, crate::Vote::Yes);
 
-		assert_eq!(PropertyGovernance::<T>::ongoing_inquery_votes(1).unwrap().yes_votes, 100);
-		assert_eq!(PropertyGovernance::<T>::inquery_voter(1).len(), 1);
+		assert_eq!(PropertyGovernance::<T>::ongoing_challenge_votes(1, crate::ChallengeState::First).unwrap().yes_votes, 100);
+		assert_eq!(PropertyGovernance::<T>::challenge_voter(1, crate::ChallengeState::First).len(), 1);
 	}  
 
 

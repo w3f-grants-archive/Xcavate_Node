@@ -293,6 +293,10 @@ pub mod pallet {
 		VotedOnChallenge { challenge_id: ChallengeIndex, voter: AccountIdOf<T>, vote: Vote },
 		/// The proposal has been executed.
 		ProposalExecuted { asset_id: u32, amount: BalanceOf<T> },
+		/// The agent got slashed.
+		AgentSlashed { challenge_id: ChallengeIndex, amount: BalanceOf<T> },
+		/// The agent has been changed.
+		AgentChanged { challenge_id: ChallengeIndex, asset_id: u32 },
 	}
 
 	#[pallet::error]
@@ -475,7 +479,7 @@ pub mod pallet {
 		///
 		/// Emits `Challenge` event when succesfful.
 		#[pallet::call_index(1)]
-		#[pallet::weight(<T as pallet::Config>::WeightInfo::inquery_against_letting_agent())]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::challenge_against_letting_agent())]
 		pub fn challenge_against_letting_agent(
 			origin: OriginFor<T>,
 			asset_id: u32,
@@ -555,7 +559,7 @@ pub mod pallet {
 		///
 		/// Emits `VotedOnChallenge` event when succesfful.
 		#[pallet::call_index(3)]
-		#[pallet::weight(<T as pallet::Config>::WeightInfo::vote_on_letting_agent_inquery())]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::vote_on_letting_agent_challenge())]
 		pub fn vote_on_letting_agent_challenge(
 			origin: OriginFor<T>,
 			challenge_id: ChallengeIndex,
@@ -611,6 +615,7 @@ pub mod pallet {
 				keys.try_push(challenge_id).map_err(|_| Error::<T>::TooManyProposals)?;
 				Ok::<(), DispatchError>(())
 			})?;
+			Self::deposit_event(Event::AgentSlashed { challenge_id, amount });
 			Ok(())
 		}
 
@@ -632,6 +637,7 @@ pub mod pallet {
 				asset_details.location,
 				challenge.asset_id,
 			);
+			Self::deposit_event(Event::AgentChanged { challenge_id, asset_id: challenge.asset_id });
 			Ok(())
 		}
 

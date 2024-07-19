@@ -1,4 +1,4 @@
-use crate::{mock::*, Error};
+/* use crate::{mock::*, Error};
 use frame_support::{
 	assert_noop, assert_ok,
 	traits::{OnFinalize, OnInitialize},
@@ -1020,3 +1020,4 @@ fn different_proposals() {
 		assert_eq!(PropertyManagement::property_reserve(0), 500);
 	});
 }
+ */

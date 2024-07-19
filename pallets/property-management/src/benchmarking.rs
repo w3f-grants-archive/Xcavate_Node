@@ -17,17 +17,12 @@ type DepositBalanceOf1<T> =
 use frame_support::sp_runtime::traits::StaticLookup;
 use frame_support::BoundedVec;
 use frame_support::{assert_ok, traits::Get};
-use pallet_balances::Pallet as Balances;
 use pallet_xcavate_whitelist::Pallet as Whitelist;
 
-type BalanceOf1<T> = <<T as pallet_nft_marketplace::Config>::Currency as Currency<
-	<T as frame_system::Config>::AccountId,
->>::Balance;
 use pallet_assets::Pallet as Assets;
 
 fn setup_real_estate_object<T: Config>(
 ) -> BoundedVec<u8, <T as pallet_nft_marketplace::Config>::PostcodeLimit> {
-	let value: BalanceOf1<T> = 100_000u32.into();
 	let caller: T::AccountId = whitelisted_caller();
 	<T as pallet_nfts::Config>::Currency::make_free_balance_be(
 		&caller,
@@ -251,15 +246,15 @@ mod benchmarks {
 			amount
 		));
 		let caller: T::AccountId = whitelisted_caller();
-		<T as pallet::Config>::Currency::make_free_balance_be(&caller, 10_u32.into());
+		<T as pallet::Config>::Currency::make_free_balance_be(&caller, 100000000_u32.into());
 		let pallet_account = PropertyManagement::<T>::account_id();
 		<T as pallet::Config>::Currency::make_free_balance_be(
 			&pallet_account,
 			DepositBalanceOf1::<T>::max_value(),
 		);
 
-		//assert_eq!(<T as pallet::Config>::Currency::free_balance(&pallet_account), amount);
-		//assert_eq!(PropertyManagement::<T>::stored_funds(caller.clone()), amount);
+		assert_eq!(<T as pallet::Config>::Currency::free_balance(&pallet_account), DepositBalanceOf1::<T>::max_value());
+		assert_eq!(PropertyManagement::<T>::stored_funds(caller.clone()), amount);
 		#[extrinsic_call]
 		withdraw_funds(RawOrigin::Signed(caller.clone()));
 
