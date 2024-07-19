@@ -1,10 +1,10 @@
 use node_template_runtime::{
-	constants::currency::DOLLARS, AccountId, RuntimeGenesisConfig, Signature, WASM_BINARY, 
-	BABE_GENESIS_EPOCH_CONFIG, opaque::SessionKeys, Balance,
+	constants::currency::DOLLARS, opaque::SessionKeys, AccountId, Balance, RuntimeGenesisConfig,
+	Signature, BABE_GENESIS_EPOCH_CONFIG, WASM_BINARY,
 };
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
-use sp_authority_discovery::AuthorityId as AuthorityDiscoveryId;
 use sc_service::ChainType;
+use sp_authority_discovery::AuthorityId as AuthorityDiscoveryId;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_core::{sr25519, Pair, Public};
@@ -37,17 +37,26 @@ where
 }
 
 /// Generate an Aura authority key.
-pub fn authority_keys_from_seed(s: &str) -> (AccountId, AccountId, AuraId, GrandpaId, ImOnlineId, AuthorityDiscoveryId) {
-	(get_account_id_from_seed::<sr25519::Public>(s), get_account_id_from_seed::<sr25519::Public>(s), get_from_seed::<AuraId>(s), get_from_seed::<GrandpaId>(s), get_from_seed::<ImOnlineId>(s), get_from_seed::<AuthorityDiscoveryId>(s))
+pub fn authority_keys_from_seed(
+	s: &str,
+) -> (AccountId, AccountId, AuraId, GrandpaId, ImOnlineId, AuthorityDiscoveryId) {
+	(
+		get_account_id_from_seed::<sr25519::Public>(s),
+		get_account_id_from_seed::<sr25519::Public>(s),
+		get_from_seed::<AuraId>(s),
+		get_from_seed::<GrandpaId>(s),
+		get_from_seed::<ImOnlineId>(s),
+		get_from_seed::<AuthorityDiscoveryId>(s),
+	)
 }
 
 fn session_keys(
 	aura: AuraId,
 	grandpa: GrandpaId,
- 	im_online: ImOnlineId,
-	authority_discovery: AuthorityDiscoveryId, 
+	im_online: ImOnlineId,
+	authority_discovery: AuthorityDiscoveryId,
 ) -> SessionKeys {
-	SessionKeys { aura, grandpa, im_online, authority_discovery}
+	SessionKeys { aura, grandpa, im_online, authority_discovery }
 }
 
 pub fn development_config() -> Result<ChainSpec, String> {
@@ -98,58 +107,57 @@ fn testnet_genesis(
 		AccountId,
 		AuraId,
 		GrandpaId,
- 		ImOnlineId,
+		ImOnlineId,
 		AuthorityDiscoveryId,
 	)>,
 	root_key: AccountId,
 	endowed_accounts: Vec<(AccountId, u128)>,
 	_enable_println: bool,
 ) -> serde_json::Value {
-
 	const ENDOWMENT: Balance = 100_000 * DOLLARS;
 
 	serde_json::json!({
-		"balances": {
-			// Configure endowed accounts with initial balance of 1 << 60.
-			"balances": endowed_accounts.iter().cloned().map(|x| (x.0, ENDOWMENT)).collect::<Vec<_>>(),
-		},
-		// "aura": {
-		// 	"authorities": initial_authorities.iter().map(|x| (x.0.clone())).collect::<Vec<_>>(),
-		// },
-		// "grandpa": {
-		// 	"authorities": initial_authorities.iter().map(|x| (x.1.clone(), 1)).collect::<Vec<_>>(),
-		// },
-/*   		"assets" : {
-			"assets": vec![(1, root_key.clone(), true, 1)], // Genesis assets: id, owner, is_sufficient, min_balance
-			"metadata": vec![(1, "XUSD".as_bytes(), "XUSD".as_bytes(), 0)], // Genesis metadata: id, name, symbol, decimals
-			"accounts": endowed_accounts.iter().cloned().map(|x| (1, x.0.clone(), 1_000_000)).collect::<Vec<_>>(),
-		},  */  
-		"sudo": {
-			// Assign network admin rights.
-			"key": Some(root_key),
-		},
-		"staking": {
-			"validatorCount": initial_authorities.len() as u32,
-			"minimumValidatorCount": initial_authorities.len() as u32,
-			"invulnerables": initial_authorities.iter().map(|x| x.0.clone()).collect::<Vec<_>>(),
-			"slashRewardFraction": Perbill::from_percent(10),
-		},
-		"babe": {
-			"epochConfig": Some(BABE_GENESIS_EPOCH_CONFIG),
-		},
-		"session": {
-			"keys": initial_authorities
-				.iter()
-				.map(|x| {
-					(
-						x.0.clone(),
-						x.0.clone(),
-						session_keys(x.2.clone(), x.3.clone() , x.4.clone(), x.5.clone()),
-					)
-				})
-				.collect::<Vec<_>>(),
-		},
-	})
+			"balances": {
+				// Configure endowed accounts with initial balance of 1 << 60.
+				"balances": endowed_accounts.iter().cloned().map(|x| (x.0, ENDOWMENT)).collect::<Vec<_>>(),
+			},
+			// "aura": {
+			// 	"authorities": initial_authorities.iter().map(|x| (x.0.clone())).collect::<Vec<_>>(),
+			// },
+			// "grandpa": {
+			// 	"authorities": initial_authorities.iter().map(|x| (x.1.clone(), 1)).collect::<Vec<_>>(),
+			// },
+/* 	   		"assets" : {
+				"assets": vec![(1, root_key.clone(), true, 1)], // Genesis assets: id, owner, is_sufficient, min_balance
+				"metadata": vec![(1, "XUSD".as_bytes(), "XUSD".as_bytes(), 0)], // Genesis metadata: id, name, symbol, decimals
+				"accounts": endowed_accounts.iter().cloned().map(|x| (1, x.0.clone(), 1_000_000)).collect::<Vec<_>>(),
+			},   */
+			"sudo": {
+				// Assign network admin rights.
+				"key": Some(root_key),
+			},
+			"staking": {
+				"validatorCount": initial_authorities.len() as u32,
+				"minimumValidatorCount": initial_authorities.len() as u32,
+				"invulnerables": initial_authorities.iter().map(|x| x.0.clone()).collect::<Vec<_>>(),
+				"slashRewardFraction": Perbill::from_percent(10),
+			},
+			"babe": {
+				"epochConfig": Some(BABE_GENESIS_EPOCH_CONFIG),
+			},
+			"session": {
+				"keys": initial_authorities
+					.iter()
+					.map(|x| {
+						(
+							x.0.clone(),
+							x.0.clone(),
+							session_keys(x.2.clone(), x.3.clone() , x.4.clone(), x.5.clone()),
+						)
+					})
+					.collect::<Vec<_>>(),
+			},
+		})
 }
 
 pub fn chain_spec_properties() -> serde_json::map::Map<String, serde_json::Value> {

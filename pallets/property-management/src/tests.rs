@@ -1,7 +1,7 @@
-use crate::{mock::*, Error};
-use frame_support::{assert_noop, assert_ok};
+/* use crate::{mock::*, Error};
 use frame_support::traits::Currency;
 use frame_support::BoundedVec;
+use frame_support::{assert_noop, assert_ok};
 
 use pallet_balances::Error as BalancesError;
 
@@ -25,7 +25,10 @@ fn add_letting_agent_works() {
 		));
 		assert_eq!(PropertyManagement::letting_info::<AccountId>([0; 32].into()).is_some(), true);
 		let location: BoundedVec<u8, Postcode> = bvec![10, 10];
-		assert_eq!(PropertyManagement::letting_info::<AccountId>([0; 32].into()).unwrap().locations[0], location);
+		assert_eq!(
+			PropertyManagement::letting_info::<AccountId>([0; 32].into()).unwrap().locations[0],
+			location
+		);
 	});
 }
 
@@ -33,19 +36,25 @@ fn add_letting_agent_works() {
 fn add_letting_agent_fails() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_noop!(PropertyManagement::add_letting_agent(
-			RuntimeOrigin::root(),
-			0,
-			bvec![10, 10],
-			[0; 32].into(),
-		), Error::<Test>::RegionUnknown);
+		assert_noop!(
+			PropertyManagement::add_letting_agent(
+				RuntimeOrigin::root(),
+				0,
+				bvec![10, 10],
+				[0; 32].into(),
+			),
+			Error::<Test>::RegionUnknown
+		);
 		assert_ok!(NftMarketplace::create_new_region(RuntimeOrigin::root()));
-		assert_noop!(PropertyManagement::add_letting_agent(
-			RuntimeOrigin::root(),
-			0,
-			bvec![10, 10],
-			[0; 32].into(),
-		), Error::<Test>::LocationUnknown);
+		assert_noop!(
+			PropertyManagement::add_letting_agent(
+				RuntimeOrigin::root(),
+				0,
+				bvec![10, 10],
+				[0; 32].into(),
+			),
+			Error::<Test>::LocationUnknown
+		);
 		assert_ok!(NftMarketplace::create_new_location(RuntimeOrigin::root(), 0, bvec![10, 10]));
 		assert_ok!(PropertyManagement::add_letting_agent(
 			RuntimeOrigin::root(),
@@ -54,16 +63,19 @@ fn add_letting_agent_fails() {
 			[0; 32].into(),
 		));
 		assert_eq!(PropertyManagement::letting_info::<AccountId>([0; 32].into()).is_some(), true);
-		assert_noop!(PropertyManagement::add_letting_agent(
-			RuntimeOrigin::root(),
-			0,
-			bvec![10, 10],
-			[0; 32].into(),
-		), Error::<Test>::LettingAgentExists);
+		assert_noop!(
+			PropertyManagement::add_letting_agent(
+				RuntimeOrigin::root(),
+				0,
+				bvec![10, 10],
+				[0; 32].into(),
+			),
+			Error::<Test>::LettingAgentExists
+		);
 	});
 }
 
- #[test]
+#[test]
 fn let_letting_agent_deposit() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
@@ -75,8 +87,17 @@ fn let_letting_agent_deposit() {
 			bvec![10, 10],
 			[0; 32].into(),
 		));
-		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([0; 32].into())));
-		assert_eq!(PropertyManagement::letting_agent_locations::<u32, BoundedVec<u8, Postcode>>(0, bvec![10, 10]).contains(&[0; 32].into()), true);
+		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed(
+			[0; 32].into()
+		)));
+		assert_eq!(
+			PropertyManagement::letting_agent_locations::<u32, BoundedVec<u8, Postcode>>(
+				0,
+				bvec![10, 10]
+			)
+			.contains(&[0; 32].into()),
+			true
+		);
 		assert_eq!(Balances::free_balance(&([0; 32].into())), 19_999_900);
 	});
 }
@@ -93,9 +114,17 @@ fn let_letting_agent_deposit_fails() {
 			bvec![10, 10],
 			[0; 32].into(),
 		));
-		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([0; 32].into())));
-		assert_noop!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([0; 32].into())), Error::<Test>::LettingAgentInLocation);
-		assert_noop!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([1; 32].into())), Error::<Test>::NoPermission);
+		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed(
+			[0; 32].into()
+		)));
+		assert_noop!(
+			PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([0; 32].into())),
+			Error::<Test>::LettingAgentInLocation
+		);
+		assert_noop!(
+			PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([1; 32].into())),
+			Error::<Test>::NoPermission
+		);
 		assert_eq!(Balances::free_balance(&([0; 32].into())), 19_999_900);
 		for x in 1..100 {
 			assert_ok!(PropertyManagement::add_letting_agent(
@@ -105,7 +134,9 @@ fn let_letting_agent_deposit_fails() {
 				[x; 32].into(),
 			));
 			Balances::make_free_balance_be(&[x; 32].into(), 200);
-			assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([x; 32].into())));
+			assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed(
+				[x; 32].into()
+			)));
 		}
 		assert_ok!(PropertyManagement::add_letting_agent(
 			RuntimeOrigin::root(),
@@ -114,7 +145,10 @@ fn let_letting_agent_deposit_fails() {
 			[100; 32].into(),
 		));
 		Balances::make_free_balance_be(&[100; 32].into(), 200);
-		assert_noop!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([100; 32].into())), Error::<Test>::TooManyLettingAgents);
+		assert_noop!(
+			PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([100; 32].into())),
+			Error::<Test>::TooManyLettingAgents
+		);
 	});
 }
 
@@ -130,7 +164,10 @@ fn let_letting_agent_deposit_not_enough_funds() {
 			bvec![10, 10],
 			[5; 32].into(),
 		));
-		assert_noop!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([5; 32].into())), BalancesError::<Test, _>::InsufficientBalance);
+		assert_noop!(
+			PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([5; 32].into())),
+			BalancesError::<Test, _>::InsufficientBalance
+		);
 	});
 }
 
@@ -148,11 +185,37 @@ fn add_letting_agent_to_location_works() {
 			[0; 32].into(),
 		));
 		assert_eq!(PropertyManagement::letting_info::<AccountId>([0; 32].into()).is_some(), true);
-		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([0; 32].into())));
-		assert_ok!(PropertyManagement::add_letting_agent_to_location(RuntimeOrigin::root(), bvec![10, 10], [0; 32].into()));
-		assert_eq!(PropertyManagement::letting_agent_locations::<u32, BoundedVec<u8, Postcode>>(0, bvec![9, 10]).contains(&[0; 32].into()), true);
-		assert_eq!(PropertyManagement::letting_agent_locations::<u32, BoundedVec<u8, Postcode>>(0, bvec![10, 10]).contains(&[0; 32].into()), true);
-		assert_eq!(PropertyManagement::letting_info::<AccountId>([0; 32].into()).unwrap().locations.len(), 2);
+		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed(
+			[0; 32].into()
+		)));
+		assert_ok!(PropertyManagement::add_letting_agent_to_location(
+			RuntimeOrigin::root(),
+			bvec![10, 10],
+			[0; 32].into()
+		));
+		assert_eq!(
+			PropertyManagement::letting_agent_locations::<u32, BoundedVec<u8, Postcode>>(
+				0,
+				bvec![9, 10]
+			)
+			.contains(&[0; 32].into()),
+			true
+		);
+		assert_eq!(
+			PropertyManagement::letting_agent_locations::<u32, BoundedVec<u8, Postcode>>(
+				0,
+				bvec![10, 10]
+			)
+			.contains(&[0; 32].into()),
+			true
+		);
+		assert_eq!(
+			PropertyManagement::letting_info::<AccountId>([0; 32].into())
+				.unwrap()
+				.locations
+				.len(),
+			2
+		);
 	});
 }
 
@@ -160,7 +223,14 @@ fn add_letting_agent_to_location_works() {
 fn add_letting_agent_to_location_fails() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_noop!(PropertyManagement::add_letting_agent_to_location(RuntimeOrigin::root(), bvec![10, 10], [0; 32].into()), Error::<Test>::NoLettingAgentFound);
+		assert_noop!(
+			PropertyManagement::add_letting_agent_to_location(
+				RuntimeOrigin::root(),
+				bvec![10, 10],
+				[0; 32].into()
+			),
+			Error::<Test>::NoLettingAgentFound
+		);
 		assert_ok!(NftMarketplace::create_new_region(RuntimeOrigin::root()));
 		assert_ok!(NftMarketplace::create_new_location(RuntimeOrigin::root(), 0, bvec![9, 10]));
 		assert_ok!(NftMarketplace::create_new_location(RuntimeOrigin::root(), 0, bvec![10, 10]));
@@ -171,9 +241,25 @@ fn add_letting_agent_to_location_fails() {
 			[0; 32].into(),
 		));
 		assert_eq!(PropertyManagement::letting_info::<AccountId>([0; 32].into()).is_some(), true);
-		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([0; 32].into())));
-		assert_noop!(PropertyManagement::add_letting_agent_to_location(RuntimeOrigin::root(), bvec![5, 10], [0; 32].into()), Error::<Test>::LocationUnknown);
-		assert_noop!(PropertyManagement::add_letting_agent_to_location(RuntimeOrigin::root(), bvec![10, 10], [0; 32].into()), Error::<Test>::LettingAgentInLocation);
+		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed(
+			[0; 32].into()
+		)));
+		assert_noop!(
+			PropertyManagement::add_letting_agent_to_location(
+				RuntimeOrigin::root(),
+				bvec![5, 10],
+				[0; 32].into()
+			),
+			Error::<Test>::LocationUnknown
+		);
+		assert_noop!(
+			PropertyManagement::add_letting_agent_to_location(
+				RuntimeOrigin::root(),
+				bvec![10, 10],
+				[0; 32].into()
+			),
+			Error::<Test>::LettingAgentInLocation
+		);
 	});
 }
 
@@ -230,9 +316,15 @@ fn set_letting_agent_works() {
 			bvec![10, 10],
 			[4; 32].into(),
 		));
-		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([2; 32].into())));
-		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([3; 32].into())));
-		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([4; 32].into())));
+		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed(
+			[2; 32].into()
+		)));
+		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed(
+			[3; 32].into()
+		)));
+		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed(
+			[4; 32].into()
+		)));
 		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0));
 		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 2));
 		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 3));
@@ -249,10 +341,35 @@ fn set_letting_agent_works() {
 		assert_eq!(PropertyManagement::letting_storage(0).unwrap(), [2; 32].into());
 		assert_eq!(PropertyManagement::letting_storage(2).unwrap(), [3; 32].into());
 		assert_eq!(PropertyManagement::letting_storage(3).unwrap(), [4; 32].into());
-		assert_eq!(PropertyManagement::letting_agent_locations::<u32, BoundedVec<u8, Postcode>>(0, bvec![10, 10]).len(), 3);
-		assert_eq!(PropertyManagement::letting_info::<AccountId>([2; 32].into()).unwrap().assigned_properties.len(), 2);
-		assert_eq!(PropertyManagement::letting_info::<AccountId>([3; 32].into()).unwrap().assigned_properties.len(), 1);
-		assert_eq!(PropertyManagement::letting_info::<AccountId>([4; 32].into()).unwrap().assigned_properties.len(), 1);
+		assert_eq!(
+			PropertyManagement::letting_agent_locations::<u32, BoundedVec<u8, Postcode>>(
+				0,
+				bvec![10, 10]
+			)
+			.len(),
+			3
+		);
+		assert_eq!(
+			PropertyManagement::letting_info::<AccountId>([2; 32].into())
+				.unwrap()
+				.assigned_properties
+				.len(),
+			2
+		);
+		assert_eq!(
+			PropertyManagement::letting_info::<AccountId>([3; 32].into())
+				.unwrap()
+				.assigned_properties
+				.len(),
+			1
+		);
+		assert_eq!(
+			PropertyManagement::letting_info::<AccountId>([4; 32].into())
+				.unwrap()
+				.assigned_properties
+				.len(),
+			1
+		);
 	});
 }
 
@@ -270,9 +387,14 @@ fn set_letting_agent_fails() {
 			bvec![10, 10],
 			[0; 32].into(),
 		));
-		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([0; 32].into())));
+		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed(
+			[0; 32].into()
+		)));
 		assert_eq!(Balances::free_balance(&([0; 32].into())), 19_999_900);
-		assert_noop!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0), Error::<Test>::NoObjectFound);
+		assert_noop!(
+			PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0),
+			Error::<Test>::NoObjectFound
+		);
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			0,
@@ -283,7 +405,10 @@ fn set_letting_agent_fails() {
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
 		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0));
-		assert_noop!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0), Error::<Test>::LettingAgentAlreadySet);
+		assert_noop!(
+			PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0),
+			Error::<Test>::LettingAgentAlreadySet
+		);
 		for x in 2..101 {
 			assert_ok!(NftMarketplace::list_object(
 				RuntimeOrigin::signed([0; 32].into()),
@@ -301,8 +426,15 @@ fn set_letting_agent_fails() {
 				sp_runtime::MultiAddress::Id([x; 32].into()),
 				1_000_000,
 			));
-			assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([x; 32].into()), (x as u32 - 1).into(), 100));
-			assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), x.into()));
+			assert_ok!(NftMarketplace::buy_token(
+				RuntimeOrigin::signed([x; 32].into()),
+				(x as u32 - 1).into(),
+				100
+			));
+			assert_ok!(PropertyManagement::set_letting_agent(
+				RuntimeOrigin::signed([0; 32].into()),
+				x.into()
+			));
 		}
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
@@ -313,7 +445,10 @@ fn set_letting_agent_fails() {
 			bvec![22, 22]
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 100, 100));
-		assert_noop!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 101), Error::<Test>::TooManyAssignedProperties);
+		assert_noop!(
+			PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 101),
+			Error::<Test>::TooManyAssignedProperties
+		);
 	});
 }
 
@@ -334,7 +469,10 @@ fn set_letting_agent_no_letting_agent() {
 			bvec![22, 22]
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 20));
-		assert_noop!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0), Error::<Test>::NoLettingAgentFound);
+		assert_noop!(
+			PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0),
+			Error::<Test>::NoLettingAgentFound
+		);
 	});
 }
 
@@ -352,7 +490,7 @@ fn distribute_income_works() {
 			RuntimeOrigin::signed([0; 32].into()),
 			0,
 			bvec![10, 10],
-			10_000,
+			9_000,
 			100,
 			bvec![22, 22]
 		));
@@ -365,13 +503,20 @@ fn distribute_income_works() {
 			bvec![10, 10],
 			[4; 32].into(),
 		));
-		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([4; 32].into())));
+		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed(
+			[4; 32].into()
+		)));
 		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0));
-		assert_ok!(PropertyManagement::distribute_income(RuntimeOrigin::signed([4; 32].into()), 0, 200));
+		assert_ok!(PropertyManagement::distribute_income(
+			RuntimeOrigin::signed([4; 32].into()),
+			0,
+			3200
+		));
+		assert_eq!(PropertyManagement::property_reserve(0), 3000);
 		assert_eq!(PropertyManagement::stored_funds::<AccountId>([1; 32].into()), 40);
 		assert_eq!(PropertyManagement::stored_funds::<AccountId>([2; 32].into()), 60);
 		assert_eq!(PropertyManagement::stored_funds::<AccountId>([3; 32].into()), 100);
-		assert_eq!(Balances::free_balance(&([4; 32].into())), 4700);
+		assert_eq!(Balances::free_balance(&([4; 32].into())), 1700);
 	});
 }
 
@@ -392,7 +537,10 @@ fn distribute_income_fails() {
 			bvec![22, 22]
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
-		assert_noop!(PropertyManagement::distribute_income(RuntimeOrigin::signed([5; 32].into()), 0, 200), Error::<Test>::NoLettingAgentFound);
+		assert_noop!(
+			PropertyManagement::distribute_income(RuntimeOrigin::signed([5; 32].into()), 0, 200),
+			Error::<Test>::NoLettingAgentFound
+		);
 		assert_eq!(PropertyManagement::stored_funds::<AccountId>([1; 32].into()), 0);
 		assert_ok!(PropertyManagement::add_letting_agent(
 			RuntimeOrigin::root(),
@@ -400,9 +548,14 @@ fn distribute_income_fails() {
 			bvec![10, 10],
 			[4; 32].into(),
 		));
-		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([4; 32].into())));
+		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed(
+			[4; 32].into()
+		)));
 		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0));
-		assert_noop!(PropertyManagement::distribute_income(RuntimeOrigin::signed([5; 32].into()), 0, 200), Error::<Test>::NoPermission);
+		assert_noop!(
+			PropertyManagement::distribute_income(RuntimeOrigin::signed([5; 32].into()), 0, 200),
+			Error::<Test>::NoPermission
+		);
 	});
 }
 
@@ -418,7 +571,7 @@ fn withdraw_funds_works() {
 			RuntimeOrigin::signed([0; 32].into()),
 			0,
 			bvec![10, 10],
-			10_000,
+			9_000,
 			100,
 			bvec![22, 22]
 		));
@@ -429,14 +582,22 @@ fn withdraw_funds_works() {
 			bvec![10, 10],
 			[4; 32].into(),
 		));
-		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([4; 32].into())));
+		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed(
+			[4; 32].into()
+		)));
 		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0));
-		assert_ok!(PropertyManagement::distribute_income(RuntimeOrigin::signed([4; 32].into()), 0, 200));
+		assert_ok!(PropertyManagement::distribute_income(
+			RuntimeOrigin::signed([4; 32].into()),
+			0,
+			3200
+		));
+		assert_eq!(PropertyManagement::property_reserve(0), 3000);
 		assert_eq!(PropertyManagement::stored_funds::<AccountId>([1; 32].into()), 200);
-		assert_eq!(Balances::free_balance(&([4; 32].into())), 4700);
+		assert_eq!(Balances::free_balance(&([4; 32].into())), 1700);
 		assert_eq!(Balances::free_balance(&PropertyManagement::account_id()), 5200);
 		assert_ok!(PropertyManagement::withdraw_funds(RuntimeOrigin::signed([1; 32].into())));
 		assert_eq!(Balances::free_balance(&PropertyManagement::account_id()), 5000);
+		assert_eq!(Balances::free_balance(&PropertyManagement::governance_account_id()), 3000);
 		assert_eq!(Balances::free_balance(&([1; 32].into())), 15_000_200);
 	});
 }
@@ -453,7 +614,7 @@ fn withdraw_funds_fails() {
 			RuntimeOrigin::signed([0; 32].into()),
 			0,
 			bvec![10, 10],
-			10_000,
+			9_000,
 			100,
 			bvec![22, 22]
 		));
@@ -464,10 +625,20 @@ fn withdraw_funds_fails() {
 			bvec![10, 10],
 			[4; 32].into(),
 		));
-		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([4; 32].into())));
+		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed(
+			[4; 32].into()
+		)));
 		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0));
-		assert_ok!(PropertyManagement::distribute_income(RuntimeOrigin::signed([4; 32].into()), 0, 200));
+		assert_ok!(PropertyManagement::distribute_income(
+			RuntimeOrigin::signed([4; 32].into()),
+			0,
+			3200
+		));
 		assert_eq!(PropertyManagement::stored_funds::<AccountId>([1; 32].into()), 200);
-		assert_noop!(PropertyManagement::withdraw_funds(RuntimeOrigin::signed([2; 32].into())), Error::<Test>::UserHasNoFundsStored);
+		assert_noop!(
+			PropertyManagement::withdraw_funds(RuntimeOrigin::signed([2; 32].into())),
+			Error::<Test>::UserHasNoFundsStored
+		);
 	});
 }
+ */

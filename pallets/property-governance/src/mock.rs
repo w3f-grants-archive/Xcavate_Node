@@ -161,7 +161,7 @@ impl pallet_assets::Config<Instance1> for Test {
 	type CallbackHandle = ();
 	type WeightInfo = ();
 	type RemoveItemsLimit = ConstU32<1000>;
-} 
+}
 
 parameter_types! {
 	pub const NftFractionalizationPalletId: PalletId = PalletId(*b"fraction");
@@ -198,7 +198,7 @@ impl pallet_xcavate_whitelist::Config for Test {
 	type MaxUsersInWhitelist = MaxWhitelistUsers;
 }
 
- parameter_types! {
+parameter_types! {
 	pub const NftMarketplacePalletId: PalletId = PalletId(*b"py/nftxc");
 	pub const MaxNftTokens: u32 = 100;
 	pub const MaxNftsInCollection: u32 = 100;
@@ -224,7 +224,7 @@ impl pallet_nft_marketplace::Config for Test {
 	type AssetId = <Self as pallet_assets::Config<Instance1>>::AssetId;
 	type AssetId2 = u32;
 	type PostcodeLimit = Postcode;
-} 
+}
 
 parameter_types! {
 	pub const PropertyManagementPalletId: PalletId = PalletId(*b"py/ppmmt");
@@ -244,13 +244,18 @@ impl pallet_property_management::Config for Test {
 	type MaxProperties = MaxProperty;
 	type MaxLettingAgents = MaxLettingAgent;
 	type MaxLocations = MaxLocation;
+	type GovernanceId = PropertyGovernancePalletId;
+	type PropertyReserve = ConstU32<3000>;
+	type AssetId = <Self as pallet_assets::Config<Instance1>>::AssetId;
 }
 
 parameter_types! {
 	pub const PropertyVotingTime: BlockNumber = 30;
 	pub const MaxVoteForBlock: u32 = 100;
 	pub const MaximumVoter: u32 = 100;
-	pub const VotingThreshold: u8 = 67;
+	pub const VotingThreshold: u8 = 51;
+	pub const HighVotingThreshold: u8 = 67;
+	pub const PropertyGovernancePalletId: PalletId = PalletId(*b"py/gvrnc");
 }
 
 /// Configure the pallet-property-governance in pallets/property-governance.
@@ -259,13 +264,18 @@ impl pallet_property_governance::Config for Test {
 	type WeightInfo = weights::SubstrateWeight<Test>;
 	type Currency = Balances;
 	type VotingTime = PropertyVotingTime;
-	type MaxVotesForBlock =  MaxVoteForBlock;
+	type MaxVotesForBlock = MaxVoteForBlock;
 	type Slash = ();
 	type MinSlashingAmount = ConstU32<100>;
 	type MaxVoter = MaximumVoter;
 	type Threshold = VotingThreshold;
+	type HighThreshold = HighVotingThreshold;
 	#[cfg(feature = "runtime-benchmarks")]
 	type Helper = AssetHelper;
+	type LowProposal = ConstU32<500>;
+	type HighProposal = ConstU32<2000>;
+	type PalletId = PropertyGovernancePalletId;
+	type AssetId = <Self as pallet_assets::Config<Instance1>>::AssetId;
 }
 
 // Build genesis storage according to the mock runtime.
@@ -280,12 +290,14 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 			([3; 32].into(), 1_005_000),
 			([4; 32].into(), 5_000),
 			((NftMarketplace::account_id()), 20_000_000),
+			((PropertyGovernance::account_id()), 500_000),
+			((PropertyManagement::account_id()), 1),
 		],
 	}
 	.assimilate_storage(&mut test)
 	.unwrap();
 
-pallet_assets::GenesisConfig::<Test, Instance1> {
+/* 	pallet_assets::GenesisConfig::<Test, Instance1> {
 		assets: vec![(1, /* account("buyer", SEED, SEED) */ [0; 32].into(), true, 1)], // Genesis assets: id, owner, is_sufficient, min_balance
 		metadata: vec![(1, "XUSD".into(), "XUSD".into(), 0)], // Genesis metadata: id, name, symbol, decimals
 		accounts: vec![
@@ -298,7 +310,7 @@ pallet_assets::GenesisConfig::<Test, Instance1> {
 		], // Genesis accounts: id, account_id, balance
 	}
 	.assimilate_storage(&mut test)
-	.unwrap(); 
+	.unwrap(); */
 
 	test.into()
 }

@@ -1,10 +1,7 @@
 [workspace]
 members = [
     "node",
-    "pallets/xcavate-staking",
     "runtime",
-    "pallets/community-loan-pool",
-    "pallets/community-projects",
     "pallets/nft-marketplace",
     "pallets/property-governance",
     "pallets/property-management",

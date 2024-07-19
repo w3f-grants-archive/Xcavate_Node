@@ -104,7 +104,7 @@ parameter_types! {
 	pub const MaxTips: u32 = 10;
 	pub const MaxDeadlineDuration: BlockNumber = 12 * 30 * DAYS;
 	pub const MaxAttributesPerCall: u32 = 10;
-} 
+}
 
 impl pallet_nfts::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
@@ -131,7 +131,7 @@ impl pallet_nfts::Config for Test {
 	type Features = Features;
 	type OffchainSignature = Signature;
 	type OffchainPublic = AccountPublic;
-} 
+}
 
 parameter_types! {
 	pub const MaxWhitelistUsers: u32 = 1000000;
@@ -142,7 +142,7 @@ impl pallet_xcavate_whitelist::Config for Test {
 	type WeightInfo = pallet_xcavate_whitelist::weights::SubstrateWeight<Test>;
 	type WhitelistOrigin = frame_system::EnsureRoot<Self::AccountId>;
 	type MaxUsersInWhitelist = MaxWhitelistUsers;
-}  
+}
 
 parameter_types! {
 	pub const AssetConversionPalletId: PalletId = PalletId(*b"py/ascon");
@@ -168,7 +168,7 @@ impl pallet_assets::Config<Instance1> for Test {
 	type CallbackHandle = ();
 	type WeightInfo = ();
 	type RemoveItemsLimit = ConstU32<1000>;
-} 
+}
 
 parameter_types! {
 	pub const NftFractionalizationPalletId: PalletId = PalletId(*b"fraction");
@@ -192,7 +192,7 @@ impl pallet_nft_fractionalization::Config for Test {
 	type WeightInfo = ();
 	type StringLimit = ConstU32<50>;
 	type RuntimeHoldReason = RuntimeHoldReason;
-} 
+}
 
 parameter_types! {
 	pub const NftMarketplacePalletId: PalletId = PalletId(*b"py/nftxc");
@@ -213,13 +213,13 @@ impl pallet_nft_marketplace::Config for Test {
 	type LocationOrigin = EnsureRoot<Self::AccountId>;
 	#[cfg(feature = "runtime-benchmarks")]
 	type Helper = NftHelper;
- 	type CollectionId = u32;
-	type ItemId = u32; 
+	type CollectionId = u32;
+	type ItemId = u32;
 	type TreasuryId = TreasuryPalletId;
 	type CommunityProjectsId = CommunityProjectPalletId;
- 	type FractionalizeCollectionId = <Self as pallet_nfts::Config>::CollectionId;
+	type FractionalizeCollectionId = <Self as pallet_nfts::Config>::CollectionId;
 	type FractionalizeItemId = <Self as pallet_nfts::Config>::ItemId;
-	type AssetId = <Self as pallet_assets::Config<Instance1>>::AssetId; 
+	type AssetId = <Self as pallet_assets::Config<Instance1>>::AssetId;
 	type AssetId2 = u32;
 	type PostcodeLimit = Postcode;
 }
@@ -240,7 +240,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 	.assimilate_storage(&mut test)
 	.unwrap();
 
-  	pallet_assets::GenesisConfig::<Test, Instance1> {
+/* 	pallet_assets::GenesisConfig::<Test, Instance1> {
 		assets: vec![(1, /* account("buyer", SEED, SEED) */ [0; 32].into(), true, 1)], // Genesis assets: id, owner, is_sufficient, min_balance
 		metadata: vec![(1, "XUSD".into(), "XUSD".into(), 0)], // Genesis metadata: id, name, symbol, decimals
 		accounts: vec![
@@ -253,7 +253,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 		], // Genesis accounts: id, account_id, balance
 	}
 	.assimilate_storage(&mut test)
-	.unwrap();  
+	.unwrap(); */
 
 	test.into()
 }
