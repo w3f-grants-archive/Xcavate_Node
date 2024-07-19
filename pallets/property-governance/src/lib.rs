@@ -317,8 +317,6 @@ pub mod pallet {
 		NoLettingAgentFound,
 		/// The pallet has not enough funds.
 		NotEnoughFunds,
-		/// The property does not have enough reserves to make this proposal.
-		NotEnoughReserves,
 		/// Error during converting types.
 		ConversionError,
 	}
@@ -339,9 +337,9 @@ pub mod pallet {
 						let required_threshold =
 							if proposal.amount >= <T as Config>::HighProposal::get() {
 								<T as Config>::HighThreshold::get()
-							} else {
+							}  else {
 								<T as Config>::Threshold::get()
-							};
+							}; 
 						if voting_result.yes_votes > voting_result.no_votes
 							&& required_threshold
 								< voting_result.yes_votes.saturating_add(voting_result.no_votes)
@@ -446,7 +444,7 @@ pub mod pallet {
 
 			// Check if the amount is less than LowProposal
 			if amount.saturating_mul(
-				Self::u64_to_balance_option(1 /* 000000000000 */ )?,
+				Self::u64_to_balance_option(1000000000000)?,
 			) <= <T as Config>::LowProposal::get() {
 				// Execute the proposal immediately
 				Self::execute_proposal(proposal)?;
@@ -660,7 +658,7 @@ pub mod pallet {
 					&Self::account_id(),
 					&letting_agent,
 					proposal_amount.saturating_mul(
-						Self::u64_to_balance_option(1 /* 000000000000 */ )?,
+						Self::u64_to_balance_option(1000000000000)?,
 					),
 					KeepAlive,
 				).map_err(|_| Error::<T>::NotEnoughFunds)?;
@@ -679,7 +677,7 @@ pub mod pallet {
 					&Self::account_id(),
 					&letting_agent,
 					property_reserves.saturating_mul(
-						Self::u64_to_balance_option(1 /* 000000000000 */ )?,
+						Self::u64_to_balance_option(1000000000000)?,
 					),
 					KeepAlive,
 				).map_err(|_| Error::<T>::NotEnoughFunds)?;

@@ -1,4 +1,4 @@
-/* use crate::{mock::*, Error};
+use crate::{mock::*, Error};
 use frame_support::{
 	assert_noop, assert_ok,
 	traits::{OnFinalize, OnInitialize},
@@ -45,21 +45,21 @@ fn propose_works() {
 			RuntimeOrigin::root(),
 			0,
 			bvec![10, 10],
-			[0; 32].into(),
+			[2; 32].into(),
 		));
 		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed(
-			[0; 32].into()
+			[2; 32].into()
 		)));
-		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0));
-		assert_eq!(PropertyManagement::letting_storage(0).unwrap(), [0; 32].into());
+		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([2; 32].into()), 0));
+		assert_eq!(PropertyManagement::letting_storage(0).unwrap(), [2; 32].into());
 		assert_ok!(PropertyManagement::distribute_income(
-			RuntimeOrigin::signed([0; 32].into()),
+			RuntimeOrigin::signed([2; 32].into()),
 			0,
 			1000
 		));
 		assert_eq!(PropertyManagement::property_reserve(0), 1000);
 		assert_ok!(PropertyGovernance::propose(
-			RuntimeOrigin::signed([0; 32].into()),
+			RuntimeOrigin::signed([2; 32].into()),
 			0,
 			1000,
 			bvec![10, 10]
@@ -110,6 +110,7 @@ fn proposal_with_low_amount_works() {
 			bvec![10, 10]
 		));
 		assert_eq!(Balances::free_balance(&([4; 32].into())), 4400);
+		assert_eq!(PropertyGovernance::ongoing_votes(1).is_some(), false);
 	});
 }
 
@@ -194,6 +195,47 @@ fn challenge_against_letting_agent_works() {
 			0
 		));
 		assert_eq!(PropertyGovernance::challenges(1).is_some(), true);
+		assert_eq!(PropertyGovernance::challenges(1).unwrap().state, crate::ChallengeState::First);
+	});
+}
+
+
+#[test]
+fn challenge_against_letting_agent_fails() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(NftMarketplace::create_new_region(RuntimeOrigin::root()));
+		assert_ok!(NftMarketplace::create_new_location(RuntimeOrigin::root(), 0, bvec![10, 10]));
+		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(NftMarketplace::list_object(
+			RuntimeOrigin::signed([0; 32].into()),
+			0,
+			bvec![10, 10],
+			10_000,
+			100,
+			bvec![22, 22]
+		));
+		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_noop!(PropertyGovernance::challenge_against_letting_agent(
+			RuntimeOrigin::signed([1; 32].into()),
+			0
+		), Error::<Test>::NoLettingAgentFound);
+		assert_ok!(PropertyManagement::add_letting_agent(
+			RuntimeOrigin::root(),
+			0,
+			bvec![10, 10],
+			[0; 32].into(),
+		));
+		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed(
+			[0; 32].into()
+		)));
+		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0));
+		assert_noop!(PropertyGovernance::challenge_against_letting_agent(
+			RuntimeOrigin::signed([2; 32].into()),
+			0
+		), Error::<Test>::NoPermission);
+		assert_eq!(PropertyGovernance::challenges(1).is_some(), false);
 	});
 }
 
@@ -314,6 +356,7 @@ fn proposal_pass() {
 		assert_eq!(Balances::free_balance(&PropertyGovernance::account_id()), 500_000);
 		assert_eq!(PropertyManagement::property_reserve(0), 0);
 		assert_eq!(PropertyGovernance::proposals(1).is_none(), true);
+		assert_eq!(PropertyGovernance::ongoing_votes(1).is_none(), true);
 	});
 }
 
@@ -428,8 +471,73 @@ fn proposal_not_pass() {
 			crate::Vote::No
 		));
 		assert_eq!(PropertyGovernance::proposals(1).is_some(), true);
+		assert_eq!(Balances::free_balance(&([0; 32].into())), 19_998_900);
+		assert_eq!(Balances::free_balance(&PropertyGovernance::account_id()), 501_000);
+		assert_eq!(PropertyManagement::property_reserve(0), 1000);
+		run_to_block(31);
+		assert_eq!(Balances::free_balance(&([0; 32].into())), 19_998_900);
+		assert_eq!(Balances::free_balance(&PropertyGovernance::account_id()), 501_000);
+		assert_eq!(PropertyManagement::property_reserve(0), 1000);
+		assert_eq!(PropertyGovernance::proposals(1).is_none(), true);
+	});
+}
+
+#[test]
+fn proposal_not_pass_2() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(NftMarketplace::create_new_region(RuntimeOrigin::root()));
+		assert_ok!(NftMarketplace::create_new_location(RuntimeOrigin::root(), 0, bvec![10, 10]));
+		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
+		assert_ok!(NftMarketplace::list_object(
+			RuntimeOrigin::signed([0; 32].into()),
+			0,
+			bvec![10, 10],
+			10_000,
+			100,
+			bvec![22, 22]
+		));
+		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 60));
+		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([2; 32].into()), 0, 40));
+		assert_ok!(PropertyManagement::add_letting_agent(
+			RuntimeOrigin::root(),
+			0,
+			bvec![10, 10],
+			[0; 32].into(),
+		));
+		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed(
+			[0; 32].into()
+		)));
+		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 0));
+		assert_eq!(PropertyManagement::letting_storage(0).unwrap(), [0; 32].into());
+		assert_ok!(PropertyManagement::distribute_income(
+			RuntimeOrigin::signed([0; 32].into()),
+			0,
+			1000
+		));
+		assert_ok!(PropertyGovernance::propose(
+			RuntimeOrigin::signed([0; 32].into()),
+			0,
+			10000,
+			bvec![10, 10]
+		));
+		assert_ok!(PropertyGovernance::vote_on_proposal(
+			RuntimeOrigin::signed([1; 32].into()),
+			1,
+			crate::Vote::Yes
+		));
+		assert_eq!(PropertyGovernance::proposals(1).is_some(), true);
+		assert_eq!(PropertyGovernance::proposals(1).unwrap().amount, 10000);
+		assert_eq!(Balances::free_balance(&([0; 32].into())), 19_998_900);
+		assert_eq!(Balances::free_balance(&PropertyGovernance::account_id()), 501_000);
+		assert_eq!(PropertyManagement::property_reserve(0), 1000);
 		run_to_block(31);
 		assert_eq!(PropertyGovernance::proposals(1).is_none(), true);
+		assert_eq!(Balances::free_balance(&([0; 32].into())), 19_998_900);
+		assert_eq!(Balances::free_balance(&PropertyGovernance::account_id()), 501_000);
+		assert_eq!(PropertyManagement::property_reserve(0), 1000);
 	});
 }
 
@@ -652,6 +760,13 @@ fn challenge_pass() {
 			crate::Vote::Yes
 		));
 		assert_eq!(PropertyManagement::letting_storage(0).unwrap(), [0; 32].into());
+		assert_eq!(
+			PropertyManagement::letting_info::<AccountId>([0; 32].into())
+				.unwrap()
+				.locations
+				.len(),
+			1
+		);
 		run_to_block(121);
 		assert_eq!(PropertyManagement::letting_storage(0).unwrap(), [1; 32].into());
 		assert_eq!(
@@ -661,6 +776,13 @@ fn challenge_pass() {
 			)
 			.len(),
 			1
+		);
+		assert_eq!(
+			PropertyManagement::letting_info::<AccountId>([0; 32].into())
+				.unwrap()
+				.locations
+				.len(),
+			0
 		);
 		assert_eq!(PropertyGovernance::challenges(1).is_none(), true);
 	});
@@ -1020,4 +1142,3 @@ fn different_proposals() {
 		assert_eq!(PropertyManagement::property_reserve(0), 500);
 	});
 }
- */
