@@ -430,7 +430,7 @@ pub mod pallet {
 				&origin,
 				&Self::account_id(),
 				scaled_amount.saturating_mul(
-					Self::u64_to_balance_option(1 /* 000000000000 */ )?,
+					Self::u64_to_balance_option(1000000000000)?,
 				),
 				KeepAlive,
 			).map_err(|_| Error::<T>::NotEnoughFunds)?;
@@ -462,7 +462,7 @@ pub mod pallet {
 					&Self::account_id(),
 					&letting_agent,
 					amount_to_pay_debts.saturating_mul(
-						Self::u64_to_balance_option(1 /* 000000000000 */ )?,
+						Self::u64_to_balance_option(1000000000000)?,
 					),
 					KeepAlive,
 				).map_err(|_| Error::<T>::NotEnoughFunds)?;
@@ -486,7 +486,7 @@ pub mod pallet {
 						&Self::account_id(),
 						&Self::governance_account_id(),
 						reserve_amount.saturating_mul(
-							Self::u64_to_balance_option(1 /* 000000000000 */ )?,
+							Self::u64_to_balance_option(1000000000000)?,
 						),
 						KeepAlive,
 					).map_err(|_| Error::<T>::NotEnoughFunds)?;
@@ -546,7 +546,7 @@ pub mod pallet {
 				&Self::account_id(),
 				&origin,
 				amount.saturating_mul(
-					Self::u64_to_balance_option(1 /* 000000000000 */ )?,
+					Self::u64_to_balance_option(1000000000000)?,
 				),
 				KeepAlive,
 			)
@@ -611,7 +611,16 @@ pub mod pallet {
 				.position(|x| *x == agent)
 				.ok_or(Error::<T>::AgentNotFound)?;
 			letting_agents.remove(index);
+			let mut letting_info =
+				Self::letting_info(agent.clone()).ok_or(Error::<T>::NoLettingAgentFound)?;
+			let index = letting_info
+				.locations
+				.iter()
+				.position(|x| *x == location)
+				.ok_or(Error::<T>::AgentNotFound)?;
+			letting_info.locations.remove(index);	
 			LettingAgentLocations::<T>::insert(region, location, letting_agents);
+			LettingInfo::<T>::insert(agent, letting_info);
 			Ok(())
 		}
 

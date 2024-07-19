@@ -1,4 +1,4 @@
-/* use crate::{mock::*, Error};
+use crate::{mock::*, Error};
 use frame_support::traits::Currency;
 use frame_support::BoundedVec;
 use frame_support::{assert_noop, assert_ok};
@@ -87,6 +87,18 @@ fn let_letting_agent_deposit() {
 			bvec![10, 10],
 			[0; 32].into(),
 		));
+		assert_eq!(
+			PropertyManagement::letting_agent_locations::<u32, BoundedVec<u8, Postcode>>(
+				0,
+				bvec![10, 10]
+			)
+			.contains(&[0; 32].into()),
+			false
+		);
+		assert_eq!(
+			PropertyManagement::letting_info::<AccountId>([0; 32].into()).unwrap().deposited,
+			false
+		);
 		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed(
 			[0; 32].into()
 		)));
@@ -96,6 +108,10 @@ fn let_letting_agent_deposit() {
 				bvec![10, 10]
 			)
 			.contains(&[0; 32].into()),
+			true
+		);
+		assert_eq!(
+			PropertyManagement::letting_info::<AccountId>([0; 32].into()).unwrap().deposited,
 			true
 		);
 		assert_eq!(Balances::free_balance(&([0; 32].into())), 19_999_900);
@@ -241,6 +257,14 @@ fn add_letting_agent_to_location_fails() {
 			[0; 32].into(),
 		));
 		assert_eq!(PropertyManagement::letting_info::<AccountId>([0; 32].into()).is_some(), true);
+		assert_noop!(
+			PropertyManagement::add_letting_agent_to_location(
+				RuntimeOrigin::root(),
+				bvec![10, 10],
+				[0; 32].into()
+			),
+			Error::<Test>::NotDeposited
+		);
 		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed(
 			[0; 32].into()
 		)));
@@ -341,6 +365,7 @@ fn set_letting_agent_works() {
 		assert_eq!(PropertyManagement::letting_storage(0).unwrap(), [2; 32].into());
 		assert_eq!(PropertyManagement::letting_storage(2).unwrap(), [3; 32].into());
 		assert_eq!(PropertyManagement::letting_storage(3).unwrap(), [4; 32].into());
+		assert_eq!(PropertyManagement::letting_storage(4).unwrap(), [2; 32].into());
 		assert_eq!(
 			PropertyManagement::letting_agent_locations::<u32, BoundedVec<u8, Postcode>>(
 				0,
@@ -556,6 +581,10 @@ fn distribute_income_fails() {
 			PropertyManagement::distribute_income(RuntimeOrigin::signed([5; 32].into()), 0, 200),
 			Error::<Test>::NoPermission
 		);
+		assert_noop!(
+			PropertyManagement::distribute_income(RuntimeOrigin::signed([4; 32].into()), 0, 20000),
+			Error::<Test>::NotEnoughFunds
+		);
 	});
 }
 
@@ -596,6 +625,7 @@ fn withdraw_funds_works() {
 		assert_eq!(Balances::free_balance(&([4; 32].into())), 1700);
 		assert_eq!(Balances::free_balance(&PropertyManagement::account_id()), 5200);
 		assert_ok!(PropertyManagement::withdraw_funds(RuntimeOrigin::signed([1; 32].into())));
+		assert_eq!(PropertyManagement::stored_funds::<AccountId>([1; 32].into()), 0);
 		assert_eq!(Balances::free_balance(&PropertyManagement::account_id()), 5000);
 		assert_eq!(Balances::free_balance(&PropertyManagement::governance_account_id()), 3000);
 		assert_eq!(Balances::free_balance(&([1; 32].into())), 15_000_200);
@@ -641,4 +671,3 @@ fn withdraw_funds_fails() {
 		);
 	});
 }
- */
