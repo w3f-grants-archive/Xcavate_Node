@@ -99,7 +99,7 @@ pub mod pallet {
 		No,
 	}
 
-	/// challenge state of the challenge voting.
+	/// Challenge state of the challenge voting.
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
 	pub enum ChallengeState {
@@ -160,8 +160,10 @@ pub mod pallet {
 			Self,
 		>;
 
+		/// Proposal amount to be considered a low proposal.
 		type LowProposal: Get<BalanceOf<Self>>;
 
+		/// Proposal amount to be considered a high proposal.
 		type HighProposal: Get<BalanceOf<Self>>;
 
 		/// The property governance's pallet id, used for deriving its sovereign account ID.
@@ -175,6 +177,7 @@ pub mod pallet {
 			+ Ord
 			+ Copy;
 	}
+
 	pub type AssetId<T> = <T as Config>::AssetId;
 
 	/// Number of proposals that have been made.
@@ -204,7 +207,7 @@ pub mod pallet {
 		OptionQuery,
 	>;
 
-	/// Challenges that have been made.
+	/// Mapping of challenge index to the challenge info.
 	#[pallet::storage]
 	#[pallet::getter(fn challenges)]
 	pub(super) type Challenges<T> =
@@ -283,8 +286,6 @@ pub mod pallet {
 	pub enum Event<T: Config> {
 		/// New proposal has been created.
 		Proposed { proposal_id: ProposalIndex, asset_id: u32, proposer: AccountIdOf<T> },
-		/// New proposal has been created.
-		SellProposed { proposal_id: ProposalIndex, asset_id: u32, proposer: AccountIdOf<T> },
 		/// A new challenge has been made.
 		Challenge { challenge_id: ChallengeIndex, asset_id: u32, proposer: AccountIdOf<T> },
 		/// Voted on proposal.
@@ -408,7 +409,7 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		/// Creates a proposal for a real estate object.
-		/// Only one of the letting agent can propose.
+		/// Only the letting agent can propose.
 		///
 		/// The origin must be Signed and the sender must have sufficient funds free.
 		///
@@ -444,7 +445,7 @@ pub mod pallet {
 
 			// Check if the amount is less than LowProposal
 			if amount.saturating_mul(
-				Self::u64_to_balance_option(1000000000000)?,
+				Self::u64_to_balance_option(1/* 000000000000 */)?,
 			) <= <T as Config>::LowProposal::get() {
 				// Execute the proposal immediately
 				Self::execute_proposal(proposal)?;
@@ -639,6 +640,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Executes a proposal once it passes.
 		fn execute_proposal(proposal: Proposal<BlockNumberFor<T>, T>) -> DispatchResult {
 			let letting_agent =
 				pallet_property_management::Pallet::<T>::letting_storage(proposal.asset_id)
@@ -658,7 +660,7 @@ pub mod pallet {
 					&Self::account_id(),
 					&letting_agent,
 					proposal_amount.saturating_mul(
-						Self::u64_to_balance_option(1000000000000)?,
+						Self::u64_to_balance_option(1/* 000000000000 */)?,
 					),
 					KeepAlive,
 				).map_err(|_| Error::<T>::NotEnoughFunds)?;
@@ -677,7 +679,7 @@ pub mod pallet {
 					&Self::account_id(),
 					&letting_agent,
 					property_reserves.saturating_mul(
-						Self::u64_to_balance_option(1000000000000)?,
+						Self::u64_to_balance_option(1/* 000000000000 */)?,
 					),
 					KeepAlive,
 				).map_err(|_| Error::<T>::NotEnoughFunds)?;
