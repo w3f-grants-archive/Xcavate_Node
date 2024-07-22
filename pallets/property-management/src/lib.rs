@@ -150,7 +150,7 @@ pub mod pallet {
 	pub(super) type PropertyReserve<T> =
 		StorageMap<_, Blake2_128Concat, u32, BalanceOf<T>, ValueQuery>;
 
-	/// Mapping of asset id to the stored debts for a property.
+	/// Mapping of asset id to the stored debts of a property.
 	#[pallet::storage]
 	#[pallet::getter(fn property_debts)]
 	pub(super) type PropertyDebts<T> =
@@ -162,7 +162,7 @@ pub mod pallet {
 	pub type LettingInfo<T: Config> =
 		StorageMap<_, Blake2_128Concat, AccountIdOf<T>, LettingAgentInfo<T>, OptionQuery>;
 
-	/// Mapping from location to the letting agents of this location.
+	/// Mapping from region and location to the letting agents of this location.
 	#[pallet::storage]
 	#[pallet::getter(fn letting_agent_locations)]
 	pub type LettingAgentLocations<T: Config> = StorageDoubleMap<
@@ -206,7 +206,7 @@ pub mod pallet {
 		UserHasNoFundsStored,
 		/// The pallet has not enough funds.
 		NotEnoughFunds,
-		/// The letting agent already has too many assigned properties.
+		/// The letting agent has already too many assigned properties.
 		TooManyAssignedProperties,
 		/// No letting agent could be selected.
 		NoLettingAgentFound,
@@ -400,8 +400,6 @@ pub mod pallet {
 			Ok(())
 		}
 
-		// create debt for outstanding payments
-
 		/// Lets the letting agent distribute the income for a property.
 		///
 		/// The origin must be Signed and the sender must have sufficient funds free.
@@ -430,7 +428,7 @@ pub mod pallet {
 				&origin,
 				&Self::account_id(),
 				scaled_amount.saturating_mul(
-					Self::u64_to_balance_option(1000000000000)?,
+					Self::u64_to_balance_option(1/* 000000000000 */)?,
 				),
 				KeepAlive,
 			).map_err(|_| Error::<T>::NotEnoughFunds)?;
@@ -462,7 +460,7 @@ pub mod pallet {
 					&Self::account_id(),
 					&letting_agent,
 					amount_to_pay_debts.saturating_mul(
-						Self::u64_to_balance_option(1000000000000)?,
+						Self::u64_to_balance_option(1/* 000000000000 */)?,
 					),
 					KeepAlive,
 				).map_err(|_| Error::<T>::NotEnoughFunds)?;
@@ -486,7 +484,7 @@ pub mod pallet {
 						&Self::account_id(),
 						&Self::governance_account_id(),
 						reserve_amount.saturating_mul(
-							Self::u64_to_balance_option(1000000000000)?,
+							Self::u64_to_balance_option(1/* 000000000000 */)?,
 						),
 						KeepAlive,
 					).map_err(|_| Error::<T>::NotEnoughFunds)?;
@@ -546,7 +544,7 @@ pub mod pallet {
 				&Self::account_id(),
 				&origin,
 				amount.saturating_mul(
-					Self::u64_to_balance_option(1000000000000)?,
+					Self::u64_to_balance_option(1/* 000000000000 */)?,
 				),
 				KeepAlive,
 			)
@@ -562,6 +560,7 @@ pub mod pallet {
 			<T as pallet::Config>::PalletId::get().into_account_truncating()
 		}
 
+		/// Get the account id of the governance pallet
 		pub fn governance_account_id() -> AccountIdOf<T> {
 			<T as pallet::Config>::GovernanceId::get().into_account_truncating()
 		}
@@ -624,6 +623,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Decreases the reserve of a property.
 		pub fn decrease_reserves(asset_id: u32, amount: BalanceOf<T>) -> DispatchResult {
 			let mut property_reserve = Self::property_reserve(asset_id);
 			ensure!(property_reserve >= amount, Error::<T>::NotEnoughReserves);
@@ -632,6 +632,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Increases the debts of a property.
 		pub fn increase_debts(asset_id: u32, amount: BalanceOf<T>) -> DispatchResult {
 			let mut property_debts = Self::property_debts(asset_id);
 			property_debts = property_debts.saturating_add(amount);
