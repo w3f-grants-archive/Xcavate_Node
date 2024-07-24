@@ -501,6 +501,7 @@ parameter_types! {
 	pub const MaxLettingAgent: u32 = 100;
 	pub const MaxLocation: u32 = 100;
 	pub const PropertyReserves: Balance = 1000 * DOLLARS;
+	pub const PolkadotJsMultiply: Balance = CENTS;
 }
 
 /// Configure the pallet-property-management in pallets/property-management.
@@ -519,6 +520,7 @@ impl pallet_property_management::Config for Runtime {
 	type GovernanceId = PropertyGovernancePalletId;
 	type PropertyReserve = PropertyReserves;
 	type AssetId = <Self as pallet_assets::Config<Instance1>>::AssetId;
+	type PolkadotJsMultiplier = PolkadotJsMultiply;
 }
 
 parameter_types! {
@@ -551,6 +553,7 @@ impl pallet_property_governance::Config for Runtime {
 	type HighProposal = HighProposal;
 	type PalletId = PropertyGovernancePalletId;
 	type AssetId = <Self as pallet_assets::Config<Instance1>>::AssetId;
+	type PolkadotJsMultiplier = PolkadotJsMultiply;
 }
 
 parameter_types! {

@@ -199,7 +199,7 @@ impl pallet_xcavate_whitelist::Config for Test {
 
 parameter_types! {
 	pub const NftMarketplacePalletId: PalletId = PalletId(*b"py/nftxc");
-	pub const MaxNftTokens: u32 = 100;
+	pub const MaxNftTokens: u32 = 1000;
 	pub const MaxNftsInCollection: u32 = 100;
 	pub const TreasuryPalletId: PalletId = PalletId(*b"py/trsry");
 	pub const CommunityProjectPalletId: PalletId = PalletId(*b"py/cmprj");
@@ -249,6 +249,7 @@ impl pallet_property_management::Config for Test {
 	type GovernanceId = PropertyGovernancePalletId;
 	type PropertyReserve = ConstU32<3000>;
 	type AssetId = <Self as pallet_assets::Config<Instance1>>::AssetId;
+	type PolkadotJsMultiplier = ConstU32<1>;
 }
 
 // Build genesis storage according to the mock runtime.

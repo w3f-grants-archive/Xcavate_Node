@@ -127,6 +127,9 @@ pub mod pallet {
 			+ From<u32>
 			+ Ord
 			+ Copy;
+
+		/// Multiplier for polkadot js.
+		type PolkadotJsMultiplier: Get<BalanceOf<Self>>;
 	}
 
 	pub type AssetId<T> = <T as Config>::AssetId;
@@ -236,6 +239,8 @@ pub mod pallet {
 		LettingAgentExists,
 		/// The property does not have enough reserves to make this proposal.
 		NotEnoughReserves,
+		/// This asset has no token.
+		AssetNotFound,
 	}
 
 	#[pallet::call]
@@ -428,7 +433,7 @@ pub mod pallet {
 				&origin,
 				&Self::account_id(),
 				scaled_amount.saturating_mul(
-					Self::u64_to_balance_option(1/* 000000000000 */)?,
+					<T as Config>::PolkadotJsMultiplier::get(),
 				),
 				KeepAlive,
 			).map_err(|_| Error::<T>::NotEnoughFunds)?;
@@ -436,9 +441,9 @@ pub mod pallet {
 			let owner_list = pallet_nft_marketplace::Pallet::<T>::property_owner(asset_id);
 			let mut governance_amount = BalanceOf::<T>::zero();
 			let property_reserve = Self::property_reserve(asset_id);
-			let property_price = pallet_nft_marketplace::Pallet::<T>::asset_id_details(asset_id)
-				.ok_or(Error::<T>::NoObjectFound)?
-				.price;
+			let property_info = pallet_nft_marketplace::Pallet::<T>::asset_id_details(asset_id)
+				.ok_or(Error::<T>::NoObjectFound)?;
+			let property_price = property_info.price;
 		
 			let property_price_converted: BalanceOf<T> = TryInto::<u64>::try_into(property_price)
 				.map_err(|_| Error::<T>::ConversionError)?
@@ -460,7 +465,7 @@ pub mod pallet {
 					&Self::account_id(),
 					&letting_agent,
 					amount_to_pay_debts.saturating_mul(
-						Self::u64_to_balance_option(1/* 000000000000 */)?,
+						<T as Config>::PolkadotJsMultiplier::get(),
 					),
 					KeepAlive,
 				).map_err(|_| Error::<T>::NotEnoughFunds)?;
@@ -484,7 +489,7 @@ pub mod pallet {
 						&Self::account_id(),
 						&Self::governance_account_id(),
 						reserve_amount.saturating_mul(
-							Self::u64_to_balance_option(1/* 000000000000 */)?,
+							<T as Config>::PolkadotJsMultiplier::get(),
 						),
 						KeepAlive,
 					).map_err(|_| Error::<T>::NotEnoughFunds)?;
@@ -502,6 +507,7 @@ pub mod pallet {
 		
 			// Distribute remaining amount to property owners
 			let final_remaining_amount = amount.saturating_sub(governance_amount);
+			let total_token = property_info.token_amount;
 			for owner in owner_list {
 				let token_amount = pallet_nft_marketplace::Pallet::<T>::property_owner_token(
 					asset_id,
@@ -510,7 +516,7 @@ pub mod pallet {
 				let amount_for_owner = Self::u64_to_balance_option(token_amount as u64)?
 					.checked_mul(&final_remaining_amount)
 					.ok_or(Error::<T>::MultiplyError)?
-					.checked_div(&Self::u64_to_balance_option(100)?)
+					.checked_div(&Self::u64_to_balance_option(total_token.into())?)
 					.ok_or(Error::<T>::DivisionError)?;
 				let mut old_funds = Self::stored_funds(owner.clone());
 				old_funds = old_funds
@@ -544,7 +550,7 @@ pub mod pallet {
 				&Self::account_id(),
 				&origin,
 				amount.saturating_mul(
-					Self::u64_to_balance_option(1/* 000000000000 */)?,
+					<T as Config>::PolkadotJsMultiplier::get(),
 				),
 				KeepAlive,
 			)

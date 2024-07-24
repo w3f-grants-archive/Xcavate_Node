@@ -644,11 +644,12 @@ fn withdraw_funds_fails() {
 			RuntimeOrigin::signed([0; 32].into()),
 			0,
 			bvec![10, 10],
-			9_000,
-			100,
+			900,
+			1000,
 			bvec![22, 22]
 		));
-		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 1000));
+		assert_eq!(Assets::total_supply(0), 1000);
 		assert_ok!(PropertyManagement::add_letting_agent(
 			RuntimeOrigin::root(),
 			0,
