@@ -8,6 +8,8 @@ include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
 /// Constant values used within the runtimezz
 pub mod constants;
+pub mod substrate_weights;
+
 use codec::Decode;
 mod voter_bags;
 use constants::{currency::*, time::*};
@@ -294,7 +296,7 @@ impl frame_system::Config for Runtime {
 	/// The data to be stored in an account.
 	type AccountData = pallet_balances::AccountData<Balance>;
 	/// Weight information for the extrinsics of this pallet.
-	type SystemWeightInfo = ();
+	type SystemWeightInfo = substrate_weights::frame_system::WeightInfo<Runtime>;
 	/// This is used as an identifier of the chain. 42 is the generic substrate prefix.
 	type SS58Prefix = SS58Prefix;
 	/// The set code logic, just the default since we're not a parachain.
@@ -329,7 +331,7 @@ impl pallet_timestamp::Config for Runtime {
 	type Moment = u64;
 	type OnTimestampSet = Aura;
 	type MinimumPeriod = ConstU64<{ SLOT_DURATION / 2 }>;
-	type WeightInfo = ();
+	type WeightInfo = substrate_weights::pallet_timestamp::WeightInfo<Runtime>;
 }
 
 impl pallet_authorship::Config for Runtime {
@@ -375,7 +377,7 @@ impl pallet_balances::Config for Runtime {
 	type DustRemoval = ();
 	type ExistentialDeposit = ConstU128<EXISTENTIAL_DEPOSIT>;
 	type AccountStore = System;
-	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = substrate_weights::pallet_balances::WeightInfo<Runtime>;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type RuntimeFreezeReason = RuntimeFreezeReason;
 	type FreezeIdentifier = RuntimeFreezeReason;
@@ -501,7 +503,7 @@ parameter_types! {
 	pub const MaxLettingAgent: u32 = 100;
 	pub const MaxLocation: u32 = 100;
 	pub const PropertyReserves: Balance = 1000 * DOLLARS;
-	pub const PolkadotJsMultiply: Balance = CENTS;
+	pub const PolkadotJsMultiply: Balance = 1/* CENTS */;
 }
 
 /// Configure the pallet-property-management in pallets/property-management.
@@ -597,7 +599,7 @@ impl pallet_nfts::Config for Runtime {
 	type Features = Features;
 	type OffchainSignature = Signature;
 	type OffchainPublic = <Signature as Verify>::Signer;
-	type WeightInfo = pallet_nfts::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = substrate_weights::pallet_nfts::WeightInfo<Runtime>;
 	#[cfg(feature = "runtime-benchmarks")]
 	type Helper = ();
 	//type CreateOrigin = AsEnsureOriginWithArg<EnsureSignedBy<CollectionCreationOrigin, AccountId>>;
@@ -619,7 +621,7 @@ impl pallet_uniques::Config for Runtime {
 	type StringLimit = StringLimit;
 	type KeyLimit = KeyLimit;
 	type ValueLimit = ValueLimit;
-	type WeightInfo = pallet_uniques::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = substrate_weights::pallet_uniques::WeightInfo<Runtime>;
 	#[cfg(feature = "runtime-benchmarks")]
 	type Helper = ();
 	type CreateOrigin = AsEnsureOriginWithArg<EnsureSigned<AccountId>>;
@@ -650,7 +652,7 @@ impl pallet_assets::Config<Instance1> for Runtime {
 	type Freezer = ();
 	type Extra = ();
 	type CallbackHandle = ();
-	type WeightInfo = pallet_assets::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = substrate_weights::pallet_assets::WeightInfo<Runtime>;
 	type RemoveItemsLimit = ConstU32<1000>;
 	#[cfg(feature = "runtime-benchmarks")]
 	type BenchmarkHelper = ();
@@ -676,7 +678,7 @@ impl pallet_assets::Config<Instance2> for Runtime {
 	type StringLimit = StringLimit;
 	type Freezer = ();
 	type Extra = ();
-	type WeightInfo = pallet_assets::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = substrate_weights::pallet_assets::WeightInfo<Runtime>;
 	type RemoveItemsLimit = ConstU32<1000>;
 	type CallbackHandle = ();
 	#[cfg(feature = "runtime-benchmarks")]
@@ -687,7 +689,7 @@ impl pallet_utility::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeCall = RuntimeCall;
 	type PalletsOrigin = OriginCaller;
-	type WeightInfo = pallet_utility::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = substrate_weights::pallet_utility::WeightInfo<Runtime>;
 }
 
 parameter_types! {
@@ -705,7 +707,7 @@ impl pallet_multisig::Config for Runtime {
 	type DepositBase = DepositBase;
 	type DepositFactor = DepositFactor;
 	type MaxSignatories = ConstU32<100>;
-	type WeightInfo = pallet_multisig::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = substrate_weights::pallet_multisig::WeightInfo<Runtime>;
 }
 
 frame_election_provider_support::generate_solution_type!(
@@ -1313,7 +1315,7 @@ impl pallet_nft_fractionalization::Config for Runtime {
 	type Assets = Assets;
 	type Nfts = Nfts;
 	type PalletId = NftFractionalizationPalletId;
-	type WeightInfo = ();
+	type WeightInfo = substrate_weights::pallet_nft_fractionalization::WeightInfo<Runtime>;
 	type StringLimit = StringLimit;
 	#[cfg(feature = "runtime-benchmarks")]
 	type BenchmarkHelper = ();
@@ -1559,10 +1561,10 @@ mod benches {
 		[frame_system, SystemBench::<Runtime>]
 		[pallet_balances, Balances]
 		[pallet_timestamp, Timestamp]
-		[pallet_nft_marketplace, NftMarketplace]
+/* 		[pallet_nft_marketplace, NftMarketplace]
 		[pallet_xcavate_whitelist, XcavateWhitelist]
 		[pallet_property_management, PropertyManagement]
-		[pallet_property_governance, PropertyGovernance]
+		[pallet_property_governance, PropertyGovernance] */
 		[pallet_nfts, Nfts]
 		[pallet_uniques, Uniques]
 		[pallet_assets, Assets]
