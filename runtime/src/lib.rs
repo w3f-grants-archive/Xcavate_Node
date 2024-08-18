@@ -89,11 +89,13 @@ use pallet_nfts::PalletFeatures;
 #[cfg(any(feature = "std", test))]
 pub use pallet_staking::StakerStatus;
 pub use pallet_timestamp::Call as TimestampCall;
-use pallet_transaction_payment::{ConstFeeMultiplier, CurrencyAdapter, Multiplier};
-use sp_runtime::traits::IdentityLookup;
+use pallet_transaction_payment::{CurrencyAdapter, Multiplier, TargetedFeeAdjustment};
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
-pub use sp_runtime::{Perbill, Permill};
+pub use sp_runtime::{
+	traits::{IdentityLookup, Bounded},
+	Perbill, Permill, Perquintill, FixedPointNumber,
+};
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -220,6 +222,18 @@ const MAXIMUM_BLOCK_WEIGHT: Weight =
 
 parameter_types! {
 	pub const BlockHashCount: BlockNumber = 2400;
+	/// The portion of the `NORMAL_DISPATCH_RATIO` that we adjust the fees with. Blocks filled less
+	/// than this will decrease the weight and more will increase.
+	pub const TargetBlockFullness: Perquintill = Perquintill::from_percent(25);
+	/// The adjustment variable of the runtime. Higher values will cause `TargetBlockFullness` to
+	/// change the fees more rapidly.
+	pub AdjustmentVariable: Multiplier = Multiplier::saturating_from_rational(2, 100_000);
+	/// Minimum amount of the multiplier. This value cannot be too low. A test case should ensure
+	/// that combined with `AdjustmentVariable`, we can recover from the minimum.
+	/// See `multiplier_can_grow_from_zero`.
+	pub MinimumMultiplier: Multiplier = Multiplier::saturating_from_rational(1, 1_000_000u128);
+	/// The maximum amount of the multiplier.
+	pub MaximumMultiplier: Multiplier = Bounded::max_value();
 	pub const Version: RuntimeVersion = VERSION;
 	/// We allow for 2 seconds of compute with a 6 second average block time.
 	pub BlockWeights: frame_system::limits::BlockWeights =
@@ -251,6 +265,9 @@ parameter_types! {
 		.build_or_panic();
 	pub MaxCollectivesProposalWeight: Weight = Perbill::from_percent(50) * RuntimeBlockWeights::get().max_block; // FIXME
 }
+
+pub type SlowAdjustingFeeUpdate<R> =
+	TargetedFeeAdjustment<R, TargetBlockFullness, AdjustmentVariable, MinimumMultiplier, MaximumMultiplier>;
 
 // Configure FRAME pallets to include in runtime.
 
@@ -304,8 +321,6 @@ impl frame_system::Config for Runtime {
 	type MaxConsumers = frame_support::traits::ConstU32<1024>;
 	type RuntimeTask = ();
 }
-
-impl pallet_insecure_randomness_collective_flip::Config for Runtime {}
 
 impl pallet_aura::Config for Runtime {
 	type AuthorityId = AuraId;
@@ -395,7 +410,7 @@ impl pallet_transaction_payment::Config for Runtime {
 	type OperationalFeeMultiplier = ConstU8<5>;
 	type WeightToFee = IdentityFee<Balance>;
 	type LengthToFee = IdentityFee<Balance>;
-	type FeeMultiplierUpdate = ConstFeeMultiplier<FeeMultiplier>;
+	type FeeMultiplierUpdate = SlowAdjustingFeeUpdate<Self>;
 }
 
 impl pallet_asset_tx_payment::Config for Runtime {
@@ -407,50 +422,10 @@ impl pallet_asset_tx_payment::Config for Runtime {
 	>;
 }
 
-// impl pallet_asset_conversion_tx_payment::Config for Runtime {
-// 	type RuntimeEvent = RuntimeEvent;
-// 	type Fungibles = Assets;
-// 	type OnChargeAssetTransaction =
-// 		pallet_asset_conversion_tx_payment::AssetConversionAdapter<Balances, AssetConversion>;
-// }
-
-// parameter_types! {
-// 	pub const AssetConversionPalletId: PalletId = PalletId(*b"py/ascon");
-// 	pub AllowMultiAssetPools: bool = true;
-// 	pub const PoolSetupFee: Balance = 1 * DOLLARS; // should be more or equal to the existential
-// deposit 	pub const MintMinLiquidity: Balance = 100;  // 100 is good enough when the main currency
-// has 10-12 decimals. 	pub const LiquidityWithdrawalFee: Permill = Permill::from_percent(0);  //
-// should be non-zero if AllowMultiAssetPools is true, otherwise can be zero. }
-
-// impl pallet_asset_conversion::Config for Runtime {
-// 	type RuntimeEvent = RuntimeEvent;
-// 	type Currency = Balances;
-// 	type AssetBalance = <Self as pallet_balances::Config>::Balance;
-// 	type HigherPrecisionBalance = sp_core::U256;
-// 	type Assets = Assets;
-// 	type Balance = u128;
-// 	type PoolAssets = PoolAssets; // TODO:
-// 	type AssetId = <Self as pallet_assets::Config<Instance1>>::AssetId;
-// 	type MultiAssetId = NativeOrAssetId<u32>;
-// 	type PoolAssetId = <Self as pallet_assets::Config<Instance2>>::AssetId;
-// 	type PalletId = AssetConversionPalletId;
-// 	type LPFee = ConstU32<3>; // means 0.3%
-// 	type PoolSetupFee = PoolSetupFee;
-// 	type PoolSetupFeeReceiver = AssetConversionOrigin;
-// 	type LiquidityWithdrawalFee = LiquidityWithdrawalFee;
-// 	type WeightInfo = pallet_asset_conversion::weights::SubstrateWeight<Runtime>;
-// 	type AllowMultiAssetPools = AllowMultiAssetPools;
-// 	type MaxSwapPathLength = ConstU32<4>;
-// 	type MintMinLiquidity = MintMinLiquidity;
-// 	type MultiAssetIdConverter = NativeOrAssetIdConverter<u32>;
-// 	#[cfg(feature = "runtime-benchmarks")]
-// 	type BenchmarkHelper = ();
-// }
-
 impl pallet_sudo::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeCall = RuntimeCall;
-	type WeightInfo = pallet_sudo::weights::SubstrateWeight<Runtime>; // FIXME
+	type WeightInfo = substrate_weights::pallet_sudo::WeightInfo<Runtime>;
 }
 
 parameter_types! {
@@ -1322,139 +1297,6 @@ impl pallet_nft_fractionalization::Config for Runtime {
 	type RuntimeHoldReason = RuntimeHoldReason;
 }
 
-// TODO::
-
-// parameter_types! {
-// 	pub const VoteLockingPeriod: BlockNumber = 30 * DAYS;
-// }
-
-// impl pallet_conviction_voting::Config for Runtime {
-// 	type WeightInfo = pallet_conviction_voting::weights::SubstrateWeight<Self>;
-// 	type RuntimeEvent = RuntimeEvent;
-// 	type Currency = Balances;
-// 	type VoteLockingPeriod = VoteLockingPeriod;
-// 	type MaxVotes = ConstU32<512>;
-// 	type MaxTurnout = frame_support::traits::TotalIssuanceOf<Balances, Self::AccountId>;
-// 	type Polls = Referenda;
-// }
-
-// impl pallet_ranked_collective::Config for Runtime {
-// 	type WeightInfo = pallet_ranked_collective::weights::SubstrateWeight<Self>;
-// 	type RuntimeEvent = RuntimeEvent;
-// 	type PromoteOrigin = EnsureRootWithSuccess<AccountId, ConstU16<65535>>;
-// 	type DemoteOrigin = EnsureRootWithSuccess<AccountId, ConstU16<65535>>;
-// 	type Polls = RankedPolls;
-// 	type MinRankOfClass = traits::Identity;
-// 	type VoteWeight = pallet_ranked_collective::Geometric;
-// }
-
-// parameter_types! {
-// 	pub const AlarmInterval: BlockNumber = 1;
-// 	pub const SubmissionDeposit: Balance = 100 * DOLLARS;
-// 	pub const UndecidingTimeout: BlockNumber = 28 * DAYS;
-// }
-
-// pub struct TracksInfo;
-// impl pallet_referenda::TracksInfo<Balance, BlockNumber> for TracksInfo {
-// 	type Id = u16;
-// 	type RuntimeOrigin = <RuntimeOrigin as frame_support::traits::OriginTrait>::PalletsOrigin;
-// 	fn tracks() -> &'static [(Self::Id, pallet_referenda::TrackInfo<Balance, BlockNumber>)] {
-// 		static DATA: [(u16, pallet_referenda::TrackInfo<Balance, BlockNumber>); 1] = [(
-// 			0u16,
-// 			pallet_referenda::TrackInfo {
-// 				name: "root",
-// 				max_deciding: 1,
-// 				decision_deposit: 10,
-// 				prepare_period: 4,
-// 				decision_period: 4,
-// 				confirm_period: 2,
-// 				min_enactment_period: 4,
-// 				min_approval: pallet_referenda::Curve::LinearDecreasing {
-// 					length: Perbill::from_percent(100),
-// 					floor: Perbill::from_percent(50),
-// 					ceil: Perbill::from_percent(100),
-// 				},
-// 				min_support: pallet_referenda::Curve::LinearDecreasing {
-// 					length: Perbill::from_percent(100),
-// 					floor: Perbill::from_percent(0),
-// 					ceil: Perbill::from_percent(100),
-// 				},
-// 			},
-// 		)];
-// 		&DATA[..]
-// 	}
-// 	fn track_for(id: &Self::RuntimeOrigin) -> Result<Self::Id, ()> {
-// 		if let Ok(system_origin) = frame_system::RawOrigin::try_from(id.clone()) {
-// 			match system_origin {
-// 				frame_system::RawOrigin::Root => Ok(0),
-// 				_ => Err(()),
-// 			}
-// 		} else {
-// 			Err(())
-// 		}
-// 	}
-// }
-
-// pallet_referenda::impl_tracksinfo_get!(TracksInfo, Balance, BlockNumber);
-
-// impl pallet_referenda::Config for Runtime {
-// 	type WeightInfo = pallet_referenda::weights::SubstrateWeight<Self>;
-// 	type RuntimeCall = RuntimeCall;
-// 	type RuntimeEvent = RuntimeEvent;
-// 	type Scheduler = Scheduler;
-// 	type Currency = pallet_balances::Pallet<Self>;
-// 	type SubmitOrigin = EnsureSigned<AccountId>;
-// 	type CancelOrigin = EnsureRoot<AccountId>;
-// 	type KillOrigin = EnsureRoot<AccountId>;
-// 	type Slash = ();
-// 	type Votes = pallet_conviction_voting::VotesOf<Runtime>;
-// 	type Tally = pallet_conviction_voting::TallyOf<Runtime>;
-// 	type SubmissionDeposit = SubmissionDeposit;
-// 	type MaxQueued = ConstU32<100>;
-// 	type UndecidingTimeout = UndecidingTimeout;
-// 	type AlarmInterval = AlarmInterval;
-// 	type Tracks = TracksInfo;
-// 	type Preimages = Preimage;
-// }
-
-// impl pallet_referenda::Config<pallet_referenda::Instance2> for Runtime {
-// 	type WeightInfo = pallet_referenda::weights::SubstrateWeight<Self>;
-// 	type RuntimeCall = RuntimeCall;
-// 	type RuntimeEvent = RuntimeEvent;
-// 	type Scheduler = Scheduler;
-// 	type Currency = pallet_balances::Pallet<Self>;
-// 	type SubmitOrigin = EnsureSigned<AccountId>;
-// 	type CancelOrigin = EnsureRoot<AccountId>;
-// 	type KillOrigin = EnsureRoot<AccountId>;
-// 	type Slash = ();
-// 	type Votes = pallet_ranked_collective::Votes;
-// 	type Tally = pallet_ranked_collective::TallyOf<Runtime>;
-// 	type SubmissionDeposit = SubmissionDeposit;
-// 	type MaxQueued = ConstU32<100>;
-// 	type UndecidingTimeout = UndecidingTimeout;
-// 	type AlarmInterval = AlarmInterval;
-// 	type Tracks = TracksInfo;
-// 	type Preimages = Preimage;
-// }
-
-// TODO:
-
-/* pub struct OnAcurastFulfillment;
-impl pallet_acurast_fulfillment_receiver::traits::OnFulfillment<Runtime> for OnAcurastFulfillment {
-	fn on_fulfillment(
-		_from: <Runtime as frame_system::Config>::AccountId,
-		_fulfillment: Fulfillment,
-	) -> DispatchResultWithInfo<PostDispatchInfo> {
-		Ok(PostDispatchInfo { actual_weight: None, pays_fee: Pays::No })
-	}
-} */
-
-/* impl pallet_acurast_fulfillment_receiver::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type OnFulfillment = OnAcurastFulfillment;
-	type WeightInfo = ();
-} */
-
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub struct Runtime
@@ -1472,7 +1314,6 @@ construct_runtime!(
 		PropertyGovernance: pallet_property_governance,
 		Nfts: pallet_nfts,
 		Uniques: pallet_uniques, //10
-		RandomnessCollectiveFlip: pallet_insecure_randomness_collective_flip,
 		Assets: pallet_assets::<Instance1>,
 		PoolAssets: pallet_assets::<Instance2>,
 		Utility: pallet_utility,
@@ -1501,19 +1342,6 @@ construct_runtime!(
 		Preimage: pallet_preimage,
 		Democracy: pallet_democracy,
 		NftFractionalization: pallet_nft_fractionalization,
-
-		// TODO:
-		// Referenda: pallet_referenda,
-		// RankedPolls: pallet_referenda::<Instance2>,
-		// ConvictionVoting: pallet_conviction_voting,
-		// RankedCollective: pallet_ranked_collective,
-		// TODO::
-		// AssetConversionTxPayment: pallet_asset_conversion_tx_payment,
-		// AssetConversion: pallet_asset_conversion,
-
-		// Acurast
-		//AcurastReceiver: pallet_acurast_fulfillment_receiver::{Pallet, Call, Storage, Event<T>} = 40,
-
 	}
 );
 
@@ -1571,6 +1399,8 @@ mod benches {
 		[pallet_utility, Utility]
 		[pallet_multisig, Multisig]
 		[pallet_nft_fractionalization, NftFractionalization]
+
+		[pallet_sudo, Sudo]
 	);
 }
 

@@ -26,15 +26,7 @@
 standard_args=" --release --features=runtime-benchmarks"
 
 pallets=(
-	frame-system
-	pallet-balances
-	pallet-timestamp
-    pallet-nfts
-    pallet-uniques
-	pallet-assets
-	pallet-utility
-	pallet-multisig
-	pallet-nft-fractionalization
+	pallet-sudo
 )
 
 cargo build $standard_args

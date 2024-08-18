@@ -7,3 +7,4 @@ pub mod pallet_assets;
 pub mod pallet_utility;
 pub mod pallet_multisig;
 pub mod pallet_nft_fractionalization;
+pub mod pallet_sudo;

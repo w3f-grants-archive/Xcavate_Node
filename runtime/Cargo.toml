@@ -53,7 +53,6 @@ pallet-nfts = {  default-features = false, git = "https://github.com/paritytech/
 pallet-uniques = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.6.0" }
 pallet-nfts-runtime-api = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.6.0" }
 node-primitives = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.6.0" }
-pallet-insecure-randomness-collective-flip = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.6.0" }
 pallet-assets = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.6.0" }
 pallet-asset-tx-payment = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.6.0" }
 # pallet-asset-conversion-tx-payment = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.6.0" }
@@ -155,7 +154,6 @@ std = [
 	"pallet-uniques/std",
 	"pallet-nfts-runtime-api/std",
 	"node-primitives/std",
-	"pallet-insecure-randomness-collective-flip/std",
 	"pallet-assets/std",
 	"pallet-utility/std",
 	"pallet-multisig/std",
@@ -219,6 +217,7 @@ runtime-benchmarks = [
 	"pallet-referenda/runtime-benchmarks",
 	"pallet-conviction-voting/runtime-benchmarks",
 	"pallet-nft-fractionalization/runtime-benchmarks",
+	"pallet-sudo/runtime-benchmarks",
 ]
 try-runtime = [
 	"frame-try-runtime/try-runtime",
@@ -238,7 +237,6 @@ try-runtime = [
 	"pallet-xcavate-whitelist/try-runtime",
 	"pallet-property-management/try-runtime",
 	"pallet-nfts/try-runtime",
-	"pallet-insecure-randomness-collective-flip/try-runtime",
 	"pallet-assets/try-runtime",
 	"pallet-uniques/try-runtime",
 	"pallet-utility/try-runtime",
