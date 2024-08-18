@@ -176,6 +176,9 @@ pub mod pallet {
 			+ From<u32>
 			+ Ord
 			+ Copy;
+
+		/// Multiplier for polkadot js.
+		type PolkadotJsMultiplier: Get<BalanceOf<Self>>;
 	}
 
 	pub type AssetId<T> = <T as Config>::AssetId;
@@ -341,11 +344,17 @@ pub mod pallet {
 							}  else {
 								<T as Config>::Threshold::get()
 							}; 
-						if voting_result.yes_votes > voting_result.no_votes
-							&& required_threshold
-								< voting_result.yes_votes.saturating_add(voting_result.no_votes)
-						{
-							let _ = Self::execute_proposal(proposal);
+						let asset_details = pallet_nft_marketplace::Pallet::<T>::asset_id_details(proposal.asset_id);
+						if let Some(asset_details) = asset_details {
+							let yes_votes_adjusted = voting_result.yes_votes.saturating_mul(100).saturating_div(asset_details.token_amount);
+							let no_votes_adjusted = voting_result.no_votes.saturating_mul(100).saturating_div(asset_details.token_amount);
+	
+							if yes_votes_adjusted > no_votes_adjusted
+								&& required_threshold
+									< yes_votes_adjusted.saturating_add(no_votes_adjusted)
+							{
+								let _ = Self::execute_proposal(proposal);
+							}
 						}
 					}
 				}
@@ -373,29 +382,35 @@ pub mod pallet {
 					else {
 						let voting_results = <OngoingChallengeVotes<T>>::take(item, challenge.state.clone());
 						if let Some(voting_result) = voting_results {
-							if voting_result.yes_votes > voting_result.no_votes
-								&& <T as Config>::Threshold::get()
-									< voting_result.yes_votes.saturating_add(voting_result.no_votes)
-							{
-								if challenge.state == ChallengeState::First {
-									challenge.state = ChallengeState::Second;
-									Challenges::<T>::insert(item, challenge.clone());
-									let current_block_number = <frame_system::Pallet<T>>::block_number();
-									let expiry_block =
-										current_block_number.saturating_add(<T as Config>::VotingTime::get());
-									let _ = ChallengeRoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
-										keys.try_push(*item).map_err(|_| Error::<T>::TooManyProposals)?;
-										Ok::<(), DispatchError>(())
-									});
-								} 
-								if challenge.state == ChallengeState::Third {
-									let _ = Self::slash_letting_agent(*item);
-								} 
-								if challenge.state == ChallengeState::Fourth {
-									let _ = Self::change_letting_agent(*item);
-								} 
-							} else {
-								Challenges::<T>::take(*item);
+							let asset_details = pallet_nft_marketplace::Pallet::<T>::asset_id_details(challenge.asset_id);
+							if let Some(asset_details) = asset_details {
+								let yes_votes_adjusted = voting_result.yes_votes.saturating_mul(100).saturating_div(asset_details.token_amount);
+								let no_votes_adjusted = voting_result.no_votes.saturating_mul(100).saturating_div(asset_details.token_amount);
+	
+								if yes_votes_adjusted > no_votes_adjusted
+									&& <T as Config>::Threshold::get()
+										< yes_votes_adjusted.saturating_add(no_votes_adjusted)
+								{
+									if challenge.state == ChallengeState::First {
+										challenge.state = ChallengeState::Second;
+										Challenges::<T>::insert(item, challenge.clone());
+										let current_block_number = <frame_system::Pallet<T>>::block_number();
+										let expiry_block =
+											current_block_number.saturating_add(<T as Config>::VotingTime::get());
+										let _ = ChallengeRoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
+											keys.try_push(*item).map_err(|_| Error::<T>::TooManyProposals)?;
+											Ok::<(), DispatchError>(())
+										});
+									} 
+									if challenge.state == ChallengeState::Third {
+										let _ = Self::slash_letting_agent(*item);
+									} 
+									if challenge.state == ChallengeState::Fourth {
+										let _ = Self::change_letting_agent(*item);
+									} 
+								} else {
+									Challenges::<T>::take(*item);
+								}
 							}
 						}
 					}
@@ -445,7 +460,7 @@ pub mod pallet {
 
 			// Check if the amount is less than LowProposal
 			if amount.saturating_mul(
-				Self::u64_to_balance_option(1/* 000000000000 */)?,
+				<T as Config>::PolkadotJsMultiplier::get(),
 			) <= <T as Config>::LowProposal::get() {
 				// Execute the proposal immediately
 				Self::execute_proposal(proposal)?;
@@ -660,7 +675,7 @@ pub mod pallet {
 					&Self::account_id(),
 					&letting_agent,
 					proposal_amount.saturating_mul(
-						Self::u64_to_balance_option(1/* 000000000000 */)?,
+						<T as Config>::PolkadotJsMultiplier::get(),
 					),
 					KeepAlive,
 				).map_err(|_| Error::<T>::NotEnoughFunds)?;
@@ -679,7 +694,7 @@ pub mod pallet {
 					&Self::account_id(),
 					&letting_agent,
 					property_reserves.saturating_mul(
-						Self::u64_to_balance_option(1/* 000000000000 */)?,
+						<T as Config>::PolkadotJsMultiplier::get(),
 					),
 					KeepAlive,
 				).map_err(|_| Error::<T>::NotEnoughFunds)?;

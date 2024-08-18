@@ -125,6 +125,7 @@ pub mod pallet {
 		pub region: u32,
 		pub location: LocationId<T>,
 		pub price: BalanceOf<T>,
+		pub token_amount: u32,
 	}
 
 	/// Infos regarding an offer.
@@ -667,7 +668,7 @@ pub mod pallet {
 				.checked_mul(&Self::u64_to_balance_option(token_amount as u64)?)
 				.ok_or(Error::<T>::MultiplyError)?;
 			let asset_details =
-				AssetDetails { collection_id, item_id, region, location, price: property_price };
+				AssetDetails { collection_id, item_id, region, location, price: property_price, token_amount };
 			AssetIdDetails::<T>::insert(asset_number, asset_details);
 			next_item_id = next_item_id.checked_add(1).ok_or(Error::<T>::ArithmeticOverflow)?;
 			asset_number = asset_number.checked_add(1).ok_or(Error::<T>::ArithmeticOverflow)?;
