@@ -478,7 +478,7 @@ parameter_types! {
 	pub const MaxLettingAgent: u32 = 100;
 	pub const MaxLocation: u32 = 100;
 	pub const PropertyReserves: Balance = 1000 * DOLLARS;
-	pub const PolkadotJsMultiply: Balance = 1/* CENTS */;
+	pub const PolkadotJsMultiply: Balance = 1 * CENTS;
 }
 
 /// Configure the pallet-property-management in pallets/property-management.
