@@ -344,7 +344,7 @@ pub mod pallet {
 							}  else {
 								<T as Config>::Threshold::get()
 							}; 
-						let asset_details = pallet_nft_marketplace::Pallet::<T>::asset_id_details(proposal.asset_id);
+						let asset_details = pallet_nft_marketplace::AssetIdDetails::<T>::get(proposal.asset_id);
 						if let Some(asset_details) = asset_details {
 							let yes_votes_adjusted = voting_result.yes_votes.saturating_mul(100).saturating_div(asset_details.token_amount);
 							let no_votes_adjusted = voting_result.no_votes.saturating_mul(100).saturating_div(asset_details.token_amount);
@@ -382,7 +382,7 @@ pub mod pallet {
 					else {
 						let voting_results = <OngoingChallengeVotes<T>>::take(item, challenge.state.clone());
 						if let Some(voting_result) = voting_results {
-							let asset_details = pallet_nft_marketplace::Pallet::<T>::asset_id_details(challenge.asset_id);
+							let asset_details = pallet_nft_marketplace::AssetIdDetails::<T>::get(challenge.asset_id);
 							if let Some(asset_details) = asset_details {
 								let yes_votes_adjusted = voting_result.yes_votes.saturating_mul(100).saturating_div(asset_details.token_amount);
 								let no_votes_adjusted = voting_result.no_votes.saturating_mul(100).saturating_div(asset_details.token_amount);
@@ -499,7 +499,7 @@ pub mod pallet {
 			asset_id: u32,
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
-			let owner_list = pallet_nft_marketplace::Pallet::<T>::property_owner(asset_id);
+			let owner_list = pallet_nft_marketplace::PropertyOwner::<T>::get(asset_id);
 			ensure!(owner_list.contains(&origin), Error::<T>::NoPermission);
 			ensure!(pallet_property_management::Pallet::<T>::letting_storage(asset_id).is_some(), Error::<T>::NoLettingAgentFound);
 			let challenge_id = Self::challenge_count().saturating_add(1);
@@ -540,10 +540,10 @@ pub mod pallet {
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let proposal = Self::proposals(proposal_id).ok_or(Error::<T>::NotOngoing)?;
-			let owner_list = pallet_nft_marketplace::Pallet::<T>::property_owner(proposal.asset_id);
+			let owner_list = pallet_nft_marketplace::PropertyOwner::<T>::get(proposal.asset_id);
 			ensure!(owner_list.contains(&origin), Error::<T>::NoPermission);
 			ensure!(!Self::proposal_voter(proposal_id).contains(&origin), Error::<T>::AlreadyVoted);
-			let voting_power = pallet_nft_marketplace::Pallet::<T>::property_owner_token(
+			let voting_power = pallet_nft_marketplace::PropertyOwnerToken::<T>::get(
 				proposal.asset_id,
 				origin.clone(),
 			);
@@ -581,10 +581,10 @@ pub mod pallet {
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let challenge = Self::challenges(challenge_id).ok_or(Error::<T>::NotOngoing)?;
-			let owner_list = pallet_nft_marketplace::Pallet::<T>::property_owner(challenge.asset_id);
+			let owner_list = pallet_nft_marketplace::PropertyOwner::<T>::get(challenge.asset_id);
 			ensure!(owner_list.contains(&origin), Error::<T>::NoPermission);
 			ensure!(!Self::challenge_voter(challenge_id, challenge.state.clone()).contains(&origin), Error::<T>::AlreadyVoted);
-			let voting_power = pallet_nft_marketplace::Pallet::<T>::property_owner_token(
+			let voting_power = pallet_nft_marketplace::PropertyOwnerToken::<T>::get(
 				challenge.asset_id,
 				origin.clone(),
 			);
@@ -639,7 +639,7 @@ pub mod pallet {
 			let letting_agent =
 				pallet_property_management::Pallet::<T>::letting_storage(challenge.asset_id).ok_or(Error::<T>::NoLettingAgentFound)?;
 			let asset_details =
-				pallet_nft_marketplace::Pallet::<T>::asset_id_details(challenge.asset_id)
+				pallet_nft_marketplace::AssetIdDetails::<T>::get(challenge.asset_id)
 					.ok_or(Error::<T>::NoAssetFound)?;
 			let _ = pallet_property_management::Pallet::<T>::remove_bad_letting_agent(
 				asset_details.region,

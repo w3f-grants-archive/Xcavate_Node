@@ -265,11 +265,11 @@ pub mod pallet {
 		) -> DispatchResult {
 			T::AgentOrigin::ensure_origin(origin)?;
 			ensure!(
-				pallet_nft_marketplace::Pallet::<T>::region_collections(region).is_some(),
+				pallet_nft_marketplace::RegionCollections::<T>::get(region).is_some(),
 				Error::<T>::RegionUnknown
 			);
 			ensure!(
-				pallet_nft_marketplace::Pallet::<T>::location_registration(
+				pallet_nft_marketplace::LocationRegistration::<T>::get(
 					region,
 					location.clone()
 				),
@@ -353,7 +353,7 @@ pub mod pallet {
 			let mut letting_info =
 				Self::letting_info(letting_agent.clone()).ok_or(Error::<T>::NoLettingAgentFound)?;
 			ensure!(
-				pallet_nft_marketplace::Pallet::<T>::location_registration(
+				pallet_nft_marketplace::LocationRegistration::<T>::get(
 					letting_info.region,
 					location.clone()
 				),
@@ -398,7 +398,7 @@ pub mod pallet {
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::set_letting_agent())]
 		pub fn set_letting_agent(origin: OriginFor<T>, asset_id: u32) -> DispatchResult {
 			let _origin = ensure_signed(origin)?;
-			let asset_details = pallet_nft_marketplace::Pallet::<T>::asset_id_details(asset_id)
+			let asset_details = pallet_nft_marketplace::AssetIdDetails::<T>::get(asset_id)
 				.ok_or(Error::<T>::NoObjectFound)?;
 			ensure!(Self::letting_storage(asset_id).is_none(), Error::<T>::LettingAgentAlreadySet);
 			Self::selects_letting_agent(asset_details.region, asset_details.location, asset_id)?;
@@ -438,10 +438,10 @@ pub mod pallet {
 				KeepAlive,
 			).map_err(|_| Error::<T>::NotEnoughFunds)?;
 		
-			let owner_list = pallet_nft_marketplace::Pallet::<T>::property_owner(asset_id);
+			let owner_list = pallet_nft_marketplace::PropertyOwner::<T>::get(asset_id);
 			let mut governance_amount = BalanceOf::<T>::zero();
 			let property_reserve = Self::property_reserve(asset_id);
-			let property_info = pallet_nft_marketplace::Pallet::<T>::asset_id_details(asset_id)
+			let property_info = pallet_nft_marketplace::AssetIdDetails::<T>::get(asset_id)
 				.ok_or(Error::<T>::NoObjectFound)?;
 			let property_price = property_info.price;
 		
@@ -509,7 +509,7 @@ pub mod pallet {
 			let final_remaining_amount = amount.saturating_sub(governance_amount);
 			let total_token = property_info.token_amount;
 			for owner in owner_list {
-				let token_amount = pallet_nft_marketplace::Pallet::<T>::property_owner_token(
+				let token_amount = pallet_nft_marketplace::PropertyOwnerToken::<T>::get(
 					asset_id,
 					owner.clone(),
 				);
