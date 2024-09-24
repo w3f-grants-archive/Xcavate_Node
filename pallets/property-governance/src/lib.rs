@@ -185,23 +185,19 @@ pub mod pallet {
 
 	/// Number of proposals that have been made.
 	#[pallet::storage]
-	#[pallet::getter(fn proposal_count)]
 	pub(super) type ProposalCount<T> = StorageValue<_, ProposalIndex, ValueQuery>;
 
 	/// Number of Challenges that have been made.
 	#[pallet::storage]
-	#[pallet::getter(fn challenge_count)]
 	pub(super) type ChallengeCount<T> = StorageValue<_, ProposalIndex, ValueQuery>;
 
 	/// Proposals that have been made.
 	#[pallet::storage]
-	#[pallet::getter(fn proposals)]
 	pub(super) type Proposals<T> =
 		StorageMap<_, Blake2_128Concat, ProposalIndex, Proposal<BlockNumberFor<T>, T>, OptionQuery>;
 
 	/// Sell proposals that have been made.
 	#[pallet::storage]
-	#[pallet::getter(fn sell_proposals)]
 	pub(super) type SellProposals<T> = StorageMap<
 		_,
 		Blake2_128Concat,
@@ -212,19 +208,16 @@ pub mod pallet {
 
 	/// Mapping of challenge index to the challenge info.
 	#[pallet::storage]
-	#[pallet::getter(fn challenges)]
 	pub(super) type Challenges<T> =
 		StorageMap<_, Blake2_128Concat, ChallengeIndex, Challenge<BlockNumberFor<T>, T>, OptionQuery>;
 
 	/// Mapping of ongoing votes.
 	#[pallet::storage]
-	#[pallet::getter(fn ongoing_votes)]
 	pub(super) type OngoingVotes<T> =
 		StorageMap<_, Blake2_128Concat, ProposalIndex, VoteStats, OptionQuery>;
 
 	/// Mapping from proposal to vector of users who voted.
 	#[pallet::storage]
-	#[pallet::getter(fn proposal_voter)]
 	pub(super) type ProposalVoter<T: Config> = StorageMap<
 		_,
 		Blake2_128Concat,
@@ -235,13 +228,11 @@ pub mod pallet {
 
 	/// Mapping of ongoing votes about challenges.
 	#[pallet::storage]
-	#[pallet::getter(fn ongoing_challenge_votes)]
 	pub(super) type OngoingChallengeVotes<T> =
 		StorageDoubleMap<_, Blake2_128Concat, ChallengeIndex, Blake2_128Concat, ChallengeState, VoteStats, OptionQuery>;
 
 	/// Mapping from challenge to vector of users who voted.
 	#[pallet::storage]
-	#[pallet::getter(fn challenge_voter)]
 	pub(super) type ChallengeVoter<T: Config> = StorageDoubleMap<
 		_,
 		Blake2_128Concat,
@@ -264,7 +255,6 @@ pub mod pallet {
 
 	/// Stores the project keys and round types ending on a given block for challenge votings.
 	#[pallet::storage]
-	#[pallet::getter(fn challenge_rounds_expiring)]
 	pub type ChallengeRoundsExpiring<T: Config> = StorageMap<
 		_,
 		Blake2_128Concat,
@@ -275,7 +265,6 @@ pub mod pallet {
 
 	/// Stores the project keys and round types ending on a given block for sell_property votings.
 	#[pallet::storage]
-	#[pallet::getter(fn sell_property_rounds_expiring)]
 	pub type SellPropertyRoundsExpiring<T: Config> = StorageMap<
 		_,
 		Blake2_128Concat,
@@ -364,7 +353,7 @@ pub mod pallet {
 			// checks if there is a voting for an challenge ending in this block.
 			ended_challenge_votings.iter().for_each(|item| {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
-				let challenge = Self::challenges(item);
+				let challenge = Challenges::<T>::get(item);
 				if let Some(mut challenge) = challenge {
 					if challenge.state == ChallengeState::Second {
 						challenge.state = ChallengeState::Third;
@@ -444,7 +433,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			ensure!(
-				pallet_property_management::Pallet::<T>::letting_storage(asset_id)
+				pallet_property_management::LettingStorage::<T>::get(asset_id)
 					.ok_or(Error::<T>::NoLettingAgentFound)?
 					== origin.clone(),
 				Error::<T>::NoPermission
@@ -467,7 +456,7 @@ pub mod pallet {
 				return Ok(());
 			}
 
-			let proposal_id = Self::proposal_count().saturating_add(1);
+			let proposal_id = ProposalCount::<T>::get().saturating_add(1);
 			let expiry_block =
 				current_block_number.saturating_add(<T as Config>::VotingTime::get());
 			RoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
@@ -501,8 +490,8 @@ pub mod pallet {
 			let origin = ensure_signed(origin)?;
 			let owner_list = pallet_nft_marketplace::PropertyOwner::<T>::get(asset_id);
 			ensure!(owner_list.contains(&origin), Error::<T>::NoPermission);
-			ensure!(pallet_property_management::Pallet::<T>::letting_storage(asset_id).is_some(), Error::<T>::NoLettingAgentFound);
-			let challenge_id = Self::challenge_count().saturating_add(1);
+			ensure!(pallet_property_management::LettingStorage::<T>::get(asset_id).is_some(), Error::<T>::NoLettingAgentFound);
+			let challenge_id = ChallengeCount::<T>::get().saturating_add(1);
 
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
 			let expiry_block =
@@ -539,16 +528,16 @@ pub mod pallet {
 			vote: Vote,
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
-			let proposal = Self::proposals(proposal_id).ok_or(Error::<T>::NotOngoing)?;
+			let proposal = Proposals::<T>::get(proposal_id).ok_or(Error::<T>::NotOngoing)?;
 			let owner_list = pallet_nft_marketplace::PropertyOwner::<T>::get(proposal.asset_id);
 			ensure!(owner_list.contains(&origin), Error::<T>::NoPermission);
-			ensure!(!Self::proposal_voter(proposal_id).contains(&origin), Error::<T>::AlreadyVoted);
+			ensure!(!ProposalVoter::<T>::get(proposal_id).contains(&origin), Error::<T>::AlreadyVoted);
 			let voting_power = pallet_nft_marketplace::PropertyOwnerToken::<T>::get(
 				proposal.asset_id,
 				origin.clone(),
 			);
 			let mut current_vote =
-				Self::ongoing_votes(proposal_id).ok_or(Error::<T>::NotOngoing)?;
+				OngoingVotes::<T>::get(proposal_id).ok_or(Error::<T>::NotOngoing)?;
 			match vote {
 				Vote::Yes => current_vote.yes_votes += voting_power,
 				Vote::No => current_vote.no_votes += voting_power,
@@ -580,16 +569,16 @@ pub mod pallet {
 			vote: Vote,
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
-			let challenge = Self::challenges(challenge_id).ok_or(Error::<T>::NotOngoing)?;
+			let challenge = Challenges::<T>::get(challenge_id).ok_or(Error::<T>::NotOngoing)?;
 			let owner_list = pallet_nft_marketplace::PropertyOwner::<T>::get(challenge.asset_id);
 			ensure!(owner_list.contains(&origin), Error::<T>::NoPermission);
-			ensure!(!Self::challenge_voter(challenge_id, challenge.state.clone()).contains(&origin), Error::<T>::AlreadyVoted);
+			ensure!(!ChallengeVoter::<T>::get(challenge_id, challenge.state.clone()).contains(&origin), Error::<T>::AlreadyVoted);
 			let voting_power = pallet_nft_marketplace::PropertyOwnerToken::<T>::get(
 				challenge.asset_id,
 				origin.clone(),
 			);
 			let mut current_vote =
-				Self::ongoing_challenge_votes(challenge_id, challenge.state.clone()).ok_or(Error::<T>::NotOngoing)?;
+				OngoingChallengeVotes::<T>::get(challenge_id, challenge.state.clone()).ok_or(Error::<T>::NotOngoing)?;
 			match vote {
 				Vote::Yes => current_vote.yes_votes += voting_power,
 				Vote::No => current_vote.no_votes += voting_power,
@@ -613,7 +602,7 @@ pub mod pallet {
 		fn slash_letting_agent(challenge_id: ChallengeIndex) -> DispatchResult {
 			let mut challenge = Challenges::<T>::take(challenge_id).ok_or(Error::<T>::NotOngoing)?;
 			let letting_agent =
-				pallet_property_management::Pallet::<T>::letting_storage(challenge.asset_id).ok_or(Error::<T>::NoLettingAgentFound)?;
+				pallet_property_management::LettingStorage::<T>::get(challenge.asset_id).ok_or(Error::<T>::NoLettingAgentFound)?;
 			let amount = <T as Config>::MinSlashingAmount::get();
 			<T as pallet::Config>::Slash::on_unbalanced(
 				<T as pallet::Config>::Currency::slash_reserved(&letting_agent, amount).0,
@@ -637,7 +626,7 @@ pub mod pallet {
 		fn change_letting_agent(challenge_id: ChallengeIndex) -> DispatchResult {
 			let challenge = Challenges::<T>::take(challenge_id).ok_or(Error::<T>::NotOngoing)?;
 			let letting_agent =
-				pallet_property_management::Pallet::<T>::letting_storage(challenge.asset_id).ok_or(Error::<T>::NoLettingAgentFound)?;
+				pallet_property_management::LettingStorage::<T>::get(challenge.asset_id).ok_or(Error::<T>::NoLettingAgentFound)?;
 			let asset_details =
 				pallet_nft_marketplace::AssetIdDetails::<T>::get(challenge.asset_id)
 					.ok_or(Error::<T>::NoAssetFound)?;
@@ -658,10 +647,10 @@ pub mod pallet {
 		/// Executes a proposal once it passes.
 		fn execute_proposal(proposal: Proposal<BlockNumberFor<T>, T>) -> DispatchResult {
 			let letting_agent =
-				pallet_property_management::Pallet::<T>::letting_storage(proposal.asset_id)
+				pallet_property_management::LettingStorage::<T>::get(proposal.asset_id)
 					.ok_or(Error::<T>::NoLettingAgentFound)?;
 		
-			let property_reserves_balances = pallet_property_management::Pallet::<T>::property_reserve(proposal.asset_id);
+			let property_reserves_balances = pallet_property_management::PropertyReserve::<T>::get(proposal.asset_id);
 			let property_reserves: BalanceOf<T> = TryInto::<u64>::try_into(property_reserves_balances)
 				.map_err(|_| Error::<T>::ConversionError)?
 				.try_into()

@@ -3,6 +3,8 @@ use frame_support::traits::Currency;
 use frame_support::BoundedVec;
 use frame_support::{assert_noop, assert_ok};
 
+use crate::{PropertyReserve, LettingStorage, LettingInfo, LettingAgentLocations, StoredFunds};
+
 use pallet_balances::Error as BalancesError;
 
 macro_rules! bvec {
@@ -23,10 +25,10 @@ fn add_letting_agent_works() {
 			bvec![10, 10],
 			[0; 32].into(),
 		));
-		assert_eq!(PropertyManagement::letting_info::<AccountId>([0; 32].into()).is_some(), true);
+		assert_eq!(LettingInfo::<Test>::get::<AccountId>([0; 32].into()).is_some(), true);
 		let location: BoundedVec<u8, Postcode> = bvec![10, 10];
 		assert_eq!(
-			PropertyManagement::letting_info::<AccountId>([0; 32].into()).unwrap().locations[0],
+			LettingInfo::<Test>::get::<AccountId>([0; 32].into()).unwrap().locations[0],
 			location
 		);
 	});
@@ -62,7 +64,7 @@ fn add_letting_agent_fails() {
 			bvec![10, 10],
 			[0; 32].into(),
 		));
-		assert_eq!(PropertyManagement::letting_info::<AccountId>([0; 32].into()).is_some(), true);
+		assert_eq!(LettingInfo::<Test>::get::<AccountId>([0; 32].into()).is_some(), true);
 		assert_noop!(
 			PropertyManagement::add_letting_agent(
 				RuntimeOrigin::root(),
@@ -88,7 +90,7 @@ fn let_letting_agent_deposit() {
 			[0; 32].into(),
 		));
 		assert_eq!(
-			PropertyManagement::letting_agent_locations::<u32, BoundedVec<u8, Postcode>>(
+			LettingAgentLocations::<Test>::get::<u32, BoundedVec<u8, Postcode>>(
 				0,
 				bvec![10, 10]
 			)
@@ -96,14 +98,14 @@ fn let_letting_agent_deposit() {
 			false
 		);
 		assert_eq!(
-			PropertyManagement::letting_info::<AccountId>([0; 32].into()).unwrap().deposited,
+			LettingInfo::<Test>::get::<AccountId>([0; 32].into()).unwrap().deposited,
 			false
 		);
 		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed(
 			[0; 32].into()
 		)));
 		assert_eq!(
-			PropertyManagement::letting_agent_locations::<u32, BoundedVec<u8, Postcode>>(
+			LettingAgentLocations::<Test>::get::<u32, BoundedVec<u8, Postcode>>(
 				0,
 				bvec![10, 10]
 			)
@@ -111,7 +113,7 @@ fn let_letting_agent_deposit() {
 			true
 		);
 		assert_eq!(
-			PropertyManagement::letting_info::<AccountId>([0; 32].into()).unwrap().deposited,
+			LettingInfo::<Test>::get::<AccountId>([0; 32].into()).unwrap().deposited,
 			true
 		);
 		assert_eq!(Balances::free_balance(&([0; 32].into())), 19_999_900);
@@ -200,7 +202,7 @@ fn add_letting_agent_to_location_works() {
 			bvec![9, 10],
 			[0; 32].into(),
 		));
-		assert_eq!(PropertyManagement::letting_info::<AccountId>([0; 32].into()).is_some(), true);
+		assert_eq!(LettingInfo::<Test>::get::<AccountId>([0; 32].into()).is_some(), true);
 		assert_ok!(PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed(
 			[0; 32].into()
 		)));
@@ -210,7 +212,7 @@ fn add_letting_agent_to_location_works() {
 			[0; 32].into()
 		));
 		assert_eq!(
-			PropertyManagement::letting_agent_locations::<u32, BoundedVec<u8, Postcode>>(
+			LettingAgentLocations::<Test>::get::<u32, BoundedVec<u8, Postcode>>(
 				0,
 				bvec![9, 10]
 			)
@@ -218,7 +220,7 @@ fn add_letting_agent_to_location_works() {
 			true
 		);
 		assert_eq!(
-			PropertyManagement::letting_agent_locations::<u32, BoundedVec<u8, Postcode>>(
+			LettingAgentLocations::<Test>::get::<u32, BoundedVec<u8, Postcode>>(
 				0,
 				bvec![10, 10]
 			)
@@ -226,7 +228,7 @@ fn add_letting_agent_to_location_works() {
 			true
 		);
 		assert_eq!(
-			PropertyManagement::letting_info::<AccountId>([0; 32].into())
+			LettingInfo::<Test>::get::<AccountId>([0; 32].into())
 				.unwrap()
 				.locations
 				.len(),
@@ -256,7 +258,7 @@ fn add_letting_agent_to_location_fails() {
 			bvec![10, 10],
 			[0; 32].into(),
 		));
-		assert_eq!(PropertyManagement::letting_info::<AccountId>([0; 32].into()).is_some(), true);
+		assert_eq!(LettingInfo::<Test>::get::<AccountId>([0; 32].into()).is_some(), true);
 		assert_noop!(
 			PropertyManagement::add_letting_agent_to_location(
 				RuntimeOrigin::root(),
@@ -362,12 +364,12 @@ fn set_letting_agent_works() {
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 3, 100));
 		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([0; 32].into()), 4));
-		assert_eq!(PropertyManagement::letting_storage(0).unwrap(), [2; 32].into());
-		assert_eq!(PropertyManagement::letting_storage(2).unwrap(), [3; 32].into());
-		assert_eq!(PropertyManagement::letting_storage(3).unwrap(), [4; 32].into());
-		assert_eq!(PropertyManagement::letting_storage(4).unwrap(), [2; 32].into());
+		assert_eq!(LettingStorage::<Test>::get(0).unwrap(), [2; 32].into());
+		assert_eq!(LettingStorage::<Test>::get(2).unwrap(), [3; 32].into());
+		assert_eq!(LettingStorage::<Test>::get(3).unwrap(), [4; 32].into());
+		assert_eq!(LettingStorage::<Test>::get(4).unwrap(), [2; 32].into());
 		assert_eq!(
-			PropertyManagement::letting_agent_locations::<u32, BoundedVec<u8, Postcode>>(
+			LettingAgentLocations::<Test>::get::<u32, BoundedVec<u8, Postcode>>(
 				0,
 				bvec![10, 10]
 			)
@@ -375,21 +377,21 @@ fn set_letting_agent_works() {
 			3
 		);
 		assert_eq!(
-			PropertyManagement::letting_info::<AccountId>([2; 32].into())
+			LettingInfo::<Test>::get::<AccountId>([2; 32].into())
 				.unwrap()
 				.assigned_properties
 				.len(),
 			2
 		);
 		assert_eq!(
-			PropertyManagement::letting_info::<AccountId>([3; 32].into())
+			LettingInfo::<Test>::get::<AccountId>([3; 32].into())
 				.unwrap()
 				.assigned_properties
 				.len(),
 			1
 		);
 		assert_eq!(
-			PropertyManagement::letting_info::<AccountId>([4; 32].into())
+			LettingInfo::<Test>::get::<AccountId>([4; 32].into())
 				.unwrap()
 				.assigned_properties
 				.len(),
@@ -537,10 +539,10 @@ fn distribute_income_works() {
 			0,
 			3200
 		));
-		assert_eq!(PropertyManagement::property_reserve(0), 3000);
-		assert_eq!(PropertyManagement::stored_funds::<AccountId>([1; 32].into()), 40);
-		assert_eq!(PropertyManagement::stored_funds::<AccountId>([2; 32].into()), 60);
-		assert_eq!(PropertyManagement::stored_funds::<AccountId>([3; 32].into()), 100);
+		assert_eq!(PropertyReserve::<Test>::get(0), 3000);
+		assert_eq!(StoredFunds::<Test>::get::<AccountId>([1; 32].into()), 40);
+		assert_eq!(StoredFunds::<Test>::get::<AccountId>([2; 32].into()), 60);
+		assert_eq!(StoredFunds::<Test>::get::<AccountId>([3; 32].into()), 100);
 		assert_eq!(Balances::free_balance(&([4; 32].into())), 1700);
 	});
 }
@@ -566,7 +568,7 @@ fn distribute_income_fails() {
 			PropertyManagement::distribute_income(RuntimeOrigin::signed([5; 32].into()), 0, 200),
 			Error::<Test>::NoLettingAgentFound
 		);
-		assert_eq!(PropertyManagement::stored_funds::<AccountId>([1; 32].into()), 0);
+		assert_eq!(StoredFunds::<Test>::get::<AccountId>([1; 32].into()), 0);
 		assert_ok!(PropertyManagement::add_letting_agent(
 			RuntimeOrigin::root(),
 			0,
@@ -620,12 +622,12 @@ fn withdraw_funds_works() {
 			0,
 			3200
 		));
-		assert_eq!(PropertyManagement::property_reserve(0), 3000);
-		assert_eq!(PropertyManagement::stored_funds::<AccountId>([1; 32].into()), 200);
+		assert_eq!(PropertyReserve::<Test>::get(0), 3000);
+		assert_eq!(StoredFunds::<Test>::get::<AccountId>([1; 32].into()), 200);
 		assert_eq!(Balances::free_balance(&([4; 32].into())), 1700);
 		assert_eq!(Balances::free_balance(&PropertyManagement::account_id()), 5200);
 		assert_ok!(PropertyManagement::withdraw_funds(RuntimeOrigin::signed([1; 32].into())));
-		assert_eq!(PropertyManagement::stored_funds::<AccountId>([1; 32].into()), 0);
+		assert_eq!(StoredFunds::<Test>::get::<AccountId>([1; 32].into()), 0);
 		assert_eq!(Balances::free_balance(&PropertyManagement::account_id()), 5000);
 		assert_eq!(Balances::free_balance(&PropertyManagement::governance_account_id()), 3000);
 		assert_eq!(Balances::free_balance(&([1; 32].into())), 15_000_200);
@@ -665,7 +667,7 @@ fn withdraw_funds_fails() {
 			0,
 			3200
 		));
-		assert_eq!(PropertyManagement::stored_funds::<AccountId>([1; 32].into()), 200);
+		assert_eq!(StoredFunds::<Test>::get::<AccountId>([1; 32].into()), 200);
 		assert_noop!(
 			PropertyManagement::withdraw_funds(RuntimeOrigin::signed([2; 32].into())),
 			Error::<Test>::UserHasNoFundsStored

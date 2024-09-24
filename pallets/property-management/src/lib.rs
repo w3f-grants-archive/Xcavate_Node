@@ -138,36 +138,30 @@ pub mod pallet {
 
 	/// Mapping from the real estate object to the letting agent.
 	#[pallet::storage]
-	#[pallet::getter(fn letting_storage)]
 	pub type LettingStorage<T> = StorageMap<_, Blake2_128Concat, u32, AccountIdOf<T>, OptionQuery>;
 
 	/// Mapping from account to currently stored balance.
 	#[pallet::storage]
-	#[pallet::getter(fn stored_funds)]
 	pub type StoredFunds<T> =
 		StorageMap<_, Blake2_128Concat, AccountIdOf<T>, BalanceOf<T>, ValueQuery>;
 
 	/// Mapping of asset id to the stored balance for a property.
 	#[pallet::storage]
-	#[pallet::getter(fn property_reserve)]
-	pub(super) type PropertyReserve<T> =
+	pub type PropertyReserve<T> =
 		StorageMap<_, Blake2_128Concat, u32, BalanceOf<T>, ValueQuery>;
 
 	/// Mapping of asset id to the stored debts of a property.
 	#[pallet::storage]
-	#[pallet::getter(fn property_debts)]
-	pub(super) type PropertyDebts<T> =
+	pub type PropertyDebts<T> =
 		StorageMap<_, Blake2_128Concat, u32, BalanceOf<T>, ValueQuery>;
 
 	/// Mapping from account to letting agent info
 	#[pallet::storage]
-	#[pallet::getter(fn letting_info)]
 	pub type LettingInfo<T: Config> =
 		StorageMap<_, Blake2_128Concat, AccountIdOf<T>, LettingAgentInfo<T>, OptionQuery>;
 
 	/// Mapping from region and location to the letting agents of this location.
 	#[pallet::storage]
-	#[pallet::getter(fn letting_agent_locations)]
 	pub type LettingAgentLocations<T: Config> = StorageDoubleMap<
 		_,
 		Blake2_128Concat,
@@ -305,9 +299,9 @@ pub mod pallet {
 		pub fn letting_agent_deposit(origin: OriginFor<T>) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 			let mut letting_info =
-				Self::letting_info(origin.clone()).ok_or(Error::<T>::NoPermission)?;
+				LettingInfo::<T>::get(origin.clone()).ok_or(Error::<T>::NoPermission)?;
 			ensure!(
-				!Self::letting_agent_locations(
+				!LettingAgentLocations::<T>::get(
 					letting_info.region,
 					letting_info.locations[0].clone()
 				)
@@ -351,7 +345,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			T::AgentOrigin::ensure_origin(origin)?;
 			let mut letting_info =
-				Self::letting_info(letting_agent.clone()).ok_or(Error::<T>::NoLettingAgentFound)?;
+				LettingInfo::<T>::get(letting_agent.clone()).ok_or(Error::<T>::NoLettingAgentFound)?;
 			ensure!(
 				pallet_nft_marketplace::LocationRegistration::<T>::get(
 					letting_info.region,
@@ -360,7 +354,7 @@ pub mod pallet {
 				Error::<T>::LocationUnknown
 			);
 			ensure!(
-				!Self::letting_agent_locations(letting_info.region, location.clone())
+				!LettingAgentLocations::<T>::get(letting_info.region, location.clone())
 					.contains(&letting_agent),
 				Error::<T>::LettingAgentInLocation
 			);
@@ -400,7 +394,7 @@ pub mod pallet {
 			let _origin = ensure_signed(origin)?;
 			let asset_details = pallet_nft_marketplace::AssetIdDetails::<T>::get(asset_id)
 				.ok_or(Error::<T>::NoObjectFound)?;
-			ensure!(Self::letting_storage(asset_id).is_none(), Error::<T>::LettingAgentAlreadySet);
+			ensure!(LettingStorage::<T>::get(asset_id).is_none(), Error::<T>::LettingAgentAlreadySet);
 			Self::selects_letting_agent(asset_details.region, asset_details.location, asset_id)?;
 			Ok(())
 		}
@@ -422,7 +416,7 @@ pub mod pallet {
 			amount: BalanceOf<T>,
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
-			let letting_agent = Self::letting_storage(asset_id).ok_or(Error::<T>::NoLettingAgentFound)?;
+			let letting_agent = LettingStorage::<T>::get(asset_id).ok_or(Error::<T>::NoLettingAgentFound)?;
 			ensure!(letting_agent == origin, Error::<T>::NoPermission);
 		
 			let scaled_amount = amount
@@ -440,7 +434,7 @@ pub mod pallet {
 		
 			let owner_list = pallet_nft_marketplace::PropertyOwner::<T>::get(asset_id);
 			let mut governance_amount = BalanceOf::<T>::zero();
-			let property_reserve = Self::property_reserve(asset_id);
+			let property_reserve = PropertyReserve::<T>::get(asset_id);
 			let property_info = pallet_nft_marketplace::AssetIdDetails::<T>::get(asset_id)
 				.ok_or(Error::<T>::NoObjectFound)?;
 			let property_price = property_info.price;
@@ -456,7 +450,7 @@ pub mod pallet {
 				.checked_div(&Self::u64_to_balance_option(12)?)
 				.ok_or(Error::<T>::DivisionError)?;
 		
-			let property_debts = Self::property_debts(asset_id);
+			let property_debts = PropertyDebts::<T>::get(asset_id);
 		
 			// Pay property debts first
 			let amount_to_pay_debts = core::cmp::min(amount, property_debts);
@@ -518,7 +512,7 @@ pub mod pallet {
 					.ok_or(Error::<T>::MultiplyError)?
 					.checked_div(&Self::u64_to_balance_option(total_token.into())?)
 					.ok_or(Error::<T>::DivisionError)?;
-				let mut old_funds = Self::stored_funds(owner.clone());
+				let mut old_funds = StoredFunds::<T>::get(owner.clone());
 				old_funds = old_funds
 					.checked_add(&amount_for_owner)
 					.ok_or(Error::<T>::ArithmeticOverflow)?;
@@ -582,16 +576,16 @@ pub mod pallet {
 			location: LocationId<T>,
 			asset_id: u32,
 		) -> DispatchResult {
-			let letting_agents = Self::letting_agent_locations(region, location);
+			let letting_agents = LettingAgentLocations::<T>::get(region, location);
 			let letting_agent = letting_agents
 				.iter()
 				.min_by_key(|letting_agent| {
-					Self::letting_info(letting_agent).unwrap().assigned_properties
+					LettingInfo::<T>::get(letting_agent).unwrap().assigned_properties
 				})
 				.ok_or(Error::<T>::NoLettingAgentFound)?;
 			LettingStorage::<T>::insert(asset_id, letting_agent);
 			let mut letting_info =
-				Self::letting_info(letting_agent).ok_or(Error::<T>::AgentNotFound)?;
+				LettingInfo::<T>::get(letting_agent).ok_or(Error::<T>::AgentNotFound)?;
 			letting_info
 				.assigned_properties
 				.try_push(asset_id)
@@ -610,14 +604,14 @@ pub mod pallet {
 			location: LocationId<T>,
 			agent: AccountIdOf<T>,
 		) -> DispatchResult {
-			let mut letting_agents = Self::letting_agent_locations(region, location.clone());
+			let mut letting_agents = LettingAgentLocations::<T>::get(region, location.clone());
 			let index = letting_agents
 				.iter()
 				.position(|x| *x == agent)
 				.ok_or(Error::<T>::AgentNotFound)?;
 			letting_agents.remove(index);
 			let mut letting_info =
-				Self::letting_info(agent.clone()).ok_or(Error::<T>::NoLettingAgentFound)?;
+				LettingInfo::<T>::get(agent.clone()).ok_or(Error::<T>::NoLettingAgentFound)?;
 			let index = letting_info
 				.locations
 				.iter()
@@ -631,7 +625,7 @@ pub mod pallet {
 
 		/// Decreases the reserve of a property.
 		pub fn decrease_reserves(asset_id: u32, amount: BalanceOf<T>) -> DispatchResult {
-			let mut property_reserve = Self::property_reserve(asset_id);
+			let mut property_reserve = PropertyReserve::<T>::get(asset_id);
 			ensure!(property_reserve >= amount, Error::<T>::NotEnoughReserves);
 			property_reserve = property_reserve.saturating_sub(amount);
 			PropertyReserve::<T>::insert(asset_id, property_reserve);
@@ -640,7 +634,7 @@ pub mod pallet {
 
 		/// Increases the debts of a property.
 		pub fn increase_debts(asset_id: u32, amount: BalanceOf<T>) -> DispatchResult {
-			let mut property_debts = Self::property_debts(asset_id);
+			let mut property_debts = PropertyDebts::<T>::get(asset_id);
 			property_debts = property_debts.saturating_add(amount);
 			PropertyDebts::<T>::insert(asset_id, property_debts);
 			Ok(())

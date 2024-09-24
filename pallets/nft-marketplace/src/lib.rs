@@ -130,6 +130,21 @@ pub mod pallet {
 		pub amount: u32,
 	}
 
+	impl<Balance, T: Config> OfferDetails<Balance, T>
+	where
+		Balance: CheckedMul + TryFrom<u64>,
+	{
+		pub fn get_total_amount(&self) -> Result<Balance, Error<T>> {
+			let amount_in_balance: Balance = (self.amount as u64)
+				.try_into()
+				.map_err(|_| Error::<T>::ConversionError)?;
+	
+			self.token_price
+				.checked_mul(&amount_in_balance)
+				.ok_or(Error::<T>::MultiplyError)
+		}
+	}
+
 	/// Offer enum.
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
@@ -600,15 +615,16 @@ pub mod pallet {
 				collection_id,
 				token_amount,
 			};
+			let pallet_account = Self::account_id();
 			pallet_nfts::Pallet::<T>::do_mint(
 				collection_id.into(),
 				item_id.into(),
-				Some(Self::account_id()),
-				Self::account_id(),
+				Some(pallet_account.clone()),
+				pallet_account.clone(),
 				Self::default_item_config(),
 				|_, _| Ok(()),
 			)?;
-			let pallet_origin: OriginFor<T> = RawOrigin::Signed(Self::account_id()).into();
+			let pallet_origin: OriginFor<T> = RawOrigin::Signed(pallet_account.clone()).into();
 			pallet_nfts::Pallet::<T>::set_metadata(
 				pallet_origin.clone(),
 				collection_id.into(),
@@ -625,7 +641,7 @@ pub mod pallet {
 			OngoingObjectListing::<T>::insert(listing_id, nft.clone());
 			ListedToken::<T>::insert(listing_id, token_amount);
 
-			let user_lookup = <T::Lookup as StaticLookup>::unlookup(Self::account_id());
+			let user_lookup = <T::Lookup as StaticLookup>::unlookup(pallet_account);
 			let nft_balance: FrationalizedNftBalanceOf<T> = token_amount.into();
 			let fractionalize_collection_id: FractionalizeCollectionId<T> =
 				collection_id.try_into().map_err(|_| Error::<T>::ConversionError)?;
@@ -896,21 +912,19 @@ pub mod pallet {
 			ensure!(listing_details.seller == signer, Error::<T>::NoPermission);
 			let offer_details =
 				OngoingOffers::<T>::take(listing_id, offer_id).ok_or(Error::<T>::InvalidIndex)?;
-			let price = offer_details
-				.token_price
-				.checked_mul(&Self::u64_to_balance_option(offer_details.amount.into())?)
-				.ok_or(Error::<T>::MultiplyError)?;
+			let price = offer_details.get_total_amount()?;
+			let pallet_account = Self::account_id();
 			if offer == Offer::Accept {
 				Self::buying_token_process(
 					listing_id,
-					Self::account_id(),
+					pallet_account,
 					offer_details.buyer,
 					listing_details,
 					price,
 					offer_details.amount,
 				)?;
 			} else {
-				Self::transfer_funds(Self::account_id(), offer_details.buyer, price)?;
+				Self::transfer_funds(pallet_account, offer_details.buyer, price)?;
 			}
 			Ok(())
 		}
@@ -935,10 +949,7 @@ pub mod pallet {
 			let offer_details =
 				OngoingOffers::<T>::take(listing_id, offer_id).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(offer_details.buyer == signer, Error::<T>::NoPermission);
-			let price = offer_details
-				.token_price
-				.checked_mul(&Self::u64_to_balance_option(offer_details.amount.into())?)
-				.ok_or(Error::<T>::MultiplyError)?;
+			let price = offer_details.get_total_amount()?;
 			Self::transfer_funds(Self::account_id(), offer_details.buyer, price)?;
 			Self::deposit_event(Event::<T>::OfferCancelled { listing_id, offer_id });
 			Ok(())
@@ -1069,12 +1080,12 @@ pub mod pallet {
 		/// of a collection are sold.
 		fn distribute_nfts(listing_id: u32) -> DispatchResult {
 			let list = <TokenBuyer<T>>::take(listing_id);
-
+			let pallet_account = Self::account_id();
 			let nft_details =
 				OngoingObjectListing::<T>::take(listing_id).ok_or(Error::<T>::InvalidIndex)?;
 			let price = nft_details.collected_funds;
-			Self::calculate_fees(price, Self::account_id(), nft_details.real_estate_developer)?;
-			let origin: OriginFor<T> = RawOrigin::Signed(Self::account_id()).into();
+			Self::calculate_fees(price, pallet_account.clone(), nft_details.real_estate_developer)?;
+			let origin: OriginFor<T> = RawOrigin::Signed(pallet_account).into();
 			let asset_id: AssetId<T> = nft_details.asset_id.into();
 			for owner in list {
 				let user_lookup = <T::Lookup as StaticLookup>::unlookup(owner.clone());
