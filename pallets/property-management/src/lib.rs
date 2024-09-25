@@ -241,7 +241,7 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		/// Adds an account as a letting agent.
 		///
-		/// The origin must be the sudo.
+		/// The origin must be the AgentOrigin.
 		///
 		/// Parameters:
 		/// - `region`: The region number where the letting agent should be added to.
@@ -329,7 +329,7 @@ pub mod pallet {
 
 		/// Adds a letting agent to a location.
 		///
-		/// The origin must be the sudo.
+		/// The origin must be the AgentOrigin.
 		///
 		/// Parameters:
 		/// - `location`: The location number where the letting agent should be added to.
