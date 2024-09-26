@@ -305,8 +305,8 @@ fn vote_on_proposal_works() {
 			1,
 			crate::Vote::No
 		));
-		assert_eq!(OngoingVotes::<Test>::get(1).unwrap().yes_votes, 60);
-		assert_eq!(OngoingVotes::<Test>::get(1).unwrap().no_votes, 40);
+		assert_eq!(OngoingVotes::<Test>::get(1).unwrap().yes_voting_power, 60);
+		assert_eq!(OngoingVotes::<Test>::get(1).unwrap().no_voting_power, 40);
 	});
 }
 
@@ -670,8 +670,8 @@ fn vote_on_challenge_works() {
 			1,
 			crate::Vote::No
 		));
-		assert_eq!(OngoingChallengeVotes::<Test>::get(1, crate::ChallengeState::First).unwrap().yes_votes, 60);
-		assert_eq!(OngoingChallengeVotes::<Test>::get(1, crate::ChallengeState::First).unwrap().no_votes, 40);
+		assert_eq!(OngoingChallengeVotes::<Test>::get(1, crate::ChallengeState::First).unwrap().yes_voting_power, 60);
+		assert_eq!(OngoingChallengeVotes::<Test>::get(1, crate::ChallengeState::First).unwrap().no_voting_power, 40);
 	});
 }
 

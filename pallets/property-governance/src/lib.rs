@@ -61,11 +61,11 @@ pub mod pallet {
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
 	#[scale_info(skip_type_params(T))]
-	pub struct Proposal<BlockNumber, T: Config> {
+	pub struct Proposal<T: Config> {
 		pub proposer: AccountIdOf<T>,
 		pub asset_id: u32,
 		pub amount: BalanceOf<T>,
-		pub created_at: BlockNumber,
+		pub created_at: BlockNumberFor<T>,
 		pub proposal_info: BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>,
 	}
 
@@ -73,11 +73,11 @@ pub mod pallet {
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
 	#[scale_info(skip_type_params(T))]
-	pub struct SellProposal<BlockNumber, T: Config> {
+	pub struct SellProposal<T: Config> {
 		pub proposer: AccountIdOf<T>,
 		pub asset_id: u32,
 		pub amount: BalanceOf<T>,
-		pub created_at: BlockNumber,
+		pub created_at: BlockNumberFor<T>,
 	}
 
 	/// Challenge with the challenge Details.
@@ -113,8 +113,8 @@ pub mod pallet {
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
 	pub struct VoteStats {
-		pub yes_votes: u32,
-		pub no_votes: u32,
+		pub yes_voting_power: u32,
+		pub no_voting_power: u32,
 	}
 
 	#[pallet::config]
@@ -194,7 +194,7 @@ pub mod pallet {
 	/// Proposals that have been made.
 	#[pallet::storage]
 	pub(super) type Proposals<T> =
-		StorageMap<_, Blake2_128Concat, ProposalIndex, Proposal<BlockNumberFor<T>, T>, OptionQuery>;
+		StorageMap<_, Blake2_128Concat, ProposalIndex, Proposal<T>, OptionQuery>;
 
 	/// Sell proposals that have been made.
 	#[pallet::storage]
@@ -202,7 +202,7 @@ pub mod pallet {
 		_,
 		Blake2_128Concat,
 		ProposalIndex,
-		SellProposal<BlockNumberFor<T>, T>,
+		SellProposal<T>,
 		OptionQuery,
 	>;
 
@@ -245,7 +245,7 @@ pub mod pallet {
 
 	/// Stores the project keys and round types ending on a given block for proposal votings.
 	#[pallet::storage]
-	pub type RoundsExpiring<T: Config> = StorageMap<
+	pub type ProposalRoundsExpiring<T: Config> = StorageMap<
 		_,
 		Blake2_128Concat,
 		BlockNumberFor<T>,
@@ -319,7 +319,7 @@ pub mod pallet {
 		fn on_initialize(n: frame_system::pallet_prelude::BlockNumberFor<T>) -> Weight {
 			let mut weight = T::DbWeight::get().reads_writes(1, 1);
 
-			let ended_votings = RoundsExpiring::<T>::take(n);
+			let ended_votings = ProposalRoundsExpiring::<T>::take(n);
 			// checks if there is a voting for a proposal ending in this block.
 			ended_votings.iter().for_each(|item| {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
@@ -335,12 +335,12 @@ pub mod pallet {
 							}; 
 						let asset_details = pallet_nft_marketplace::AssetIdDetails::<T>::get(proposal.asset_id);
 						if let Some(asset_details) = asset_details {
-							let yes_votes_adjusted = voting_result.yes_votes.saturating_mul(100).saturating_div(asset_details.token_amount);
-							let no_votes_adjusted = voting_result.no_votes.saturating_mul(100).saturating_div(asset_details.token_amount);
+							let yes_voting_power_adjusted = voting_result.yes_voting_power.saturating_mul(100).saturating_div(asset_details.token_amount);
+							let no_voting_power_adjusted = voting_result.no_voting_power.saturating_mul(100).saturating_div(asset_details.token_amount);
 	
-							if yes_votes_adjusted > no_votes_adjusted
+							if yes_voting_power_adjusted > no_voting_power_adjusted
 								&& required_threshold
-									< yes_votes_adjusted.saturating_add(no_votes_adjusted)
+									< yes_voting_power_adjusted.saturating_add(no_voting_power_adjusted)
 							{
 								let _ = Self::execute_proposal(proposal);
 							}
@@ -357,7 +357,7 @@ pub mod pallet {
 				if let Some(mut challenge) = challenge {
 					if challenge.state == ChallengeState::Second {
 						challenge.state = ChallengeState::Third;
-						let vote_stats = VoteStats { yes_votes: 0, no_votes: 0 };
+						let vote_stats = VoteStats { yes_voting_power: 0, no_voting_power: 0 };
 						OngoingChallengeVotes::<T>::insert(item, challenge.state.clone(), vote_stats);
 						Challenges::<T>::insert(item, challenge.clone());
 						let current_block_number = <frame_system::Pallet<T>>::block_number();
@@ -373,12 +373,12 @@ pub mod pallet {
 						if let Some(voting_result) = voting_results {
 							let asset_details = pallet_nft_marketplace::AssetIdDetails::<T>::get(challenge.asset_id);
 							if let Some(asset_details) = asset_details {
-								let yes_votes_adjusted = voting_result.yes_votes.saturating_mul(100).saturating_div(asset_details.token_amount);
-								let no_votes_adjusted = voting_result.no_votes.saturating_mul(100).saturating_div(asset_details.token_amount);
+								let yes_voting_power_adjusted = voting_result.yes_voting_power.saturating_mul(100).saturating_div(asset_details.token_amount);
+								let no_voting_power_adjusted = voting_result.no_voting_power.saturating_mul(100).saturating_div(asset_details.token_amount);
 	
-								if yes_votes_adjusted > no_votes_adjusted
+								if yes_voting_power_adjusted > no_voting_power_adjusted
 									&& <T as Config>::Threshold::get()
-										< yes_votes_adjusted.saturating_add(no_votes_adjusted)
+										< yes_voting_power_adjusted.saturating_add(no_voting_power_adjusted)
 								{
 									if challenge.state == ChallengeState::First {
 										challenge.state = ChallengeState::Second;
@@ -431,16 +431,16 @@ pub mod pallet {
 			amount: BalanceOf<T>,
 			data: BoundedVec<u8, <T as pallet_nfts::Config>::StringLimit>,
 		) -> DispatchResult {
-			let origin = ensure_signed(origin)?;
+			let signer = ensure_signed(origin)?;
 			ensure!(
 				pallet_property_management::LettingStorage::<T>::get(asset_id)
 					.ok_or(Error::<T>::NoLettingAgentFound)?
-					== origin.clone(),
+					== signer.clone(),
 				Error::<T>::NoPermission
 			);
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
 			let proposal = Proposal {
-				proposer: origin.clone(),
+				proposer: signer.clone(),
 				asset_id,
 				amount,
 				created_at: current_block_number,
@@ -452,23 +452,22 @@ pub mod pallet {
 				<T as Config>::PolkadotJsMultiplier::get(),
 			) <= <T as Config>::LowProposal::get() {
 				// Execute the proposal immediately
-				Self::execute_proposal(proposal)?;
-				return Ok(());
+				return Self::execute_proposal(proposal);
 			}
 
 			let proposal_id = ProposalCount::<T>::get().saturating_add(1);
 			let expiry_block =
 				current_block_number.saturating_add(<T as Config>::VotingTime::get());
-			RoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
+			ProposalRoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
 				keys.try_push(proposal_id).map_err(|_| Error::<T>::TooManyProposals)?;
 				Ok::<(), DispatchError>(())
 			})?;
-			let vote_stats = VoteStats { yes_votes: 0, no_votes: 0 };
+			let vote_stats = VoteStats { yes_voting_power: 0, no_voting_power: 0 };
 
 			Proposals::<T>::insert(proposal_id, proposal);
 			OngoingVotes::<T>::insert(proposal_id, vote_stats);
 			ProposalCount::<T>::put(proposal_id);
-			Self::deposit_event(Event::Proposed { proposal_id, asset_id, proposer: origin });
+			Self::deposit_event(Event::Proposed { proposal_id, asset_id, proposer: signer });
 			Ok(())
 		}
 
@@ -487,9 +486,9 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			asset_id: u32,
 		) -> DispatchResult {
-			let origin = ensure_signed(origin)?;
+			let signer = ensure_signed(origin)?;
 			let owner_list = pallet_nft_marketplace::PropertyOwner::<T>::get(asset_id);
-			ensure!(owner_list.contains(&origin), Error::<T>::NoPermission);
+			ensure!(owner_list.contains(&signer), Error::<T>::NoPermission);
 			ensure!(pallet_property_management::LettingStorage::<T>::get(asset_id).is_some(), Error::<T>::NoLettingAgentFound);
 			let challenge_id = ChallengeCount::<T>::get().saturating_add(1);
 
@@ -497,17 +496,17 @@ pub mod pallet {
 			let expiry_block =
 				current_block_number.saturating_add(<T as Config>::VotingTime::get());
 			let challenge =
-				Challenge { proposer: origin.clone(), asset_id, created_at: current_block_number, state: ChallengeState::First };
+				Challenge { proposer: signer.clone(), asset_id, created_at: current_block_number, state: ChallengeState::First };
 			ChallengeRoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
 				keys.try_push(challenge_id).map_err(|_| Error::<T>::TooManyProposals)?;
 				Ok::<(), DispatchError>(())
 			})?;
-			let vote_stats = VoteStats { yes_votes: 0, no_votes: 0 };
+			let vote_stats = VoteStats { yes_voting_power: 0, no_voting_power: 0 };
 			OngoingChallengeVotes::<T>::insert(challenge_id, challenge.state.clone(), vote_stats);
 			Challenges::<T>::insert(challenge_id, challenge);
 			ChallengeCount::<T>::put(challenge_id);
 			
-			Self::deposit_event(Event::Challenge { challenge_id, asset_id, proposer: origin });
+			Self::deposit_event(Event::Challenge { challenge_id, asset_id, proposer: signer });
 			Ok(())
 		}
 
@@ -539,8 +538,8 @@ pub mod pallet {
 			let mut current_vote =
 				OngoingVotes::<T>::get(proposal_id).ok_or(Error::<T>::NotOngoing)?;
 			match vote {
-				Vote::Yes => current_vote.yes_votes += voting_power,
-				Vote::No => current_vote.no_votes += voting_power,
+				Vote::Yes => current_vote.yes_voting_power.saturating_accrue(voting_power),
+				Vote::No => current_vote.no_voting_power.saturating_accrue(voting_power),
 			}
 			
 			OngoingVotes::<T>::insert(proposal_id, current_vote);
@@ -580,8 +579,8 @@ pub mod pallet {
 			let mut current_vote =
 				OngoingChallengeVotes::<T>::get(challenge_id, challenge.state.clone()).ok_or(Error::<T>::NotOngoing)?;
 			match vote {
-				Vote::Yes => current_vote.yes_votes += voting_power,
-				Vote::No => current_vote.no_votes += voting_power,
+				Vote::Yes => current_vote.yes_voting_power += voting_power,
+				Vote::No => current_vote.no_voting_power += voting_power,
 			}
 			OngoingChallengeVotes::<T>::insert(challenge_id, challenge.state.clone(), current_vote);
 			ChallengeVoter::<T>::try_mutate(challenge_id, challenge.state, |keys| {
@@ -608,7 +607,7 @@ pub mod pallet {
 				<T as pallet::Config>::Currency::slash_reserved(&letting_agent, amount).0,
 			);
 			challenge.state = ChallengeState::Fourth;
-			let vote_stats = VoteStats { yes_votes: 0, no_votes: 0 };
+			let vote_stats = VoteStats { yes_voting_power: 0, no_voting_power: 0 };
 			OngoingChallengeVotes::<T>::insert(challenge_id, challenge.state.clone(), vote_stats);
 			Challenges::<T>::insert(challenge_id, challenge.clone()); 
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
@@ -645,7 +644,7 @@ pub mod pallet {
 		}
 
 		/// Executes a proposal once it passes.
-		fn execute_proposal(proposal: Proposal<BlockNumberFor<T>, T>) -> DispatchResult {
+		fn execute_proposal(proposal: Proposal<T>) -> DispatchResult {
 			let letting_agent =
 				pallet_property_management::LettingStorage::<T>::get(proposal.asset_id)
 					.ok_or(Error::<T>::NoLettingAgentFound)?;
@@ -717,11 +716,6 @@ pub mod pallet {
 			});
 		
 			Ok(())
-		}
-
-		/// Converts a u64 to a balance.
-		pub fn u64_to_balance_option(input: u64) -> Result<BalanceOf<T>, Error<T>> {
-			input.try_into().map_err(|_| Error::<T>::ConversionError)
 		}
 	}
 }
