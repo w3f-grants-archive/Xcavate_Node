@@ -14,7 +14,7 @@ pub mod weights;
 pub use weights::*;
 
 use frame_support::{
-	sp_runtime::{traits::AccountIdConversion, Saturating},
+	sp_runtime::{traits::AccountIdConversion, Saturating, Percent},
 	traits::{Currency, ExistenceRequirement::KeepAlive, OnUnbalanced, ReservableCurrency},
 	PalletId,
 };
@@ -149,10 +149,10 @@ pub mod pallet {
 		type MaxVoter: Get<u32>;
 
 		/// Threshold for challenge votes.
-		type Threshold: Get<u32>;
+		type Threshold: Get<Percent>;
 
 		/// Threshold for high costs challenge votes.
-		type HighThreshold: Get<u32>;
+		type HighThreshold: Get<Percent>;
 
 		#[cfg(feature = "runtime-benchmarks")]
 		type Helper: crate::BenchmarkHelper<
@@ -226,6 +226,17 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	#[pallet::storage]
+	pub(super) type UserProposalVote<T: Config> = StorageDoubleMap<
+		_,
+		Blake2_128Concat,
+		ProposalIndex,
+		Blake2_128Concat,
+		AccountIdOf<T>,
+		Vote,
+		OptionQuery,	
+	>;
+
 	/// Mapping of ongoing votes about challenges.
 	#[pallet::storage]
 	pub(super) type OngoingChallengeVotes<T> =
@@ -241,6 +252,17 @@ pub mod pallet {
 		ChallengeState,
 		BoundedVec<AccountIdOf<T>, T::MaxVoter>,
 		ValueQuery,
+	>;
+
+	#[pallet::storage]
+	pub(super) type UserChallengeVote<T: Config> = StorageDoubleMap<
+		_,
+		Blake2_128Concat,
+		ChallengeIndex,
+		Blake2_128Concat,
+		AccountIdOf<T>,
+		Vote,
+		OptionQuery,
 	>;
 
 	/// Stores the project keys and round types ending on a given block for proposal votings.
@@ -290,6 +312,14 @@ pub mod pallet {
 		AgentSlashed { challenge_id: ChallengeIndex, amount: BalanceOf<T> },
 		/// The agent has been changed.
 		AgentChanged { challenge_id: ChallengeIndex, asset_id: u32 },
+		/// A proposal got rejected.
+		ProposalRejected { proposal_id: ProposalIndex },
+		/// A challenge has been rejected/
+		ChallengeRejected { challenge_id: ChallengeIndex, challenge_state: ChallengeState },
+		/// The threshold could not be reached for a proposal.
+		ProposalThresHoldNotReached { proposal_id: ProposalIndex, required_threshold: Percent },
+		/// The threshold could not be reached for a challenge.
+		ChallengeThresHoldNotReached { challenge_id: ProposalIndex, required_threshold: Percent, challenge_state: ChallengeState },
 	}
 
 	#[pallet::error]
@@ -302,8 +332,6 @@ pub mod pallet {
 		NotOngoing,
 		/// Too many user voted already.
 		TooManyVotes,
-		/// The user already voted.
-		AlreadyVoted,
 		/// The assets details could not be found.
 		NoAssetFound,
 		/// There is no letting agent for this property.
@@ -335,14 +363,23 @@ pub mod pallet {
 							}; 
 						let asset_details = pallet_nft_marketplace::AssetIdDetails::<T>::get(proposal.asset_id);
 						if let Some(asset_details) = asset_details {
-							let yes_voting_power_adjusted = voting_result.yes_voting_power.saturating_mul(100).saturating_div(asset_details.token_amount);
-							let no_voting_power_adjusted = voting_result.no_voting_power.saturating_mul(100).saturating_div(asset_details.token_amount);
+/* 							let yes_voting_power_adjusted = voting_result.yes_voting_power.saturating_mul(100).saturating_div(asset_details.token_amount);
+							let no_voting_power_adjusted = voting_result.no_voting_power.saturating_mul(100).saturating_div(asset_details.token_amount); */
+							let yes_votes_percentage = Percent::from_rational(voting_result.yes_voting_power, asset_details.token_amount);
+							let no_votes_percentage = Percent::from_rational(voting_result.no_voting_power, asset_details.token_amount);
 	
-							if yes_voting_power_adjusted > no_voting_power_adjusted
+							if yes_votes_percentage > no_votes_percentage
 								&& required_threshold
-									< yes_voting_power_adjusted.saturating_add(no_voting_power_adjusted)
+									< yes_votes_percentage.saturating_add(no_votes_percentage)
 							{
 								let _ = Self::execute_proposal(proposal);
+							}
+							else {
+								if yes_votes_percentage <= no_votes_percentage {
+									Self::deposit_event(Event::ProposalRejected { proposal_id: *item });
+								} else {
+									Self::deposit_event(Event::ProposalThresHoldNotReached { proposal_id: *item, required_threshold });
+								}								
 							}
 						}
 					}
@@ -373,12 +410,14 @@ pub mod pallet {
 						if let Some(voting_result) = voting_results {
 							let asset_details = pallet_nft_marketplace::AssetIdDetails::<T>::get(challenge.asset_id);
 							if let Some(asset_details) = asset_details {
-								let yes_voting_power_adjusted = voting_result.yes_voting_power.saturating_mul(100).saturating_div(asset_details.token_amount);
-								let no_voting_power_adjusted = voting_result.no_voting_power.saturating_mul(100).saturating_div(asset_details.token_amount);
-	
-								if yes_voting_power_adjusted > no_voting_power_adjusted
-									&& <T as Config>::Threshold::get()
-										< yes_voting_power_adjusted.saturating_add(no_voting_power_adjusted)
+/* 								let yes_voting_power_adjusted = voting_result.yes_voting_power.saturating_mul(100).saturating_div(asset_details.token_amount);
+								let no_voting_power_adjusted = voting_result.no_voting_power.saturating_mul(100).saturating_div(asset_details.token_amount); */
+								let yes_votes_percentage = Percent::from_rational(voting_result.yes_voting_power, asset_details.token_amount);
+								let no_votes_percentage = Percent::from_rational(voting_result.no_voting_power, asset_details.token_amount);
+								let required_threshold = <T as Config>::Threshold::get();
+								if yes_votes_percentage > no_votes_percentage
+									&& required_threshold
+										< yes_votes_percentage.saturating_add(no_votes_percentage)
 								{
 									if challenge.state == ChallengeState::First {
 										challenge.state = ChallengeState::Second;
@@ -399,6 +438,11 @@ pub mod pallet {
 									} 
 								} else {
 									Challenges::<T>::take(*item);
+									if yes_votes_percentage <= no_votes_percentage {
+										Self::deposit_event(Event::ChallengeRejected {challenge_id: *item, challenge_state: challenge.state});
+									} else {
+										Self::deposit_event(Event::ChallengeThresHoldNotReached { challenge_id: *item, required_threshold, challenge_state: challenge.state });
+									}	
 								}
 							}
 						}
@@ -526,28 +570,36 @@ pub mod pallet {
 			proposal_id: ProposalIndex,
 			vote: Vote,
 		) -> DispatchResult {
-			let origin = ensure_signed(origin)?;
+			let signer = ensure_signed(origin)?;
 			let proposal = Proposals::<T>::get(proposal_id).ok_or(Error::<T>::NotOngoing)?;
 			let owner_list = pallet_nft_marketplace::PropertyOwner::<T>::get(proposal.asset_id);
-			ensure!(owner_list.contains(&origin), Error::<T>::NoPermission);
-			ensure!(!ProposalVoter::<T>::get(proposal_id).contains(&origin), Error::<T>::AlreadyVoted);
+			ensure!(owner_list.contains(&signer), Error::<T>::NoPermission);
 			let voting_power = pallet_nft_marketplace::PropertyOwnerToken::<T>::get(
 				proposal.asset_id,
-				origin.clone(),
+				signer.clone(),
 			);
-			let mut current_vote =
-				OngoingVotes::<T>::get(proposal_id).ok_or(Error::<T>::NotOngoing)?;
-			match vote {
-				Vote::Yes => current_vote.yes_voting_power.saturating_accrue(voting_power),
-				Vote::No => current_vote.no_voting_power.saturating_accrue(voting_power),
-			}
-			
-			OngoingVotes::<T>::insert(proposal_id, current_vote);
-			ProposalVoter::<T>::try_mutate(proposal_id, |keys| {
-				keys.try_push(origin.clone()).map_err(|_| Error::<T>::TooManyVotes)?;
+			OngoingVotes::<T>::try_mutate(proposal_id, |maybe_current_vote|{
+				let current_vote = maybe_current_vote.as_mut().ok_or(Error::<T>::NotOngoing)?;
+				let previous_vote_opt = UserProposalVote::<T>::get(proposal_id, signer.clone());
+				if let Some(previous_vote) = previous_vote_opt {
+					match previous_vote {
+						Vote::Yes => current_vote.yes_voting_power = current_vote.yes_voting_power.saturating_sub(voting_power),
+						Vote::No => current_vote.no_voting_power = current_vote.no_voting_power.saturating_sub(voting_power),
+					}
+				}
+				
+				match vote {
+					Vote::Yes => current_vote.yes_voting_power.saturating_accrue(voting_power),
+					Vote::No => current_vote.no_voting_power.saturating_accrue(voting_power),
+				}
 				Ok::<(), DispatchError>(())
 			})?;
-			Self::deposit_event(Event::VotedOnProposal { proposal_id, voter: origin, vote });
+			ProposalVoter::<T>::try_mutate(proposal_id, |keys| {
+				keys.try_push(signer.clone()).map_err(|_| Error::<T>::TooManyVotes)?;
+				Ok::<(), DispatchError>(())
+			})?;
+			UserProposalVote::<T>::insert(proposal_id, signer.clone(), vote.clone());
+			Self::deposit_event(Event::VotedOnProposal { proposal_id, voter: signer, vote });
 			Ok(())
 		}
 
@@ -567,27 +619,36 @@ pub mod pallet {
 			challenge_id: ChallengeIndex,
 			vote: Vote,
 		) -> DispatchResult {
-			let origin = ensure_signed(origin)?;
+			let signer = ensure_signed(origin)?;
 			let challenge = Challenges::<T>::get(challenge_id).ok_or(Error::<T>::NotOngoing)?;
 			let owner_list = pallet_nft_marketplace::PropertyOwner::<T>::get(challenge.asset_id);
-			ensure!(owner_list.contains(&origin), Error::<T>::NoPermission);
-			ensure!(!ChallengeVoter::<T>::get(challenge_id, challenge.state.clone()).contains(&origin), Error::<T>::AlreadyVoted);
+			ensure!(owner_list.contains(&signer), Error::<T>::NoPermission);
 			let voting_power = pallet_nft_marketplace::PropertyOwnerToken::<T>::get(
 				challenge.asset_id,
-				origin.clone(),
+				signer.clone(),
 			);
-			let mut current_vote =
-				OngoingChallengeVotes::<T>::get(challenge_id, challenge.state.clone()).ok_or(Error::<T>::NotOngoing)?;
-			match vote {
-				Vote::Yes => current_vote.yes_voting_power += voting_power,
-				Vote::No => current_vote.no_voting_power += voting_power,
-			}
-			OngoingChallengeVotes::<T>::insert(challenge_id, challenge.state.clone(), current_vote);
-			ChallengeVoter::<T>::try_mutate(challenge_id, challenge.state, |keys| {
-				keys.try_push(origin.clone()).map_err(|_| Error::<T>::TooManyVotes)?;
+			OngoingChallengeVotes::<T>::try_mutate(challenge_id, challenge.state.clone(), |maybe_current_vote|{
+				let current_vote = maybe_current_vote.as_mut().ok_or(Error::<T>::NotOngoing)?;
+				let previous_vote_opt = UserChallengeVote::<T>::get(challenge_id, signer.clone());
+				if let Some(previous_vote) = previous_vote_opt {
+					match previous_vote {
+						Vote::Yes => current_vote.yes_voting_power = current_vote.yes_voting_power.saturating_sub(voting_power),
+						Vote::No => current_vote.no_voting_power = current_vote.no_voting_power.saturating_sub(voting_power),
+					}
+				}
+				
+				match vote {
+					Vote::Yes => current_vote.yes_voting_power.saturating_accrue(voting_power),
+					Vote::No => current_vote.no_voting_power.saturating_accrue(voting_power),
+				}
 				Ok::<(), DispatchError>(())
 			})?;
-			Self::deposit_event(Event::VotedOnChallenge { challenge_id, voter: origin, vote });
+			ChallengeVoter::<T>::try_mutate(challenge_id, challenge.state, |keys| {
+				keys.try_push(signer.clone()).map_err(|_| Error::<T>::TooManyVotes)?;
+				Ok::<(), DispatchError>(())
+			})?;
+			UserChallengeVote::<T>::insert(challenge_id, signer.clone(), vote.clone());
+			Self::deposit_event(Event::VotedOnChallenge { challenge_id, voter: signer, vote });
 			Ok(())
 		}
 	}

@@ -254,8 +254,8 @@ parameter_types! {
 	pub const PropertyVotingTime: BlockNumber = 30;
 	pub const MaxVoteForBlock: u32 = 100;
 	pub const MaximumVoter: u32 = 100;
-	pub const VotingThreshold: u8 = 51;
-	pub const HighVotingThreshold: u8 = 67;
+	pub const VotingThreshold: Percent = Percent::from_percent(51);
+	pub const HighVotingThreshold: Percent = Percent::from_percent(67);
 	pub const PropertyGovernancePalletId: PalletId = PalletId(*b"py/gvrnc");
 }
 

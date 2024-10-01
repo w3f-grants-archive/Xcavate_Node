@@ -1,8 +1,8 @@
-use crate::{mock::*, Error};
+use crate::{mock::*, Error, Event};
 use frame_support::{
 	assert_noop, assert_ok,
 	traits::{OnFinalize, OnInitialize},
-	BoundedVec,
+	BoundedVec, sp_runtime::Percent
 };
 
 use crate::{Proposals, Challenges, ChallengeRoundsExpiring, OngoingChallengeVotes, OngoingVotes};
@@ -305,8 +305,13 @@ fn vote_on_proposal_works() {
 			1,
 			crate::Vote::No
 		));
-		assert_eq!(OngoingVotes::<Test>::get(1).unwrap().yes_voting_power, 60);
-		assert_eq!(OngoingVotes::<Test>::get(1).unwrap().no_voting_power, 40);
+		assert_ok!(PropertyGovernance::vote_on_proposal(
+			RuntimeOrigin::signed([1; 32].into()),
+			1,
+			crate::Vote::No
+		));
+		assert_eq!(OngoingVotes::<Test>::get(1).unwrap().yes_voting_power, 10);
+		assert_eq!(OngoingVotes::<Test>::get(1).unwrap().no_voting_power, 90);
 	});
 }
 
@@ -409,6 +414,11 @@ fn proposal_pass_2() {
 		assert_ok!(PropertyGovernance::vote_on_proposal(
 			RuntimeOrigin::signed([1; 32].into()),
 			1,
+			crate::Vote::No
+		));
+		assert_ok!(PropertyGovernance::vote_on_proposal(
+			RuntimeOrigin::signed([1; 32].into()),
+			1,
 			crate::Vote::Yes
 		));
 		assert_eq!(Proposals::<Test>::get(1).is_some(), true);
@@ -486,6 +496,7 @@ fn proposal_not_pass() {
 		assert_eq!(Balances::free_balance(&PropertyGovernance::account_id()), 501_000);
 		assert_eq!(PropertyReserve::<Test>::get(0), 1000);
 		assert_eq!(Proposals::<Test>::get(1).is_none(), true);
+		System::assert_last_event(Event::ProposalRejected{ proposal_id: 1}.into());
 	});
 }
 
@@ -541,6 +552,7 @@ fn proposal_not_pass_2() {
 		assert_eq!(Balances::free_balance(&PropertyGovernance::account_id()), 501_000);
 		assert_eq!(PropertyReserve::<Test>::get(0), 1000);
 		run_to_block(31);
+		System::assert_last_event(Event::ProposalThresHoldNotReached{ proposal_id: 1, required_threshold: Percent::from_percent(67)}.into());
 		assert_eq!(Proposals::<Test>::get(1).is_none(), true);
 		assert_eq!(Balances::free_balance(&([0; 32].into())), 19_998_900);
 		assert_eq!(Balances::free_balance(&PropertyGovernance::account_id()), 501_000);
@@ -608,14 +620,6 @@ fn vote_on_proposal_fails() {
 			),
 			Error::<Test>::NoPermission
 		);
-		assert_noop!(
-			PropertyGovernance::vote_on_proposal(
-				RuntimeOrigin::signed([1; 32].into()),
-				1,
-				crate::Vote::Yes
-			),
-			Error::<Test>::AlreadyVoted
-		);
 	});
 }
 
@@ -654,6 +658,11 @@ fn vote_on_challenge_works() {
 		assert_ok!(PropertyGovernance::challenge_against_letting_agent(
 			RuntimeOrigin::signed([1; 32].into()),
 			0
+		));
+		assert_ok!(PropertyGovernance::vote_on_letting_agent_challenge(
+			RuntimeOrigin::signed([2; 32].into()),
+			1,
+			crate::Vote::Yes
 		));
 		assert_ok!(PropertyGovernance::vote_on_letting_agent_challenge(
 			RuntimeOrigin::signed([1; 32].into()),
@@ -727,6 +736,11 @@ fn challenge_pass() {
 			0
 		));
 		assert_eq!(Challenges::<Test>::get(1).unwrap().asset_id, 0);
+		assert_ok!(PropertyGovernance::vote_on_letting_agent_challenge(
+			RuntimeOrigin::signed([1; 32].into()),
+			1,
+			crate::Vote::No
+		));
 		assert_ok!(PropertyGovernance::vote_on_letting_agent_challenge(
 			RuntimeOrigin::signed([1; 32].into()),
 			1,
@@ -870,6 +884,7 @@ fn challenge_does_not_pass() {
 			crate::Vote::Yes
 		));
 		run_to_block(91);
+		System::assert_last_event(Event::ChallengeThresHoldNotReached{ challenge_id: 1, required_threshold: Percent::from_percent(51), challenge_state: crate::ChallengeState::Third}.into());
 		assert_eq!(Challenges::<Test>::get(1).is_none(), true);
 	});
 }
@@ -1024,6 +1039,7 @@ fn challenge_not_pass() {
 		));
 		assert_eq!(Challenges::<Test>::get(1).is_some(), true);
 		run_to_block(31);
+		System::assert_last_event(Event::ChallengeRejected{ challenge_id: 1, challenge_state: crate::ChallengeState::First}.into());
 		assert_eq!(Challenges::<Test>::get(1).is_none(), true);
 	});
 }
@@ -1079,14 +1095,6 @@ fn vote_on_challenge_fails() {
 				crate::Vote::Yes
 			),
 			Error::<Test>::NoPermission
-		);
-		assert_noop!(
-			PropertyGovernance::vote_on_letting_agent_challenge(
-				RuntimeOrigin::signed([1; 32].into()),
-				1,
-				crate::Vote::Yes
-			),
-			Error::<Test>::AlreadyVoted
 		);
 	});
 }
