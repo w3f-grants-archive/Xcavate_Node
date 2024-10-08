@@ -240,7 +240,7 @@ impl pallet_property_management::Config for Test {
 	type Currency = Balances;
 	type PalletId = PropertyManagementPalletId;
 	type AgentOrigin = EnsureRoot<Self::AccountId>;
-	type MinStakingAmount = ConstU32<100>;
+	type LettingAgentDeposit = ConstU32<100>;
 	type MaxProperties = MaxProperty;
 	type MaxLettingAgents = MaxLettingAgent;
 	type MaxLocations = MaxLocation;

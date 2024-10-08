@@ -490,7 +490,7 @@ impl pallet_property_management::Config for Runtime {
 	#[cfg(feature = "runtime-benchmarks")]
 	type Helper = pallet_property_management::AssetHelper;
 	type AgentOrigin = EnsureRoot<Self::AccountId>;
-	type MinStakingAmount = MinimumStakingAmount;
+	type LettingAgentDeposit = MinimumStakingAmount;
 	type MaxProperties = MaxProperty;
 	type MaxLettingAgents = MaxLettingAgent;
 	type MaxLocations = MaxLocation;

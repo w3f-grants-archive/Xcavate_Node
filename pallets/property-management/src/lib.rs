@@ -100,7 +100,7 @@ pub mod pallet {
 		type AgentOrigin: EnsureOrigin<Self::RuntimeOrigin>;
 
 		/// The minimum amount of a letting agent that has to be staked.
-		type MinStakingAmount: Get<BalanceOf<Self>>;
+		type LettingAgentDeposit: Get<BalanceOf<Self>>;
 
 		/// The maximum amount of properties that can be assigned to a letting agent.
 		#[pallet::constant]
@@ -235,6 +235,8 @@ pub mod pallet {
 		NotEnoughReserves,
 		/// This asset has no token.
 		AssetNotFound,
+		/// This letting agent has no location.
+		NoLoactions,
 	}
 
 	#[pallet::call]
@@ -297,33 +299,35 @@ pub mod pallet {
 		#[pallet::call_index(1)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::letting_agent_deposit())]
 		pub fn letting_agent_deposit(origin: OriginFor<T>) -> DispatchResult {
-			let origin = ensure_signed(origin)?;
-			let mut letting_info =
-				LettingInfo::<T>::get(origin.clone()).ok_or(Error::<T>::NoPermission)?;
-			ensure!(
-				!LettingAgentLocations::<T>::get(
+			let signer = ensure_signed(origin)?;
+			LettingInfo::<T>::try_mutate(signer.clone(), |maybe_letting_info|{
+				let letting_info = maybe_letting_info.as_mut().ok_or(Error::<T>::NoPermission)?;
+				ensure!(!letting_info.deposited, Error::<T>::AlreadyDeposited);
+				ensure!(letting_info.locations.len() > 0, Error::<T>::NoLoactions);
+				ensure!(
+					!LettingAgentLocations::<T>::get(
+						letting_info.region,
+						letting_info.locations[0].clone()
+					)
+					.contains(&signer),
+					Error::<T>::LettingAgentInLocation
+				);
+				<T as pallet::Config>::Currency::reserve(
+					&signer,
+					<T as Config>::LettingAgentDeposit::get(),
+				)?;
+				letting_info.deposited = true;
+				LettingAgentLocations::<T>::try_mutate(
 					letting_info.region,
-					letting_info.locations[0].clone()
-				)
-				.contains(&origin),
-				Error::<T>::LettingAgentInLocation
-			);
-			ensure!(!letting_info.deposited, Error::<T>::AlreadyDeposited);
-			<T as pallet::Config>::Currency::reserve(
-				&origin,
-				<T as Config>::MinStakingAmount::get(),
-			)?;
-			letting_info.deposited = true;
-			LettingAgentLocations::<T>::try_mutate(
-				letting_info.region,
-				letting_info.locations[0].clone(),
-				|keys| {
-					keys.try_push(origin.clone()).map_err(|_| Error::<T>::TooManyLettingAgents)?;
-					Ok::<(), DispatchError>(())
-				},
-			)?;
-			LettingInfo::<T>::insert(origin.clone(), letting_info);
-			Self::deposit_event(Event::<T>::Deposited { who: origin });
+					letting_info.locations[0].clone(),
+					|keys| {
+						keys.try_push(signer.clone()).map_err(|_| Error::<T>::TooManyLettingAgents)?;
+						Ok::<(), DispatchError>(())
+					},
+				)?;
+				Ok::<(), DispatchError>(())
+			})?;
+			Self::deposit_event(Event::<T>::Deposited { who: signer });
 			Ok(())
 		}
 
@@ -625,19 +629,19 @@ pub mod pallet {
 
 		/// Decreases the reserve of a property.
 		pub fn decrease_reserves(asset_id: u32, amount: BalanceOf<T>) -> DispatchResult {
-			let mut property_reserve = PropertyReserve::<T>::get(asset_id);
-			ensure!(property_reserve >= amount, Error::<T>::NotEnoughReserves);
-			property_reserve = property_reserve.saturating_sub(amount);
-			PropertyReserve::<T>::insert(asset_id, property_reserve);
-			Ok(())
+			PropertyReserve::<T>::try_mutate(asset_id, |property_reserve| -> Result<(), DispatchError> {
+				ensure!(*property_reserve >= amount, Error::<T>::NotEnoughReserves);
+				*property_reserve = property_reserve.saturating_sub(amount);				
+				Ok(())
+			})
 		}
 
 		/// Increases the debts of a property.
 		pub fn increase_debts(asset_id: u32, amount: BalanceOf<T>) -> DispatchResult {
-			let mut property_debts = PropertyDebts::<T>::get(asset_id);
-			property_debts = property_debts.saturating_add(amount);
-			PropertyDebts::<T>::insert(asset_id, property_debts);
-			Ok(())
+			PropertyDebts::<T>::try_mutate(asset_id, |property_debts| {
+				*property_debts = property_debts.saturating_add(amount);
+				Ok(())
+			})
 		}
 	}
 }

@@ -350,105 +350,15 @@ pub mod pallet {
 			let ended_votings = ProposalRoundsExpiring::<T>::take(n);
 			// checks if there is a voting for a proposal ending in this block.
 			ended_votings.iter().for_each(|item| {
-				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
-				let voting_results = <OngoingVotes<T>>::take(item);
-				let proposals = <Proposals<T>>::take(item);
-				if let Some(proposal) = proposals {
-					if let Some(voting_result) = voting_results {
-						let required_threshold =
-							if proposal.amount >= <T as Config>::HighProposal::get() {
-								<T as Config>::HighThreshold::get()
-							}  else {
-								<T as Config>::Threshold::get()
-							}; 
-						let asset_details = pallet_nft_marketplace::AssetIdDetails::<T>::get(proposal.asset_id);
-						if let Some(asset_details) = asset_details {
-/* 							let yes_voting_power_adjusted = voting_result.yes_voting_power.saturating_mul(100).saturating_div(asset_details.token_amount);
-							let no_voting_power_adjusted = voting_result.no_voting_power.saturating_mul(100).saturating_div(asset_details.token_amount); */
-							let yes_votes_percentage = Percent::from_rational(voting_result.yes_voting_power, asset_details.token_amount);
-							let no_votes_percentage = Percent::from_rational(voting_result.no_voting_power, asset_details.token_amount);
-	
-							if yes_votes_percentage > no_votes_percentage
-								&& required_threshold
-									< yes_votes_percentage.saturating_add(no_votes_percentage)
-							{
-								let _ = Self::execute_proposal(proposal);
-							}
-							else {
-								if yes_votes_percentage <= no_votes_percentage {
-									Self::deposit_event(Event::ProposalRejected { proposal_id: *item });
-								} else {
-									Self::deposit_event(Event::ProposalThresHoldNotReached { proposal_id: *item, required_threshold });
-								}								
-							}
-						}
-					}
-				}
+				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));	
+				let _ = Self::finish_proposal(*item);					
 			});
 
 			let ended_challenge_votings = ChallengeRoundsExpiring::<T>::take(n);
 			// checks if there is a voting for an challenge ending in this block.
 			ended_challenge_votings.iter().for_each(|item| {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
-				let challenge = Challenges::<T>::get(item);
-				if let Some(mut challenge) = challenge {
-					if challenge.state == ChallengeState::Second {
-						challenge.state = ChallengeState::Third;
-						let vote_stats = VoteStats { yes_voting_power: 0, no_voting_power: 0 };
-						OngoingChallengeVotes::<T>::insert(item, challenge.state.clone(), vote_stats);
-						Challenges::<T>::insert(item, challenge.clone());
-						let current_block_number = <frame_system::Pallet<T>>::block_number();
-						let expiry_block =
-							current_block_number.saturating_add(<T as Config>::VotingTime::get());
-						let _ = ChallengeRoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
-							keys.try_push(*item).map_err(|_| Error::<T>::TooManyProposals)?;
-							Ok::<(), DispatchError>(())
-						});
-					} 
-					else {
-						let voting_results = <OngoingChallengeVotes<T>>::take(item, challenge.state.clone());
-						if let Some(voting_result) = voting_results {
-							let asset_details = pallet_nft_marketplace::AssetIdDetails::<T>::get(challenge.asset_id);
-							if let Some(asset_details) = asset_details {
-/* 								let yes_voting_power_adjusted = voting_result.yes_voting_power.saturating_mul(100).saturating_div(asset_details.token_amount);
-								let no_voting_power_adjusted = voting_result.no_voting_power.saturating_mul(100).saturating_div(asset_details.token_amount); */
-								let yes_votes_percentage = Percent::from_rational(voting_result.yes_voting_power, asset_details.token_amount);
-								let no_votes_percentage = Percent::from_rational(voting_result.no_voting_power, asset_details.token_amount);
-								let required_threshold = <T as Config>::Threshold::get();
-								if yes_votes_percentage > no_votes_percentage
-									&& required_threshold
-										< yes_votes_percentage.saturating_add(no_votes_percentage)
-								{
-									if challenge.state == ChallengeState::First {
-										challenge.state = ChallengeState::Second;
-										Challenges::<T>::insert(item, challenge.clone());
-										let current_block_number = <frame_system::Pallet<T>>::block_number();
-										let expiry_block =
-											current_block_number.saturating_add(<T as Config>::VotingTime::get());
-										let _ = ChallengeRoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
-											keys.try_push(*item).map_err(|_| Error::<T>::TooManyProposals)?;
-											Ok::<(), DispatchError>(())
-										});
-									} 
-									if challenge.state == ChallengeState::Third {
-										let _ = Self::slash_letting_agent(*item);
-									} 
-									if challenge.state == ChallengeState::Fourth {
-										let _ = Self::change_letting_agent(*item);
-									} 
-								} else {
-									Challenges::<T>::take(*item);
-									if yes_votes_percentage <= no_votes_percentage {
-										Self::deposit_event(Event::ChallengeRejected {challenge_id: *item, challenge_state: challenge.state});
-									} else {
-										Self::deposit_event(Event::ChallengeThresHoldNotReached { challenge_id: *item, required_threshold, challenge_state: challenge.state });
-									}	
-								}
-							}
-						}
-					}
-					
-				}
+				let _ = Self::finish_challenge(*item);
 			});
 			weight
 		}
@@ -701,6 +611,101 @@ pub mod pallet {
 				challenge.asset_id,
 			);
 			Self::deposit_event(Event::AgentChanged { challenge_id, asset_id: challenge.asset_id });
+			Ok(())
+		}
+
+		fn finish_proposal(proposal_id: ProposalIndex) -> DispatchResult {
+			let voting_results = <OngoingVotes<T>>::take(proposal_id);
+				let proposals = <Proposals<T>>::take(proposal_id);
+				if let Some(proposal) = proposals {
+					if let Some(voting_result) = voting_results {
+						let required_threshold =
+							if proposal.amount >= <T as Config>::HighProposal::get() {
+								<T as Config>::HighThreshold::get()
+							}  else {
+								<T as Config>::Threshold::get()
+							}; 
+						let asset_details = pallet_nft_marketplace::AssetIdDetails::<T>::get(proposal.asset_id);
+						if let Some(asset_details) = asset_details {
+							let yes_votes_percentage = Percent::from_rational(voting_result.yes_voting_power, asset_details.token_amount);
+							let no_votes_percentage = Percent::from_rational(voting_result.no_voting_power, asset_details.token_amount);
+	
+							if yes_votes_percentage > no_votes_percentage
+								&& required_threshold
+									< yes_votes_percentage.saturating_add(no_votes_percentage)
+							{
+								let _ = Self::execute_proposal(proposal);
+							}
+							else {
+								if yes_votes_percentage <= no_votes_percentage {
+									Self::deposit_event(Event::ProposalRejected { proposal_id });
+								} else {
+									Self::deposit_event(Event::ProposalThresHoldNotReached { proposal_id, required_threshold });
+								}								
+							}
+						}
+					}
+				}
+			Ok(())
+		}
+
+		fn finish_challenge(challenge_id: ChallengeIndex) -> DispatchResult {
+			let challenge = Challenges::<T>::get(challenge_id);
+			if let Some(mut challenge) = challenge {
+				if challenge.state == ChallengeState::Second {
+					challenge.state = ChallengeState::Third;
+					let vote_stats = VoteStats { yes_voting_power: 0, no_voting_power: 0 };
+					OngoingChallengeVotes::<T>::insert(challenge_id, challenge.state.clone(), vote_stats);
+					Challenges::<T>::insert(challenge_id, challenge.clone());
+					let current_block_number = <frame_system::Pallet<T>>::block_number();
+					let expiry_block =
+						current_block_number.saturating_add(<T as Config>::VotingTime::get());
+					let _ = ChallengeRoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
+						keys.try_push(challenge_id).map_err(|_| Error::<T>::TooManyProposals)?;
+						Ok::<(), DispatchError>(())
+					});
+				} 
+				else {
+					let voting_results = <OngoingChallengeVotes<T>>::take(challenge_id, challenge.state.clone());
+					if let Some(voting_result) = voting_results {
+						let asset_details = pallet_nft_marketplace::AssetIdDetails::<T>::get(challenge.asset_id);
+						if let Some(asset_details) = asset_details {
+							let yes_votes_percentage = Percent::from_rational(voting_result.yes_voting_power, asset_details.token_amount);
+							let no_votes_percentage = Percent::from_rational(voting_result.no_voting_power, asset_details.token_amount);
+							let required_threshold = <T as Config>::Threshold::get();
+							if yes_votes_percentage > no_votes_percentage
+								&& required_threshold
+									< yes_votes_percentage.saturating_add(no_votes_percentage)
+							{
+								if challenge.state == ChallengeState::First {
+									challenge.state = ChallengeState::Second;
+									Challenges::<T>::insert(challenge_id, challenge.clone());
+									let current_block_number = <frame_system::Pallet<T>>::block_number();
+									let expiry_block =
+										current_block_number.saturating_add(<T as Config>::VotingTime::get());
+									let _ = ChallengeRoundsExpiring::<T>::try_mutate(expiry_block, |keys| {
+										keys.try_push(challenge_id).map_err(|_| Error::<T>::TooManyProposals)?;
+										Ok::<(), DispatchError>(())
+									});
+								} 
+								if challenge.state == ChallengeState::Third {
+									let _ = Self::slash_letting_agent(challenge_id);
+								} 
+								if challenge.state == ChallengeState::Fourth {
+									let _ = Self::change_letting_agent(challenge_id);
+								} 
+							} else {
+								Challenges::<T>::take(challenge_id);
+								if yes_votes_percentage <= no_votes_percentage {
+									Self::deposit_event(Event::ChallengeRejected {challenge_id: challenge_id, challenge_state: challenge.state});
+								} else {
+									Self::deposit_event(Event::ChallengeThresHoldNotReached { challenge_id: challenge_id, required_threshold, challenge_state: challenge.state });
+								}	
+							}
+						}
+					}
+				}	
+			}
 			Ok(())
 		}
 

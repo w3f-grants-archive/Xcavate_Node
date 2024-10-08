@@ -137,7 +137,7 @@ fn let_letting_agent_deposit_fails() {
 		)));
 		assert_noop!(
 			PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([0; 32].into())),
-			Error::<Test>::LettingAgentInLocation
+			Error::<Test>::AlreadyDeposited
 		);
 		assert_noop!(
 			PropertyManagement::letting_agent_deposit(RuntimeOrigin::signed([1; 32].into())),
