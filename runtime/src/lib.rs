@@ -1644,6 +1644,24 @@ impl_runtime_apis! {
 			build_config::<RuntimeGenesisConfig>(config)
 		}
 	}
+	
+	impl pallet_nft_marketplace::NftMarketplaceApi<Block, AccountId> for Runtime {
+		fn get_marketplace_account_id() -> AccountId {
+			AccountIdConversion::<AccountId>::into_account_truncating(&NftMarketplacePalletId::get())
+		}
+	}
+
+	impl pallet_property_governance::PropertyGovernanceApi<Block, AccountId> for Runtime {
+		fn get_governance_account_id() -> AccountId {
+			AccountIdConversion::<AccountId>::into_account_truncating(&PropertyGovernancePalletId::get())
+		}
+	}
+
+	impl pallet_property_management::PropertyManagementApi<Block, AccountId> for Runtime {
+		fn get_management_account_id() -> AccountId {
+			AccountIdConversion::<AccountId>::into_account_truncating(&PropertyManagementPalletId::get())
+		}
+	}
 }
 
 #[cfg(test)]

@@ -33,6 +33,8 @@ use pallet_nfts::{
 
 use frame_system::RawOrigin;
 
+use codec::Codec;
+
 type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
 
 type AssetBalanceOf<T> = <T as pallet_assets::Config<pallet_assets::Instance1>>::Balance;
@@ -1015,6 +1017,7 @@ pub mod pallet {
 			ensure!(ListedToken::<T>::contains_key(listing_id), Error::<T>::TokenNotForSale);
 			let _ = OngoingObjectListing::<T>::try_mutate(listing_id, |maybe_nft_details| {
 				let nft_details = maybe_nft_details.as_mut().ok_or(Error::<T>::InvalidIndex)?;
+				ensure!(nft_details.real_estate_developer == signer.clone(), Error::<T>::NoPermission);
 				ensure!(
 					!RegisteredNftDetails::<T>::get(nft_details.collection_id, nft_details.item_id)
 						.ok_or(Error::<T>::InvalidIndex)?
@@ -1282,4 +1285,13 @@ pub mod pallet {
 			.map_err(|_| Error::<T>::NotEnoughFunds)?)
 		}
 	}
+}
+
+sp_api::decl_runtime_apis! {
+    pub trait NftMarketplaceApi<AccountId> 
+	where
+		AccountId: Codec
+	{
+        fn get_marketplace_account_id() -> AccountId;
+    }
 }

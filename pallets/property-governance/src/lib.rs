@@ -21,6 +21,8 @@ use frame_support::{
 
 use pallet_assets::Instance1;
 
+use codec::Codec;
+
 pub type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
 
 pub type NegativeImbalanceOf<T> = <<T as Config>::Currency as Currency<
@@ -784,4 +786,13 @@ pub mod pallet {
 			Ok(())
 		}
 	}
+}
+
+sp_api::decl_runtime_apis! {
+    pub trait PropertyGovernanceApi<AccountId> 
+	where
+		AccountId: Codec
+	{
+        fn get_governance_account_id() -> AccountId;
+    }
 }

@@ -23,6 +23,7 @@ frame-benchmarking = {  default-features = false, optional = true, git = "https:
 frame-support = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.6.0" }
 frame-system = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.6.0" }
 sp-std = { default-features = false,  git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.6.0" }
+sp-api = { default-features = false,  git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.6.0" }
 
 pallet-nfts = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.6.0" }
 pallet-balances = {  default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-v1.6.0" }
@@ -52,6 +53,7 @@ std = [
 	# "pallet-xcavate-whitelist/std",
 	"pallet-assets/std",
 	"pallet-nft-fractionalization/std",
+	"sp-api/std",
 ]
 runtime-benchmarks = ["frame-benchmarking/runtime-benchmarks"]
 try-runtime = ["frame-support/try-runtime"]
