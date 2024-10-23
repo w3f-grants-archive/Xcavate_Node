@@ -398,11 +398,22 @@ pub mod pallet {
 		#[pallet::call_index(3)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::set_letting_agent())]
 		pub fn set_letting_agent(origin: OriginFor<T>, asset_id: u32) -> DispatchResult {
-			let _signer = ensure_signed(origin)?;
-			let asset_details = pallet_nft_marketplace::AssetIdDetails::<T>::get(asset_id)
-				.ok_or(Error::<T>::NoObjectFound)?;
+			let signer = ensure_signed(origin)?;
+			ensure!(pallet_nft_marketplace::AssetIdDetails::<T>::get(asset_id).is_some(), Error::<T>::NoObjectFound);
 			ensure!(LettingStorage::<T>::get(asset_id).is_none(), Error::<T>::LettingAgentAlreadySet);
-			Self::selects_letting_agent(asset_details.region, asset_details.location, asset_id)?;
+			LettingInfo::<T>::try_mutate(signer.clone(), |maybe_letting_info|{
+				let letting_info = maybe_letting_info.as_mut().ok_or(Error::<T>::AgentNotFound)?;
+				LettingStorage::<T>::insert(asset_id, signer.clone());
+				letting_info
+					.assigned_properties
+					.try_push(asset_id)
+					.map_err(|_| Error::<T>::TooManyAssignedProperties)?;
+				Ok::<(), DispatchError>(())
+			})?;
+			Self::deposit_event(Event::<T>::LettingAgentSet {
+				asset_id,
+				who: signer,
+			});
 			Ok(())
 		}
 
@@ -578,56 +589,11 @@ pub mod pallet {
 			input.try_into().map_err(|_| Error::<T>::ConversionError)
 		}
 
-		/// Chooses the next free letting agent in a location.
-		pub fn selects_letting_agent(
-			region: u32,
-			location: LocationId<T>,
-			asset_id: u32,
-		) -> DispatchResult {
-			let letting_agents = LettingAgentLocations::<T>::get(region, location);
-			let letting_agent = letting_agents
-				.iter()
-				.min_by_key(|letting_agent| {
-					LettingInfo::<T>::get(letting_agent).unwrap().assigned_properties
-				})
-				.ok_or(Error::<T>::NoLettingAgentFound)?;
-			LettingStorage::<T>::insert(asset_id, letting_agent);
-			let mut letting_info =
-				LettingInfo::<T>::get(letting_agent).ok_or(Error::<T>::AgentNotFound)?;
-			letting_info
-				.assigned_properties
-				.try_push(asset_id)
-				.map_err(|_| Error::<T>::TooManyAssignedProperties)?;
-			LettingInfo::<T>::insert(letting_agent, letting_info);
-			Self::deposit_event(Event::<T>::LettingAgentSet {
-				asset_id,
-				who: letting_agent.clone(),
-			});
-			Ok(())
-		}
-
 		/// Removes bad letting agents.
 		pub fn remove_bad_letting_agent(
-			region: u32,
-			location: LocationId<T>,
-			agent: AccountIdOf<T>,
+			asset_id: u32,
 		) -> DispatchResult {
-			let mut letting_agents = LettingAgentLocations::<T>::get(region, location.clone());
-			let index = letting_agents
-				.iter()
-				.position(|x| *x == agent)
-				.ok_or(Error::<T>::AgentNotFound)?;
-			letting_agents.remove(index);
-			let mut letting_info =
-				LettingInfo::<T>::get(agent.clone()).ok_or(Error::<T>::NoLettingAgentFound)?;
-			let index = letting_info
-				.locations
-				.iter()
-				.position(|x| *x == location)
-				.ok_or(Error::<T>::AgentNotFound)?;
-			letting_info.locations.remove(index);	
-			LettingAgentLocations::<T>::insert(region, location, letting_agents);
-			LettingInfo::<T>::insert(agent, letting_info);
+			LettingStorage::<T>::take(asset_id);
 			Ok(())
 		}
 

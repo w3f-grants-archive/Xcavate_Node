@@ -410,6 +410,7 @@ fn buy_relisted_token_works() {
 			3
 		));
 		assert_ok!(NftMarketplace::buy_relisted_token(RuntimeOrigin::signed([3; 32].into()), 1, 2));
+		assert_eq!(Assets::balance(0, &[3; 32].into()), 2);
 		assert_eq!(TokenListings::<Test>::get(1).is_some(), true);
 		assert_ok!(NftMarketplace::buy_relisted_token(RuntimeOrigin::signed([3; 32].into()), 1, 1));
 		assert_eq!(TokenListings::<Test>::get(1).is_some(), false);

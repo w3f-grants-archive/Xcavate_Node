@@ -597,20 +597,8 @@ pub mod pallet {
 		/// Changes the letting agent of a given real estate object.
 		fn change_letting_agent(challenge_id: ChallengeIndex) -> DispatchResult {
 			let challenge = Challenges::<T>::take(challenge_id).ok_or(Error::<T>::NotOngoing)?;
-			let letting_agent =
-				pallet_property_management::LettingStorage::<T>::get(challenge.asset_id).ok_or(Error::<T>::NoLettingAgentFound)?;
-			let asset_details =
-				pallet_nft_marketplace::AssetIdDetails::<T>::get(challenge.asset_id)
-					.ok_or(Error::<T>::NoAssetFound)?;
 			let _ = pallet_property_management::Pallet::<T>::remove_bad_letting_agent(
-				asset_details.region,
-				asset_details.location.clone(),
-				letting_agent,
-			);
-			let _ = pallet_property_management::Pallet::<T>::selects_letting_agent(
-				asset_details.region,
-				asset_details.location,
-				challenge.asset_id,
+				challenge.asset_id
 			);
 			Self::deposit_event(Event::AgentChanged { challenge_id, asset_id: challenge.asset_id });
 			Ok(())

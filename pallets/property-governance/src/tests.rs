@@ -789,23 +789,25 @@ fn challenge_pass() {
 			1
 		);
 		run_to_block(121);
-		assert_eq!(LettingStorage::<Test>::get(0).unwrap(), [1; 32].into());
+		assert_eq!(LettingStorage::<Test>::get(0).is_none(), true);
 		assert_eq!(
 			LettingAgentLocations::<Test>::get::<u32, BoundedVec<u8, Postcode>>(
 				0,
 				bvec![10, 10]
 			)
 			.len(),
-			1
+			2
 		);
 		assert_eq!(
 			LettingInfo::<Test>::get::<AccountId>([0; 32].into())
 				.unwrap()
 				.locations
 				.len(),
-			0
+			1
 		);
 		assert_eq!(Challenges::<Test>::get(1).is_none(), true);
+		assert_ok!(PropertyManagement::set_letting_agent(RuntimeOrigin::signed([1; 32].into()), 0));
+		assert_eq!(LettingStorage::<Test>::get(0).unwrap(), [1; 32].into());
 	});
 }
 
@@ -984,14 +986,14 @@ fn challenge_pass_only_one_agent() {
 		));
 		assert_eq!(LettingStorage::<Test>::get(0).unwrap(), [0; 32].into());
 		run_to_block(121);
-		assert_eq!(LettingStorage::<Test>::get(0).unwrap(), [0; 32].into());
+		assert_eq!(LettingStorage::<Test>::get(0).is_none(), true);
 		assert_eq!(
 			LettingAgentLocations::<Test>::get::<u32, BoundedVec<u8, Postcode>>(
 				0,
 				bvec![10, 10]
 			)
 			.len(),
-			0
+			1
 		);
 		assert_eq!(Challenges::<Test>::get(1).is_none(), true);
 	});

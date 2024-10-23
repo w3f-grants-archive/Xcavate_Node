@@ -132,6 +132,14 @@ pub mod pallet {
 		pub amount: u32,
 	}
 
+	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
+	#[scale_info(skip_type_params(T))]
+	pub struct PropertyLawyerDetails<T: Config> {
+		pub real_estate_developer_lawyer: Option<AccountIdOf<T>>,
+		pub spv_lawyer: Option<AccountIdOf<T>>,
+	}
+
 	impl<Balance, T: Config> OfferDetails<Balance, T>
 	where
 		Balance: CheckedMul + TryFrom<u64>,
@@ -153,6 +161,13 @@ pub mod pallet {
 	pub enum Offer {
 		Accept,
 		Reject,
+	}
+
+	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
+	pub enum LegalProperty {
+		RealEstateDeveloperSite,
+		SpvSite,
 	}
 
 	/// AccountId storage.
@@ -413,6 +428,25 @@ pub mod pallet {
 		OptionQuery,
 	>;
 
+	/// Stores the lawyer info.
+	#[pallet::storage]
+	pub(super) type RealEstateLawyer<T: Config> = StorageMap<
+		_,
+		Blake2_128Concat,
+		AccountIdOf<T>,
+		bool,
+		ValueQuery,
+	>;
+
+	#[pallet::storage]
+	pub(super) type PropertyLawyer<T: Config> = StorageMap<
+		_, 
+		Blake2_128Concat,
+		ListingId,
+		PropertyLawyerDetails<T>,
+		OptionQuery,
+	>;
+
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
@@ -484,6 +518,10 @@ pub mod pallet {
 		TooManyToken,
 		/// A user can only make one offer per listing.
 		OnlyOneOfferPerUser,
+		/// The lawyer has already been registered.
+		LawyerAlreadyRegistered,
+		/// The lawyer job has already been taken.
+		LawyerJobTaken,
 	}
 
 	#[pallet::call]
@@ -1063,6 +1101,53 @@ pub mod pallet {
 			)
 			.map_err(|_| Error::<T>::NotEnoughFunds)?;
 			Self::deposit_event(Event::<T>::ListingDelisted { listing_index: listing_id });
+			Ok(())
+		}
+
+		#[pallet::call_index(12)]
+		#[pallet::weight(0)]
+		pub fn register_lawyer(
+			origin: OriginFor<T>,
+			lawyer: AccountIdOf<T>,
+		) -> DispatchResult {
+			T::LocationOrigin::ensure_origin(origin)?;
+			ensure!(!RealEstateLawyer::<T>::get(lawyer.clone()), Error::<T>::LawyerAlreadyRegistered);
+			RealEstateLawyer::<T>::insert(lawyer.clone(), true);
+			Ok(())
+		}
+
+		#[pallet::call_index(13)]
+		#[pallet::weight(0)]
+		pub fn lawyer_claim_property(
+			origin: OriginFor<T>,
+			listing_id: ListingId,
+			legal_site: LegalProperty,
+		) -> DispatchResult {
+			let signer = ensure_signed(origin)?;
+			ensure!(RealEstateLawyer::<T>::get(signer.clone()), Error::<T>::NoPermission);
+			let mut property_lawyer_details = PropertyLawyer::<T>::get(listing_id).ok_or(Error::<T>::InvalidIndex)?;
+			
+			match legal_site {
+				LegalProperty::RealEstateDeveloperSite => {
+					ensure!(property_lawyer_details.real_estate_developer_lawyer.is_none(), Error::<T>::LawyerJobTaken);
+					property_lawyer_details.real_estate_developer_lawyer = Some(signer.clone());
+				}
+				LegalProperty::SpvSite => {
+					ensure!(property_lawyer_details.spv_lawyer.is_none(), Error::<T>::LawyerJobTaken);
+					property_lawyer_details.spv_lawyer = Some(signer.clone());
+				}
+			}
+			Ok(())
+		}
+
+		#[pallet::call_index(14)]
+		#[pallet::weight(0)]
+		pub fn finish_property_details(
+			origin: OriginFor<T>,
+			confirm: bool,
+		) -> DispatchResult {
+			let signer = ensure_signed(origin)?;
+			ensure!(RealEstateLawyer::<T>::get(signer.clone()), Error::<T>::NoPermission);
 			Ok(())
 		}
 	}
