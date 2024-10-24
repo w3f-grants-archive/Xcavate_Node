@@ -138,6 +138,17 @@ pub mod pallet {
 	pub struct PropertyLawyerDetails<T: Config> {
 		pub real_estate_developer_lawyer: Option<AccountIdOf<T>>,
 		pub spv_lawyer: Option<AccountIdOf<T>>,
+		pub real_estate_developer_status: DocumentStatus,
+		pub spv_status: DocumentStatus,
+		pub second_attempt: bool,
+	}
+
+	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo, Default)]
+	#[scale_info(skip_type_params(T))]
+	pub struct TokenOwnerDetails<Balance> {
+		pub token_amount: u32,
+		pub paid_funds: Balance,
 	}
 
 	impl<Balance, T: Config> OfferDetails<Balance, T>
@@ -168,6 +179,14 @@ pub mod pallet {
 	pub enum LegalProperty {
 		RealEstateDeveloperSite,
 		SpvSite,
+	}
+
+	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
+	pub enum DocumentStatus {
+		Pending,
+		Approved,
+		Rejected,
 	}
 
 	/// AccountId storage.
@@ -243,7 +262,7 @@ pub mod pallet {
 		/// Item id type from pallet nft fractionalization.
 		type FractionalizeItemId: IsType<<Self as pallet_nft_fractionalization::Config>::NftId>
 			+ Parameter
-			+ From<u32>
+			+ From<ItemId<Self>>
 			+ Ord
 			+ Copy
 			+ MaxEncodedLen
@@ -375,7 +394,7 @@ pub mod pallet {
 		AccountIdOf<T>,
 		Blake2_128Concat,
 		ListingId,
-		u32,
+		TokenOwnerDetails<AssetBalanceOf<T>>,
 		ValueQuery,
 	>;
 
@@ -476,7 +495,9 @@ pub mod pallet {
 		/// A new offer has been made.
 		OfferCreated { listing_id: ListingId, price: AssetBalanceOf<T> },
 		/// An offer has been cancelled.
-		OfferCancelled { listing_id: ListingId, account_id: AccountIdOf<T>  },
+		OfferCancelled { listing_id: ListingId, account_id: AccountIdOf<T> },
+		/// Documents have been approved or rejected.
+		DocumentsConfirmed { signer: AccountIdOf<T>, listing_id: ListingId, approve: bool },
 	}
 
 	// Errors inform users that something went wrong.
@@ -684,7 +705,7 @@ pub mod pallet {
 			let user_lookup = <T::Lookup as StaticLookup>::unlookup(pallet_account);
 			let nft_balance: FrationalizedNftBalanceOf<T> = token_amount.into();
 			let fractionalize_collection_id = FractionalizeCollectionId::<T>::from(collection_id);
-			let fractionalize_item_id: FractionalizeItemId<T> = next_item_id.into();
+			let fractionalize_item_id = FractionalizeItemId::<T>::from(item_id);
 			pallet_nft_fractionalization::Pallet::<T>::fractionalize(
 				pallet_origin.clone(),
 				fractionalize_collection_id.into(),
@@ -749,7 +770,26 @@ pub mod pallet {
 					.token_price
 					.checked_mul(&Self::u64_to_balance_option(amount as u64)?)
 					.ok_or(Error::<T>::MultiplyError)?;
-				Self::transfer_funds(signer.clone(), Self::account_id(), transfer_price)?;
+
+				let fee = transfer_price
+					.checked_mul(&Self::u64_to_balance_option(1)?)
+					.ok_or(Error::<T>::MultiplyError)?
+					.checked_div(&Self::u64_to_balance_option(100)?) 
+					.ok_or(Error::<T>::DivisionError)?;
+				
+				let tax = transfer_price
+					.checked_mul(&Self::u64_to_balance_option(3)?)
+					.ok_or(Error::<T>::MultiplyError)?
+					.checked_div(&Self::u64_to_balance_option(100)?) 
+					.ok_or(Error::<T>::DivisionError)?;
+				
+				let total_transfer_price = transfer_price
+					.checked_add(&fee)
+					.ok_or(Error::<T>::ArithmeticOverflow)?
+					.checked_add(&tax)
+					.ok_or(Error::<T>::ArithmeticOverflow)?;
+
+				Self::transfer_funds(signer.clone(), Self::account_id(), total_transfer_price)?;
 				*listed_token =
 					listed_token.checked_sub(amount).ok_or(Error::<T>::ArithmeticUnderflow)?;
 				if !TokenBuyer::<T>::get(listing_id).contains(&signer) {
@@ -758,9 +798,18 @@ pub mod pallet {
 						Ok::<(), DispatchError>(())
 					})?;
 				}
-				TokenOwner::<T>::try_mutate_exists(signer.clone(), listing_id, |maybe_token_of_owner| {
-					let token_of_owner = maybe_token_of_owner.get_or_insert(0);
-					*token_of_owner = token_of_owner.checked_add(amount).ok_or(Error::<T>::ArithmeticOverflow)?;
+				TokenOwner::<T>::try_mutate_exists(signer.clone(), listing_id, |maybe_token_owner_details| {
+					let token_owner_details = maybe_token_owner_details.get_or_insert( TokenOwnerDetails {
+						token_amount: 0,
+						paid_funds: Default::default(),
+					});
+					token_owner_details.token_amount = token_owner_details.token_amount
+						.checked_add(amount)
+						.ok_or(Error::<T>::ArithmeticOverflow)?;
+					token_owner_details.paid_funds = token_owner_details.paid_funds
+						.checked_add(&transfer_price)
+						.ok_or(Error::<T>::ArithmeticOverflow)?;
+
 					Ok::<(), DispatchError>(())
 				})?;
 				nft_details.collected_funds = nft_details
@@ -769,7 +818,14 @@ pub mod pallet {
 					.ok_or(Error::<T>::ArithmeticOverflow)?;
 				OngoingObjectListing::<T>::insert(listing_id, nft_details.clone());
 				if *listed_token == 0 {
-					Self::distribute_nfts(listing_id)?;
+					let property_lawyer_details = PropertyLawyerDetails {
+						real_estate_developer_lawyer: None,
+						spv_lawyer: None,
+						real_estate_developer_status: DocumentStatus::Pending,
+						spv_status: DocumentStatus::Pending,
+						second_attempt: false,
+					};
+					PropertyLawyer::<T>::insert(listing_id, property_lawyer_details);
 					*maybe_listed_token = None;
 				} 
 				Self::deposit_event(Event::<T>::TokenBoughtObject {
@@ -1142,12 +1198,45 @@ pub mod pallet {
 
 		#[pallet::call_index(14)]
 		#[pallet::weight(0)]
-		pub fn finish_property_details(
+		pub fn lawyer_confirm_documents(
 			origin: OriginFor<T>,
-			confirm: bool,
+			listing_id: ListingId,
+			approve: bool,
 		) -> DispatchResult {
 			let signer = ensure_signed(origin)?;
-			ensure!(RealEstateLawyer::<T>::get(signer.clone()), Error::<T>::NoPermission);
+			//ensure!(RealEstateLawyer::<T>::get(signer.clone()), Error::<T>::NoPermission);
+
+			let mut property_lawyer_details = PropertyLawyer::<T>::get(listing_id).ok_or(Error::<T>::InvalidIndex)?;
+			if property_lawyer_details.real_estate_developer_lawyer == Some(signer.clone()) {
+				property_lawyer_details.real_estate_developer_status = if approve {
+					DocumentStatus::Approved
+				} else {
+					DocumentStatus::Rejected
+				};
+				Self::deposit_event(Event::<T>::DocumentsConfirmed { signer, listing_id, approve });
+			} else if property_lawyer_details.spv_lawyer == Some(signer.clone()) {
+				property_lawyer_details.spv_status = if approve {
+					DocumentStatus::Approved
+				} else {
+					DocumentStatus::Rejected
+				};
+				Self::deposit_event(Event::<T>::DocumentsConfirmed {signer, listing_id, approve});
+			} else {
+				return Err(Error::<T>::NoPermission.into());
+			}
+
+			let developer_status = property_lawyer_details.real_estate_developer_status;
+			let spv_status = property_lawyer_details.spv_status;
+
+			match (developer_status, spv_status) {
+				(DocumentStatus::Approved, DocumentStatus::Approved) => {
+					Self::execute_deal(listing_id)?
+				}
+				(DocumentStatus::Rejected, DocumentStatus::Rejected) => {
+					Self::burn_tokens_and_nfts(listing_id)?;
+				}
+				_ => {}
+			}
 			Ok(())
 		}
 	}
@@ -1174,7 +1263,7 @@ pub mod pallet {
 
 		/// Sends the token to the new owners and the funds to the real estate developer once all 100 token
 		/// of a collection are sold.
-		fn distribute_nfts(listing_id: u32) -> DispatchResult {
+		fn execute_deal(listing_id: u32) -> DispatchResult {
 			let list = <TokenBuyer<T>>::take(listing_id);
 			let pallet_account = Self::account_id();
 			let nft_details =
@@ -1185,8 +1274,9 @@ pub mod pallet {
 			let asset_id: AssetId<T> = nft_details.asset_id.into();
 			for owner in list {
 				let user_lookup = <T::Lookup as StaticLookup>::unlookup(owner.clone());
-				let token: u64 = TokenOwner::<T>::take(owner.clone(), listing_id) as u64;
-				let token_amount = token.try_into().map_err(|_| Error::<T>::ConversionError)?;
+				let token_details: TokenOwnerDetails<AssetBalanceOf<T>> = TokenOwner::<T>::take(owner.clone(), listing_id);
+				//let token: u64 = TokenOwner::<T>::take(owner.clone(), listing_id) as u64;
+				let token_amount = token_details.token_amount.try_into().map_err(|_| Error::<T>::ConversionError)?;
 				pallet_assets::Pallet::<T, Instance1>::transfer(
 					origin.clone(),
 					asset_id.into().into(),
@@ -1198,7 +1288,7 @@ pub mod pallet {
 					keys.try_push(owner.clone()).map_err(|_| Error::<T>::TooManyTokenBuyer)?;
 					Ok::<(), DispatchError>(())
 				})?;
-				PropertyOwnerToken::<T>::insert(nft_details.asset_id, owner, token as u32)
+				PropertyOwnerToken::<T>::insert(nft_details.asset_id, owner, token_details.token_amount as u32)
 			}
 			let mut registered_nft_details =
 				RegisteredNftDetails::<T>::get(nft_details.collection_id, nft_details.item_id)
@@ -1209,6 +1299,25 @@ pub mod pallet {
 				nft_details.item_id,
 				registered_nft_details,
 			);
+			Ok(())
+		}
+
+		pub fn burn_tokens_and_nfts(listing_id: ListingId) -> DispatchResult {
+			let nft_details =
+				OngoingObjectListing::<T>::take(listing_id).ok_or(Error::<T>::InvalidIndex)?;
+			let pallet_account = Self::account_id();
+			let pallet_origin: OriginFor<T> = RawOrigin::Signed(pallet_account.clone()).into();
+			let user_lookup = <T::Lookup as StaticLookup>::unlookup(pallet_account);
+			let fractionalize_collection_id = FractionalizeCollectionId::<T>::from(nft_details.collection_id);
+			let fractionalize_item_id = FractionalizeItemId::<T>::from(nft_details.item_id);
+			let fractionalize_asset_id = FractionalizedAssetId::<T>::from(nft_details.asset_id);
+			pallet_nft_fractionalization::Pallet::<T>::unify(
+				pallet_origin.clone(),
+				fractionalize_collection_id.into(),
+				fractionalize_item_id.into(),
+				fractionalize_asset_id.into(),
+				user_lookup,
+			)?;
 			Ok(())
 		}
 
