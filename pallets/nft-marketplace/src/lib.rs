@@ -90,6 +90,8 @@ pub mod pallet {
 		pub real_estate_developer: AccountIdOf<T>,
 		pub token_price: Balance,
 		pub collected_funds: Balance,
+		pub collected_tax: Balance,
+		pub collected_fees: Balance,
 		pub asset_id: u32,
 		pub item_id: ItemId,
 		pub collection_id: CollectionId,
@@ -140,6 +142,8 @@ pub mod pallet {
 		pub spv_lawyer: Option<AccountIdOf<T>>,
 		pub real_estate_developer_status: DocumentStatus,
 		pub spv_status: DocumentStatus,
+		pub real_estate_developer_lawyer_costs: AssetBalanceOf<T>,
+		pub spv_costs: AssetBalanceOf<T>,
 		pub second_attempt: bool,
 	}
 
@@ -458,7 +462,7 @@ pub mod pallet {
 	>;
 
 	#[pallet::storage]
-	pub(super) type PropertyLawyer<T: Config> = StorageMap<
+	pub type PropertyLawyer<T: Config> = StorageMap<
 		_, 
 		Blake2_128Concat,
 		ListingId,
@@ -498,6 +502,8 @@ pub mod pallet {
 		OfferCancelled { listing_id: ListingId, account_id: AccountIdOf<T> },
 		/// Documents have been approved or rejected.
 		DocumentsConfirmed { signer: AccountIdOf<T>, listing_id: ListingId, approve: bool },
+		/// The property nft got burned.
+		PropertyNftBurned { collection_id: CollectionId<T>, item_id: ItemId<T>, asset_id: u32 },
 	}
 
 	// Errors inform users that something went wrong.
@@ -671,6 +677,8 @@ pub mod pallet {
 				real_estate_developer: signer.clone(),
 				token_price,
 				collected_funds: Default::default(),
+				collected_tax: Default::default(),
+				collected_fees: Default::default(),
 				asset_id: asset_number,
 				item_id,
 				collection_id,
@@ -816,6 +824,14 @@ pub mod pallet {
 					.collected_funds
 					.checked_add(&transfer_price)
 					.ok_or(Error::<T>::ArithmeticOverflow)?;
+				nft_details.collected_tax = nft_details
+					.collected_tax
+					.checked_add(&tax)
+					.ok_or(Error::<T>::ArithmeticOverflow)?;
+				nft_details.collected_fees = nft_details
+					.collected_fees
+					.checked_add(&fee)
+					.ok_or(Error::<T>::ArithmeticOverflow)?;
 				OngoingObjectListing::<T>::insert(listing_id, nft_details.clone());
 				if *listed_token == 0 {
 					let property_lawyer_details = PropertyLawyerDetails {
@@ -823,6 +839,8 @@ pub mod pallet {
 						spv_lawyer: None,
 						real_estate_developer_status: DocumentStatus::Pending,
 						spv_status: DocumentStatus::Pending,
+						real_estate_developer_lawyer_costs: Default::default(),
+						spv_costs: Default::default(),
 						second_attempt: false,
 					};
 					PropertyLawyer::<T>::insert(listing_id, property_lawyer_details);
@@ -1178,6 +1196,7 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			listing_id: ListingId,
 			legal_site: LegalProperty,
+			costs: AssetBalanceOf<T>,
 		) -> DispatchResult {
 			let signer = ensure_signed(origin)?;
 			ensure!(RealEstateLawyer::<T>::get(signer.clone()), Error::<T>::NoPermission);
@@ -1186,11 +1205,15 @@ pub mod pallet {
 			match legal_site {
 				LegalProperty::RealEstateDeveloperSite => {
 					ensure!(property_lawyer_details.real_estate_developer_lawyer.is_none(), Error::<T>::LawyerJobTaken);
+					ensure!(property_lawyer_details.spv_lawyer != Some(signer.clone()), Error::<T>::NoPermission);
 					property_lawyer_details.real_estate_developer_lawyer = Some(signer.clone());
+					PropertyLawyer::<T>::insert(listing_id, property_lawyer_details);
 				}
 				LegalProperty::SpvSite => {
 					ensure!(property_lawyer_details.spv_lawyer.is_none(), Error::<T>::LawyerJobTaken);
+					ensure!(property_lawyer_details.real_estate_developer_lawyer != Some(signer.clone()), Error::<T>::NoPermission);
 					property_lawyer_details.spv_lawyer = Some(signer.clone());
+					PropertyLawyer::<T>::insert(listing_id, property_lawyer_details);
 				}
 			}
 			Ok(())
@@ -1206,7 +1229,7 @@ pub mod pallet {
 			let signer = ensure_signed(origin)?;
 			//ensure!(RealEstateLawyer::<T>::get(signer.clone()), Error::<T>::NoPermission);
 
-			let mut property_lawyer_details = PropertyLawyer::<T>::get(listing_id).ok_or(Error::<T>::InvalidIndex)?;
+			let mut property_lawyer_details = PropertyLawyer::<T>::take(listing_id).ok_or(Error::<T>::InvalidIndex)?;
 			if property_lawyer_details.real_estate_developer_lawyer == Some(signer.clone()) {
 				property_lawyer_details.real_estate_developer_status = if approve {
 					DocumentStatus::Approved
@@ -1225,8 +1248,8 @@ pub mod pallet {
 				return Err(Error::<T>::NoPermission.into());
 			}
 
-			let developer_status = property_lawyer_details.real_estate_developer_status;
-			let spv_status = property_lawyer_details.spv_status;
+			let developer_status = property_lawyer_details.real_estate_developer_status.clone();
+			let spv_status = property_lawyer_details.spv_status.clone();
 
 			match (developer_status, spv_status) {
 				(DocumentStatus::Approved, DocumentStatus::Approved) => {
@@ -1234,8 +1257,11 @@ pub mod pallet {
 				}
 				(DocumentStatus::Rejected, DocumentStatus::Rejected) => {
 					Self::burn_tokens_and_nfts(listing_id)?;
+					Self::refund_investors(listing_id)?;
 				}
-				_ => {}
+				_ => {
+					PropertyLawyer::<T>::insert(listing_id, property_lawyer_details);
+				}
 			}
 			Ok(())
 		}
@@ -1302,7 +1328,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		pub fn burn_tokens_and_nfts(listing_id: ListingId) -> DispatchResult {
+		fn burn_tokens_and_nfts(listing_id: ListingId) -> DispatchResult {
 			let nft_details =
 				OngoingObjectListing::<T>::take(listing_id).ok_or(Error::<T>::InvalidIndex)?;
 			let pallet_account = Self::account_id();
@@ -1318,6 +1344,34 @@ pub mod pallet {
 				fractionalize_asset_id.into(),
 				user_lookup,
 			)?;
+			pallet_nfts::Pallet::<T>::burn(
+				pallet_origin,
+				nft_details.collection_id.into(),
+				nft_details.item_id.into(),
+			)?;
+			Self::deposit_event(Event::<T>::PropertyNftBurned { 
+				collection_id: nft_details.collection_id, 
+				item_id: nft_details.item_id,
+				asset_id: nft_details.asset_id, 
+			});
+			RegisteredNftDetails::<T>::take(nft_details.collection_id, nft_details.item_id)
+				.ok_or(Error::<T>::InvalidIndex)?;
+			Ok(())
+		}
+
+		fn refund_investors(listing_id: ListingId) -> DispatchResult {
+			let list = <TokenBuyer<T>>::take(listing_id);
+			let pallet_account = Self::account_id();
+			let nft_details =
+				OngoingObjectListing::<T>::take(listing_id).ok_or(Error::<T>::InvalidIndex)?;
+			for owner in list {
+				let token_details: TokenOwnerDetails<AssetBalanceOf<T>> = TokenOwner::<T>::take(owner.clone(), listing_id);
+				//let token: u64 = TokenOwner::<T>::take(owner.clone(), listing_id) as u64;
+				let refund_amount = token_details.paid_funds.try_into().map_err(|_| Error::<T>::ConversionError)?;
+				Self::transfer_funds(pallet_account.clone(), owner.clone(), refund_amount)?;
+				PropertyOwner::<T>::take(nft_details.asset_id);
+				PropertyOwnerToken::<T>::take(nft_details.asset_id, owner);
+			}
 			Ok(())
 		}
 
@@ -1404,22 +1458,31 @@ pub mod pallet {
 				.checked_div(&Self::u64_to_balance_option(100)?)
 				.ok_or(Error::<T>::DivisionError)?;
 			let treasury_id = Self::treasury_account_id();
-			let treasury_fees = fees
-				.checked_mul(&Self::u64_to_balance_option(90)?)
-				.ok_or(Error::<T>::MultiplyError)?
-				.checked_div(&Self::u64_to_balance_option(100)?)
-				.ok_or(Error::<T>::DivisionError)?;
-			let community_projects_id = Self::community_account_id();
-			let community_fees = fees
-				.checked_div(&Self::u64_to_balance_option(10)?)
-				.ok_or(Error::<T>::DivisionError)?;
 			let seller_part = price
 				.checked_mul(&Self::u64_to_balance_option(99)?)
 				.ok_or(Error::<T>::MultiplyError)?
 				.checked_div(&Self::u64_to_balance_option(100)?)
 				.ok_or(Error::<T>::DivisionError)?;
-			Self::transfer_funds(sender.clone(), treasury_id, treasury_fees)?;
-			Self::transfer_funds(sender.clone(), community_projects_id, community_fees)?;
+			Self::transfer_funds(sender.clone(), treasury_id, fees)?;
+			Self::transfer_funds(sender, receiver, seller_part)?;
+			Ok(())
+		}
+
+		fn calculate_property_fees(
+			price: AssetBalanceOf<T>,
+			sender: AccountIdOf<T>,
+			receiver: AccountIdOf<T>,
+		) -> DispatchResult {
+			let fees = price
+				.checked_div(&Self::u64_to_balance_option(100)?)
+				.ok_or(Error::<T>::DivisionError)?;
+			let treasury_id = Self::treasury_account_id();
+			let seller_part = price
+				.checked_mul(&Self::u64_to_balance_option(99)?)
+				.ok_or(Error::<T>::MultiplyError)?
+				.checked_div(&Self::u64_to_balance_option(100)?)
+				.ok_or(Error::<T>::DivisionError)?;
+			Self::transfer_funds(sender.clone(), treasury_id, fees)?;
 			Self::transfer_funds(sender, receiver, seller_part)?;
 			Ok(())
 		}
