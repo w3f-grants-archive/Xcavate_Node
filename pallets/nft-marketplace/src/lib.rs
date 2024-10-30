@@ -22,7 +22,7 @@ use frame_support::{
 };
 
 use frame_support::sp_runtime::traits::{
-	AccountIdConversion, CheckedAdd, CheckedDiv, CheckedMul, StaticLookup,
+	AccountIdConversion, CheckedAdd, CheckedSub, CheckedDiv, CheckedMul, StaticLookup,
 };
 
 use enumflags2::BitFlags;
@@ -143,7 +143,7 @@ pub mod pallet {
 		pub real_estate_developer_status: DocumentStatus,
 		pub spv_status: DocumentStatus,
 		pub real_estate_developer_lawyer_costs: AssetBalanceOf<T>,
-		pub spv_costs: AssetBalanceOf<T>,
+		pub spv_lawyer_costs: AssetBalanceOf<T>,
 		pub second_attempt: bool,
 	}
 
@@ -153,6 +153,7 @@ pub mod pallet {
 	pub struct TokenOwnerDetails<Balance> {
 		pub token_amount: u32,
 		pub paid_funds: Balance,
+		pub paid_tax: Balance,
 	}
 
 	impl<Balance, T: Config> OfferDetails<Balance, T>
@@ -549,6 +550,8 @@ pub mod pallet {
 		LawyerAlreadyRegistered,
 		/// The lawyer job has already been taken.
 		LawyerJobTaken,
+		/// A lawyer has not been set.
+		LawyerNotFound,
 	}
 
 	#[pallet::call]
@@ -810,12 +813,16 @@ pub mod pallet {
 					let token_owner_details = maybe_token_owner_details.get_or_insert( TokenOwnerDetails {
 						token_amount: 0,
 						paid_funds: Default::default(),
+						paid_tax: Default::default(),
 					});
 					token_owner_details.token_amount = token_owner_details.token_amount
 						.checked_add(amount)
 						.ok_or(Error::<T>::ArithmeticOverflow)?;
 					token_owner_details.paid_funds = token_owner_details.paid_funds
 						.checked_add(&transfer_price)
+						.ok_or(Error::<T>::ArithmeticOverflow)?;
+					token_owner_details.paid_tax = token_owner_details.paid_tax
+						.checked_add(&tax)
 						.ok_or(Error::<T>::ArithmeticOverflow)?;
 
 					Ok::<(), DispatchError>(())
@@ -840,7 +847,7 @@ pub mod pallet {
 						real_estate_developer_status: DocumentStatus::Pending,
 						spv_status: DocumentStatus::Pending,
 						real_estate_developer_lawyer_costs: Default::default(),
-						spv_costs: Default::default(),
+						spv_lawyer_costs: Default::default(),
 						second_attempt: false,
 					};
 					PropertyLawyer::<T>::insert(listing_id, property_lawyer_details);
@@ -1207,12 +1214,14 @@ pub mod pallet {
 					ensure!(property_lawyer_details.real_estate_developer_lawyer.is_none(), Error::<T>::LawyerJobTaken);
 					ensure!(property_lawyer_details.spv_lawyer != Some(signer.clone()), Error::<T>::NoPermission);
 					property_lawyer_details.real_estate_developer_lawyer = Some(signer.clone());
+					property_lawyer_details.real_estate_developer_lawyer_costs = costs;
 					PropertyLawyer::<T>::insert(listing_id, property_lawyer_details);
 				}
 				LegalProperty::SpvSite => {
 					ensure!(property_lawyer_details.spv_lawyer.is_none(), Error::<T>::LawyerJobTaken);
 					ensure!(property_lawyer_details.real_estate_developer_lawyer != Some(signer.clone()), Error::<T>::NoPermission);
 					property_lawyer_details.spv_lawyer = Some(signer.clone());
+					property_lawyer_details.spv_lawyer_costs = costs;
 					PropertyLawyer::<T>::insert(listing_id, property_lawyer_details);
 				}
 			}
@@ -1227,7 +1236,6 @@ pub mod pallet {
 			approve: bool,
 		) -> DispatchResult {
 			let signer = ensure_signed(origin)?;
-			//ensure!(RealEstateLawyer::<T>::get(signer.clone()), Error::<T>::NoPermission);
 
 			let mut property_lawyer_details = PropertyLawyer::<T>::take(listing_id).ok_or(Error::<T>::InvalidIndex)?;
 			if property_lawyer_details.real_estate_developer_lawyer == Some(signer.clone()) {
@@ -1253,11 +1261,36 @@ pub mod pallet {
 
 			match (developer_status, spv_status) {
 				(DocumentStatus::Approved, DocumentStatus::Approved) => {
-					Self::execute_deal(listing_id)?
+					Self::execute_deal(
+						listing_id, 
+						property_lawyer_details
+					)?;
 				}
 				(DocumentStatus::Rejected, DocumentStatus::Rejected) => {
 					Self::burn_tokens_and_nfts(listing_id)?;
-					Self::refund_investors(listing_id)?;
+					Self::refund_investors(listing_id, property_lawyer_details)?;
+				}
+				(DocumentStatus::Approved, DocumentStatus::Rejected) => {
+					if !property_lawyer_details.second_attempt {
+						property_lawyer_details.spv_status = DocumentStatus::Pending;
+						property_lawyer_details.real_estate_developer_status = DocumentStatus::Pending;
+						property_lawyer_details.second_attempt = true;
+						PropertyLawyer::<T>::insert(listing_id, property_lawyer_details);
+					} else {
+						Self::burn_tokens_and_nfts(listing_id)?;
+						Self::refund_investors(listing_id, property_lawyer_details)?;
+					}
+				}
+				(DocumentStatus::Rejected, DocumentStatus::Approved) => {
+					if !property_lawyer_details.second_attempt {
+						property_lawyer_details.spv_status = DocumentStatus::Pending;
+						property_lawyer_details.real_estate_developer_status = DocumentStatus::Pending;
+						property_lawyer_details.second_attempt = true;
+						PropertyLawyer::<T>::insert(listing_id, property_lawyer_details);
+					} else {
+						Self::burn_tokens_and_nfts(listing_id)?;
+						Self::refund_investors(listing_id, property_lawyer_details)?;
+					}
 				}
 				_ => {
 					PropertyLawyer::<T>::insert(listing_id, property_lawyer_details);
@@ -1289,13 +1322,45 @@ pub mod pallet {
 
 		/// Sends the token to the new owners and the funds to the real estate developer once all 100 token
 		/// of a collection are sold.
-		fn execute_deal(listing_id: u32) -> DispatchResult {
+		fn execute_deal(listing_id: u32, property_lawyer_details: PropertyLawyerDetails<T>) -> DispatchResult {
 			let list = <TokenBuyer<T>>::take(listing_id);
 			let pallet_account = Self::account_id();
 			let nft_details =
 				OngoingObjectListing::<T>::take(listing_id).ok_or(Error::<T>::InvalidIndex)?;
 			let price = nft_details.collected_funds;
-			Self::calculate_fees(price, pallet_account.clone(), nft_details.real_estate_developer)?;
+			let treasury_id = Self::treasury_account_id();
+			let seller_part = price
+				.checked_mul(&Self::u64_to_balance_option(99)?)
+				.ok_or(Error::<T>::MultiplyError)?
+				.checked_div(&Self::u64_to_balance_option(100)?)
+				.ok_or(Error::<T>::DivisionError)?;
+			let tax = nft_details.collected_tax;
+			let treasury_fees = price
+				.checked_div(&Self::u64_to_balance_option(100)?)
+				.ok_or(Error::<T>::DivisionError)?
+				.checked_add(&nft_details.collected_fees)
+				.ok_or(Error::<T>::ArithmeticOverflow)?
+				.checked_sub(&property_lawyer_details.real_estate_developer_lawyer_costs)
+				.ok_or(Error::<T>::ArithmeticUnderflow)?
+				.checked_sub(&property_lawyer_details.spv_lawyer_costs)
+				.ok_or(Error::<T>::ArithmeticUnderflow)?;
+			//Self::transfer_funds(sender.clone(), treasury_id, fees)?;
+			let real_estate_developer_lawyer_id = match property_lawyer_details.real_estate_developer_lawyer {
+				Some(account_id) => account_id,
+				None => return Err(Error::<T>::LawyerNotFound.into()),
+			};
+			let spv_lawyer_id = match property_lawyer_details.spv_lawyer {
+				Some(account_id) => account_id,
+				None => return Err(Error::<T>::LawyerNotFound.into()),
+			};
+			let real_estate_developer_part = tax
+				.checked_add(&property_lawyer_details.real_estate_developer_lawyer_costs)
+				.ok_or(Error::<T>::ArithmeticOverflow)?;
+
+			Self::transfer_funds(pallet_account.clone(), real_estate_developer_lawyer_id, real_estate_developer_part)?;
+			Self::transfer_funds(pallet_account.clone(), spv_lawyer_id, property_lawyer_details.spv_lawyer_costs)?;
+			Self::transfer_funds(pallet_account.clone(), treasury_id, treasury_fees)?;
+			Self::transfer_funds(pallet_account.clone(), nft_details.real_estate_developer, seller_part)?;
 			let origin: OriginFor<T> = RawOrigin::Signed(pallet_account).into();
 			let asset_id: AssetId<T> = nft_details.asset_id.into();
 			for owner in list {
@@ -1330,7 +1395,7 @@ pub mod pallet {
 
 		fn burn_tokens_and_nfts(listing_id: ListingId) -> DispatchResult {
 			let nft_details =
-				OngoingObjectListing::<T>::take(listing_id).ok_or(Error::<T>::InvalidIndex)?;
+				OngoingObjectListing::<T>::get(listing_id).ok_or(Error::<T>::InvalidIndex)?;
 			let pallet_account = Self::account_id();
 			let pallet_origin: OriginFor<T> = RawOrigin::Signed(pallet_account.clone()).into();
 			let user_lookup = <T::Lookup as StaticLookup>::unlookup(pallet_account);
@@ -1359,15 +1424,27 @@ pub mod pallet {
 			Ok(())
 		}
 
-		fn refund_investors(listing_id: ListingId) -> DispatchResult {
+		fn refund_investors(listing_id: ListingId, property_lawyer_details: PropertyLawyerDetails<T>) -> DispatchResult {
 			let list = <TokenBuyer<T>>::take(listing_id);
 			let pallet_account = Self::account_id();
 			let nft_details =
 				OngoingObjectListing::<T>::take(listing_id).ok_or(Error::<T>::InvalidIndex)?;
+			let fees = nft_details.collected_fees;
+			let treasury_id = Self::treasury_account_id();
+			let treasury_amount = fees
+				.checked_sub(&property_lawyer_details.spv_lawyer_costs)
+				.ok_or(Error::<T>::ArithmeticUnderflow)?;
+			Self::transfer_funds(pallet_account.clone(), treasury_id, treasury_amount)?;
+			let spv_lawyer_id = match property_lawyer_details.spv_lawyer {
+				Some(account_id) => account_id,
+				None => return Err(Error::<T>::LawyerNotFound.into()),
+			};
+			Self::transfer_funds(pallet_account.clone(), spv_lawyer_id, property_lawyer_details.spv_lawyer_costs);
 			for owner in list {
 				let token_details: TokenOwnerDetails<AssetBalanceOf<T>> = TokenOwner::<T>::take(owner.clone(), listing_id);
-				//let token: u64 = TokenOwner::<T>::take(owner.clone(), listing_id) as u64;
-				let refund_amount = token_details.paid_funds.try_into().map_err(|_| Error::<T>::ConversionError)?;
+				let refund_amount = token_details.paid_funds
+					.checked_add(&token_details.paid_tax)
+					.ok_or(Error::<T>::ArithmeticOverflow)?;
 				Self::transfer_funds(pallet_account.clone(), owner.clone(), refund_amount)?;
 				PropertyOwner::<T>::take(nft_details.asset_id);
 				PropertyOwnerToken::<T>::take(nft_details.asset_id, owner);

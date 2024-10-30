@@ -4,7 +4,8 @@ use frame_support::BoundedVec;
 use frame_support::{assert_noop, assert_ok};
 use crate::{RegionCollections, LocationRegistration, ListedToken, NextNftId,
 	OngoingObjectListing, NextAssetId, RegisteredNftDetails, TokenOwner, TokenBuyer,
-	TokenListings, OngoingOffers, PropertyOwnerToken, PropertyOwner, PropertyLawyer};
+	TokenListings, OngoingOffers, PropertyOwnerToken, PropertyOwner, PropertyLawyer,
+	RealEstateLawyer};
 
 macro_rules! bvec {
 	($( $x:tt )*) => {
@@ -71,6 +72,26 @@ fn create_new_location_fails() {
 			NftMarketplace::create_new_location(RuntimeOrigin::root(), 1, bvec![10, 10]),
 			Error::<Test>::RegionUnknown
 		);
+	})
+}
+
+// register_lawyer function
+#[test]
+fn register_lawyer_works() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_eq!(RealEstateLawyer::<Test>::get::<AccountId>([0; 32].into()), false);
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [0; 32].into()));
+		assert_eq!(RealEstateLawyer::<Test>::get::<AccountId>([0; 32].into()), true);
+	})
+}
+
+#[test]
+fn register_lawyer_fails() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [0; 32].into()));
+		assert_noop!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [0; 32].into()), Error::<Test>::LawyerAlreadyRegistered);
 	})
 }
 
@@ -169,61 +190,8 @@ fn buy_token_works() {
 	})
 }
 
-#[test]
-fn distributes_nfts_and_funds() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		assert_ok!(NftMarketplace::create_new_region(RuntimeOrigin::root()));
-		assert_ok!(NftMarketplace::create_new_location(RuntimeOrigin::root(), 0, bvec![10, 10]));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
-		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
-		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [10; 32].into()));
-		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [11; 32].into()));
-		assert_ok!(NftMarketplace::list_object(
-			RuntimeOrigin::signed([0; 32].into()),
-			0,
-			bvec![10, 10],
-			10_000,
-			100,
-			bvec![22, 22]
-		));
-		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
-		assert_ok!(NftMarketplace::lawyer_claim_property(
-			RuntimeOrigin::signed([10; 32].into()),
-			0,
-			crate::LegalProperty::RealEstateDeveloperSite,
-		));
-		assert_eq!(PropertyLawyer::<Test>::get(0).unwrap().real_estate_developer_lawyer, Some([10; 32].into()));
-		assert_ok!(NftMarketplace::lawyer_claim_property(
-			RuntimeOrigin::signed([11; 32].into()),
-			0,
-			crate::LegalProperty::SpvSite,
-		));
-		assert_eq!(PropertyLawyer::<Test>::get(0).unwrap().spv_lawyer, Some([11; 32].into()));
-		assert_ok!(NftMarketplace::lawyer_confirm_documents(
-			RuntimeOrigin::signed([10; 32].into()),
-			0,
-			true,
-		));
-		assert_eq!(PropertyLawyer::<Test>::get(0).unwrap().real_estate_developer_status, crate::DocumentStatus::Approved);
-		assert_ok!(NftMarketplace::lawyer_confirm_documents(
-			RuntimeOrigin::signed([11; 32].into()),
-			0,
-			true,
-		));
-		//assert_eq!(PropertyLawyer::<Test>::get(0).unwrap().spv_status, crate::DocumentStatus::Approved);
-		assert_eq!(Assets::balance(1, &[0; 32].into()), 20_990_000);
-		assert_eq!(Assets::balance(1, &NftMarketplace::treasury_account_id()), 9000);
-		assert_eq!(Assets::balance(1, &NftMarketplace::community_account_id()), 1000);
-		assert_eq!(Assets::balance(1, &[1; 32].into()), 460_000);
-		assert_eq!(RegisteredNftDetails::<Test>::get(0, 0).unwrap().spv_created, true);
-		assert_eq!(ListedToken::<Test>::get(0), None);
-		assert_eq!(TokenOwner::<Test>::get::<AccountId, ItemId<Test>>([1; 32].into(), 0).token_amount, 0);
-		assert_eq!(TokenBuyer::<Test>::get(0).len(), 0);
-		assert_eq!(Assets::balance(0, &[1; 32].into()), 100);
-	})
-}
-/* 
+
+
 #[test]
 fn buy_token_doesnt_work() {
 	new_test_ext().execute_with(|| {
@@ -268,6 +236,8 @@ fn listing_and_selling_multiple_objects() {
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [10; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [11; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([3; 32].into()),
 			0,
@@ -293,7 +263,31 @@ fn listing_and_selling_multiple_objects() {
 			bvec![22, 22]
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 1, 80));
+		assert_eq!(PropertyLawyer::<Test>::get(1).is_some(), false);
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 1, 20));
+		assert_eq!(PropertyLawyer::<Test>::get(1).is_some(), true);
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([10; 32].into()),
+			1,
+			crate::LegalProperty::RealEstateDeveloperSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([11; 32].into()),
+			1,
+			crate::LegalProperty::SpvSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([10; 32].into()),
+			1,
+			true,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([11; 32].into()),
+			1,
+			true,
+		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 2, 10));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 2, 10));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([2; 32].into()), 2, 30));
@@ -317,15 +311,17 @@ fn listing_and_selling_multiple_objects() {
 	});
 }
 
-// list_token function
+// lawyer_claim_property function
 #[test]
-fn relist_a_nft() {
+fn claim_property_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(NftMarketplace::create_new_region(RuntimeOrigin::root()));
 		assert_ok!(NftMarketplace::create_new_location(RuntimeOrigin::root(), 0, bvec![10, 10]));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [10; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [11; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			0,
@@ -335,6 +331,348 @@ fn relist_a_nft() {
 			bvec![22, 22]
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			crate::LegalProperty::RealEstateDeveloperSite,
+			4_000,
+		));
+		assert_eq!(PropertyLawyer::<Test>::get(0).unwrap().real_estate_developer_lawyer, Some([10; 32].into()));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			crate::LegalProperty::SpvSite,
+			4_000,
+		));
+		assert_eq!(PropertyLawyer::<Test>::get(0).unwrap().spv_lawyer, Some([11; 32].into()));
+	})
+}
+
+#[test]
+fn claim_property_fails() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(NftMarketplace::create_new_region(RuntimeOrigin::root()));
+		assert_ok!(NftMarketplace::create_new_location(RuntimeOrigin::root(), 0, bvec![10, 10]));
+		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [10; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [11; 32].into()));
+		assert_ok!(NftMarketplace::list_object(
+			RuntimeOrigin::signed([0; 32].into()),
+			0,
+			bvec![10, 10],
+			10_000,
+			100,
+			bvec![22, 22]
+		));
+		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 99));
+		assert_noop!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			crate::LegalProperty::RealEstateDeveloperSite,
+			4_000,
+		), Error::<Test>::InvalidIndex);
+		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 1));
+		assert_noop!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([9; 32].into()),
+			0,
+			crate::LegalProperty::RealEstateDeveloperSite,
+			4_000,
+		), Error::<Test>::NoPermission);
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			crate::LegalProperty::RealEstateDeveloperSite,
+			4_000,
+		));
+		assert_eq!(PropertyLawyer::<Test>::get(0).unwrap().real_estate_developer_lawyer, Some([10; 32].into()));
+		assert_noop!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			crate::LegalProperty::RealEstateDeveloperSite,
+			4_000,
+		), Error::<Test>::LawyerJobTaken);
+		assert_eq!(PropertyLawyer::<Test>::get(0).unwrap().spv_lawyer, None);
+	})
+}
+
+// lawyer_confirm_documents function
+#[test]
+fn distributes_nfts_and_funds() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(NftMarketplace::create_new_region(RuntimeOrigin::root()));
+		assert_ok!(NftMarketplace::create_new_location(RuntimeOrigin::root(), 0, bvec![10, 10]));
+		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [10; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [11; 32].into()));
+		assert_ok!(NftMarketplace::list_object(
+			RuntimeOrigin::signed([0; 32].into()),
+			0,
+			bvec![10, 10],
+			10_000,
+			100,
+			bvec![22, 22]
+		));
+		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			crate::LegalProperty::RealEstateDeveloperSite,
+			4_000,
+		));
+		assert_eq!(PropertyLawyer::<Test>::get(0).unwrap().real_estate_developer_lawyer, Some([10; 32].into()));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			crate::LegalProperty::SpvSite,
+			4_000,
+		));
+		assert_eq!(PropertyLawyer::<Test>::get(0).unwrap().spv_lawyer, Some([11; 32].into()));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			true,
+		));
+		assert_eq!(PropertyLawyer::<Test>::get(0).unwrap().real_estate_developer_status, crate::DocumentStatus::Approved);
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			true,
+		));
+		assert_eq!(PropertyLawyer::<Test>::get(1).is_some(), false);
+		assert_eq!(Assets::balance(1, &[0; 32].into()), 20_990_000);
+		assert_eq!(Assets::balance(1, &NftMarketplace::treasury_account_id()), 12000);
+		assert_eq!(Assets::balance(1, &[1; 32].into()), 460_000);
+		assert_eq!(Assets::balance(1, &[10; 32].into()), 34_000);
+		assert_eq!(Assets::balance(1, &[11; 32].into()), 4_000);
+		assert_eq!(RegisteredNftDetails::<Test>::get(0, 0).unwrap().spv_created, true);
+		assert_eq!(ListedToken::<Test>::get(0), None);
+		assert_eq!(TokenOwner::<Test>::get::<AccountId, ItemId<Test>>([1; 32].into(), 0).token_amount, 0);
+		assert_eq!(TokenBuyer::<Test>::get(0).len(), 0);
+		assert_eq!(Assets::balance(0, &[1; 32].into()), 100);
+	})
+}
+
+#[test]
+fn reject_contract_and_refund() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(NftMarketplace::create_new_region(RuntimeOrigin::root()));
+		assert_ok!(NftMarketplace::create_new_location(RuntimeOrigin::root(), 0, bvec![10, 10]));
+		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [10; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [11; 32].into()));
+		assert_ok!(NftMarketplace::list_object(
+			RuntimeOrigin::signed([0; 32].into()),
+			0,
+			bvec![10, 10],
+			10_000,
+			100,
+			bvec![22, 22]
+		));
+		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			crate::LegalProperty::RealEstateDeveloperSite,
+			4_000,
+		));
+		assert_eq!(PropertyLawyer::<Test>::get(0).unwrap().real_estate_developer_lawyer, Some([10; 32].into()));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			crate::LegalProperty::SpvSite,
+			4_000,
+		));
+		assert_eq!(PropertyLawyer::<Test>::get(0).unwrap().spv_lawyer, Some([11; 32].into()));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			false,
+		));
+		assert_eq!(PropertyLawyer::<Test>::get(0).unwrap().real_estate_developer_status, crate::DocumentStatus::Rejected);
+		assert_eq!(pallet_nfts::Item::<Test>::get(0, 0).is_none(), false);
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			false,
+		));
+		assert_eq!(PropertyLawyer::<Test>::get(1).is_some(), false);
+		assert_eq!(Assets::balance(1, &[0; 32].into()), 20_000_000);
+		assert_eq!(Assets::balance(1, &NftMarketplace::treasury_account_id()), 6000);
+		assert_eq!(Assets::balance(1, &[1; 32].into()), 1_490_000);
+		assert_eq!(Assets::balance(1, &[11; 32].into()), 4_000);
+		assert_eq!(RegisteredNftDetails::<Test>::get(0, 0).is_none(), true);
+		assert_eq!(ListedToken::<Test>::get(0), None);
+		assert_eq!(TokenOwner::<Test>::get::<AccountId, ItemId<Test>>([1; 32].into(), 0).token_amount, 0);
+		assert_eq!(TokenBuyer::<Test>::get(0).len(), 0);
+		assert_eq!(pallet_nfts::Item::<Test>::get(0, 0).is_none(), true);
+	})
+}
+
+#[test]
+fn second_attempt_works() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(NftMarketplace::create_new_region(RuntimeOrigin::root()));
+		assert_ok!(NftMarketplace::create_new_location(RuntimeOrigin::root(), 0, bvec![10, 10]));
+		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [10; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [11; 32].into()));
+		assert_ok!(NftMarketplace::list_object(
+			RuntimeOrigin::signed([0; 32].into()),
+			0,
+			bvec![10, 10],
+			10_000,
+			100,
+			bvec![22, 22]
+		));
+		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			crate::LegalProperty::RealEstateDeveloperSite,
+			4_000,
+		));
+		assert_eq!(PropertyLawyer::<Test>::get(0).unwrap().real_estate_developer_lawyer, Some([10; 32].into()));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			crate::LegalProperty::SpvSite,
+			4_000,
+		));
+		assert_eq!(PropertyLawyer::<Test>::get(0).unwrap().spv_lawyer, Some([11; 32].into()));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			true,
+		));
+		assert_eq!(PropertyLawyer::<Test>::get(0).unwrap().real_estate_developer_status, crate::DocumentStatus::Approved);
+		assert_eq!(pallet_nfts::Item::<Test>::get(0, 0).is_none(), false);
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			false,
+		));
+		assert_eq!(PropertyLawyer::<Test>::get(0).unwrap().second_attempt, true);
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			false,
+		));
+		assert_eq!(PropertyLawyer::<Test>::get(0).unwrap().real_estate_developer_status, crate::DocumentStatus::Rejected);
+		assert_eq!(pallet_nfts::Item::<Test>::get(0, 0).is_none(), false);
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			true,
+		));
+		assert_eq!(Assets::balance(1, &[0; 32].into()), 20_000_000);
+		assert_eq!(Assets::balance(1, &NftMarketplace::treasury_account_id()), 6000);
+		assert_eq!(Assets::balance(1, &[1; 32].into()), 1_490_000);
+		assert_eq!(Assets::balance(1, &[11; 32].into()), 4_000);
+		assert_eq!(RegisteredNftDetails::<Test>::get(0, 0).is_none(), true);
+		assert_eq!(ListedToken::<Test>::get(0), None);
+		assert_eq!(TokenOwner::<Test>::get::<AccountId, ItemId<Test>>([1; 32].into(), 0).token_amount, 0);
+		assert_eq!(TokenBuyer::<Test>::get(0).len(), 0);
+		assert_eq!(pallet_nfts::Item::<Test>::get(0, 0).is_none(), true);
+	})
+}
+
+#[test]
+fn lawyer_confirm_documents_fails() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(NftMarketplace::create_new_region(RuntimeOrigin::root()));
+		assert_ok!(NftMarketplace::create_new_location(RuntimeOrigin::root(), 0, bvec![10, 10]));
+		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [10; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [11; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [12; 32].into()));
+		assert_ok!(NftMarketplace::list_object(
+			RuntimeOrigin::signed([0; 32].into()),
+			0,
+			bvec![10, 10],
+			10_000,
+			100,
+			bvec![22, 22]
+		));
+		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			crate::LegalProperty::RealEstateDeveloperSite,
+			4_000,
+		));
+		assert_eq!(PropertyLawyer::<Test>::get(0).unwrap().real_estate_developer_lawyer, Some([10; 32].into()));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			crate::LegalProperty::SpvSite,
+			4_000,
+		));
+		assert_eq!(PropertyLawyer::<Test>::get(0).unwrap().spv_lawyer, Some([11; 32].into()));
+		assert_noop!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([10; 32].into()),
+			1,
+			false,
+		), Error::<Test>::InvalidIndex);
+		assert_noop!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([12; 32].into()),
+			0,
+			false,
+		), Error::<Test>::NoPermission);
+	})
+}
+
+// list_token function
+#[test]
+fn relist_a_nft() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(NftMarketplace::create_new_region(RuntimeOrigin::root()));
+		assert_ok!(NftMarketplace::create_new_location(RuntimeOrigin::root(), 0, bvec![10, 10]));
+		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [10; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [11; 32].into()));
+		assert_ok!(NftMarketplace::list_object(
+			RuntimeOrigin::signed([0; 32].into()),
+			0,
+			bvec![10, 10],
+			10_000,
+			100,
+			bvec![22, 22]
+		));
+		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			crate::LegalProperty::RealEstateDeveloperSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			crate::LegalProperty::SpvSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			true,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			true,
+		));
 		assert_eq!(RegisteredNftDetails::<Test>::get(0, 0).unwrap().spv_created, true);
 		assert_ok!(NftMarketplace::relist_token(
 			RuntimeOrigin::signed([1; 32].into()),
@@ -387,6 +725,8 @@ fn relist_a_nft_fails() {
 		assert_ok!(NftMarketplace::create_new_location(RuntimeOrigin::root(), 0, bvec![10, 10]));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [10; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [11; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			0,
@@ -396,6 +736,28 @@ fn relist_a_nft_fails() {
 			bvec![22, 22]
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			crate::LegalProperty::RealEstateDeveloperSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			crate::LegalProperty::SpvSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			true,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			true,
+		));
 		assert_eq!(RegisteredNftDetails::<Test>::get(0, 0).unwrap().spv_created, true);
 		assert_noop!(
 			NftMarketplace::relist_token(RuntimeOrigin::signed([0; 32].into()), 0, 0, 1000, 1),
@@ -414,6 +776,8 @@ fn buy_relisted_token_works() {
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [3; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [10; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [11; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			0,
@@ -423,10 +787,31 @@ fn buy_relisted_token_works() {
 			bvec![22, 22]
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			crate::LegalProperty::RealEstateDeveloperSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			crate::LegalProperty::SpvSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			true,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			true,
+		));
 		assert_eq!(Assets::balance(1, &([0; 32].into())), 20990000);
-		assert_eq!(Assets::balance(1, &NftMarketplace::treasury_account_id()), 9000);
-		assert_eq!(Assets::balance(1, &NftMarketplace::community_account_id()), 1000);
-		assert_eq!(Assets::balance(1, &([1; 32].into())), 500_000);
+		assert_eq!(Assets::balance(1, &NftMarketplace::treasury_account_id()), 12000);
+		assert_eq!(Assets::balance(1, &([1; 32].into())), 460_000);
 		assert_eq!(RegisteredNftDetails::<Test>::get(0, 0).unwrap().spv_created, true);
 		assert_ok!(NftMarketplace::relist_token(
 			RuntimeOrigin::signed([1; 32].into()),
@@ -436,9 +821,11 @@ fn buy_relisted_token_works() {
 			3
 		));
 		assert_ok!(NftMarketplace::buy_relisted_token(RuntimeOrigin::signed([3; 32].into()), 1, 2));
+		assert_eq!(Assets::balance(1, &([3; 32].into())), 3_000);
 		assert_eq!(Assets::balance(0, &[3; 32].into()), 2);
 		assert_eq!(TokenListings::<Test>::get(1).is_some(), true);
 		assert_ok!(NftMarketplace::buy_relisted_token(RuntimeOrigin::signed([3; 32].into()), 1, 1));
+		assert_eq!(Assets::balance(1, &([3; 32].into())), 2_000);
 		assert_eq!(TokenListings::<Test>::get(1).is_some(), false);
 		assert_ok!(NftMarketplace::relist_token(
 			RuntimeOrigin::signed([1; 32].into()),
@@ -452,8 +839,8 @@ fn buy_relisted_token_works() {
 		assert_eq!(PropertyOwner::<Test>::get(0).len(), 2);
 		assert_eq!(PropertyOwnerToken::<Test>::get::<u32, AccountId>(0, [1; 32].into()), 96);
 		assert_eq!(PropertyOwnerToken::<Test>::get::<u32, AccountId>(0, [3; 32].into()), 4);
-		assert_eq!(Assets::balance(1, &([1; 32].into())), 503_465);
-		assert_eq!(Assets::balance(1, &([3; 32].into())), 1_501);
+		assert_eq!(Assets::balance(1, &([1; 32].into())), 463_465);
+		assert_eq!(Assets::balance(1, &([3; 32].into())), 1_500);
 		assert_eq!(Assets::balance(0, &[1; 32].into()), 96);
 		assert_eq!(Assets::balance(0, &[3; 32].into()), 4);
 	})
@@ -468,6 +855,8 @@ fn buy_relisted_token_fails() {
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [3; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [10; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [11; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			0,
@@ -477,10 +866,31 @@ fn buy_relisted_token_fails() {
 			bvec![22, 22]
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			crate::LegalProperty::RealEstateDeveloperSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			crate::LegalProperty::SpvSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			true,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			true,
+		));
 		assert_eq!(Assets::balance(1, &([0; 32].into())), 20990000);
-		assert_eq!(Assets::balance(1, &NftMarketplace::treasury_account_id()), 9000);
-		assert_eq!(Assets::balance(1, &NftMarketplace::community_account_id()), 1000);
-		assert_eq!(Assets::balance(1, &([1; 32].into())), 500_000);
+		assert_eq!(Assets::balance(1, &NftMarketplace::treasury_account_id()), 12_000);
+		assert_eq!(Assets::balance(1, &([1; 32].into())), 460_000);
 		assert_eq!(RegisteredNftDetails::<Test>::get(0, 0).unwrap().spv_created, true);
 		assert_noop!(
 			NftMarketplace::buy_relisted_token(RuntimeOrigin::signed([3; 32].into()), 1, 1),
@@ -498,6 +908,8 @@ fn make_offer_works() {
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [10; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [11; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			0,
@@ -507,6 +919,28 @@ fn make_offer_works() {
 			bvec![22, 22]
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			crate::LegalProperty::RealEstateDeveloperSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			crate::LegalProperty::SpvSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			true,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			true,
+		));
 		assert_ok!(NftMarketplace::relist_token(
 			RuntimeOrigin::signed([1; 32].into()),
 			0,
@@ -531,6 +965,8 @@ fn make_offer_fails() {
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [3; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [10; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [11; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			0,
@@ -540,6 +976,28 @@ fn make_offer_fails() {
 			bvec![22, 22]
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			crate::LegalProperty::RealEstateDeveloperSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			crate::LegalProperty::SpvSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			true,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			true,
+		));
 		assert_noop!(
 			NftMarketplace::make_offer(RuntimeOrigin::signed([2; 32].into()), 1, 200, 1),
 			Error::<Test>::TokenNotForSale
@@ -576,6 +1034,8 @@ fn handle_offer_works() {
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [3; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [10; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [11; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			0,
@@ -585,6 +1045,28 @@ fn handle_offer_works() {
 			bvec![22, 22]
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			crate::LegalProperty::RealEstateDeveloperSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			crate::LegalProperty::SpvSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			true,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			true,
+		));
 		assert_ok!(NftMarketplace::relist_token(
 			RuntimeOrigin::signed([1; 32].into()),
 			0,
@@ -619,7 +1101,7 @@ fn handle_offer_works() {
 		assert_eq!(Assets::balance(0, &([1; 32].into())), 80);
 		assert_eq!(Assets::balance(0, &([2; 32].into())), 10);
 		assert_eq!(Assets::balance(0, &NftMarketplace::account_id()), 10);
-		assert_eq!(Assets::balance(1, &([1; 32].into())), 519_800);
+		assert_eq!(Assets::balance(1, &([1; 32].into())), 479_800);
 		assert_eq!(Assets::balance(1, &([2; 32].into())), 1_130_000);
 	})
 }
@@ -632,6 +1114,8 @@ fn handle_offer_fails() {
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [10; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [11; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			0,
@@ -641,6 +1125,28 @@ fn handle_offer_fails() {
 			bvec![22, 22]
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			crate::LegalProperty::RealEstateDeveloperSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			crate::LegalProperty::SpvSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			true,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			true,
+		));
 		assert_noop!(
 			NftMarketplace::handle_offer(
 				RuntimeOrigin::signed([1; 32].into()),
@@ -689,6 +1195,8 @@ fn cancel_offer_works() {
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [10; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [11; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			0,
@@ -698,6 +1206,28 @@ fn cancel_offer_works() {
 			bvec![22, 22]
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			crate::LegalProperty::RealEstateDeveloperSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			crate::LegalProperty::SpvSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			true,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			true,
+		));
 		assert_ok!(NftMarketplace::relist_token(
 			RuntimeOrigin::signed([1; 32].into()),
 			0,
@@ -726,6 +1256,8 @@ fn cancel_offer_fails() {
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [10; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [11; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			0,
@@ -735,6 +1267,28 @@ fn cancel_offer_fails() {
 			bvec![22, 22]
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			crate::LegalProperty::RealEstateDeveloperSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			crate::LegalProperty::SpvSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			true,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			true,
+		));
 		assert_ok!(NftMarketplace::relist_token(
 			RuntimeOrigin::signed([1; 32].into()),
 			0,
@@ -767,6 +1321,8 @@ fn upgrade_price_works() {
 		assert_ok!(NftMarketplace::create_new_location(RuntimeOrigin::root(), 0, bvec![10, 10]));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [10; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [11; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			0,
@@ -776,6 +1332,28 @@ fn upgrade_price_works() {
 			bvec![22, 22]
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			crate::LegalProperty::RealEstateDeveloperSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			crate::LegalProperty::SpvSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			true,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			true,
+		));
 		assert_ok!(NftMarketplace::relist_token(
 			RuntimeOrigin::signed([1; 32].into()),
 			0,
@@ -797,6 +1375,8 @@ fn upgrade_price_fails_if_not_owner() {
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [4; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [10; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [11; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			0,
@@ -806,6 +1386,28 @@ fn upgrade_price_fails_if_not_owner() {
 			bvec![22, 22]
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			crate::LegalProperty::RealEstateDeveloperSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			crate::LegalProperty::SpvSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			true,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			true,
+		));
 		assert_ok!(NftMarketplace::relist_token(
 			RuntimeOrigin::signed([1; 32].into()),
 			0,
@@ -850,6 +1452,8 @@ fn upgrade_object_and_distribute_works() {
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [10; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [11; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			0,
@@ -865,11 +1469,32 @@ fn upgrade_object_and_distribute_works() {
 			20_000
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([2; 32].into()), 0, 50));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			crate::LegalProperty::RealEstateDeveloperSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			crate::LegalProperty::SpvSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			true,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			true,
+		));
 		assert_eq!(Assets::balance(1, &([0; 32].into())), 21485000);
-		assert_eq!(Assets::balance(1, &NftMarketplace::treasury_account_id()), 13500);
-		assert_eq!(Assets::balance(1, &NftMarketplace::community_account_id()), 1500);
-		assert_eq!(Assets::balance(1, &([1; 32].into())), 1_000_000);
-		assert_eq!(Assets::balance(1, &([2; 32].into())), 150_000);
+		assert_eq!(Assets::balance(1, &NftMarketplace::treasury_account_id()), 22000);
+		assert_eq!(Assets::balance(1, &([1; 32].into())), 980_000);
+		assert_eq!(Assets::balance(1, &([2; 32].into())), 110_000);
 
 		assert_eq!(RegisteredNftDetails::<Test>::get(0, 0).unwrap().spv_created, true);
 		assert_eq!(ListedToken::<Test>::get(0), None);
@@ -905,6 +1530,8 @@ fn upgrade_object_for_relisted_nft_fails() {
 		assert_ok!(NftMarketplace::create_new_region(RuntimeOrigin::root()));
 		assert_ok!(NftMarketplace::create_new_location(RuntimeOrigin::root(), 0, bvec![10, 10]));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [10; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [11; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			0,
@@ -914,6 +1541,28 @@ fn upgrade_object_for_relisted_nft_fails() {
 			bvec![22, 22]
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([0; 32].into()), 0, 100));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			crate::LegalProperty::RealEstateDeveloperSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			crate::LegalProperty::SpvSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			true,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			true,
+		));
 		assert_ok!(NftMarketplace::relist_token(
 			RuntimeOrigin::signed([0; 32].into()),
 			0,
@@ -952,6 +1601,8 @@ fn delist_single_token_works() {
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [10; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [11; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			0,
@@ -961,6 +1612,28 @@ fn delist_single_token_works() {
 			bvec![22, 22]
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			crate::LegalProperty::RealEstateDeveloperSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			crate::LegalProperty::SpvSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			true,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			true,
+		));
 		assert_ok!(NftMarketplace::relist_token(
 			RuntimeOrigin::signed([1; 32].into()),
 			0,
@@ -983,7 +1656,7 @@ fn delist_single_token_works() {
 		assert_eq!(Assets::balance(0, &[1; 32].into()), 98);
 	})
 }
-
+ 
 #[test]
 fn delist_fails() {
 	new_test_ext().execute_with(|| {
@@ -993,6 +1666,8 @@ fn delist_fails() {
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [4; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [10; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [11; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			0,
@@ -1002,6 +1677,28 @@ fn delist_fails() {
 			bvec![22, 22]
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 0, 100));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			crate::LegalProperty::RealEstateDeveloperSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			crate::LegalProperty::SpvSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([10; 32].into()),
+			0,
+			true,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([11; 32].into()),
+			0,
+			true,
+		));
 		assert_ok!(NftMarketplace::relist_token(
 			RuntimeOrigin::signed([1; 32].into()),
 			0,
@@ -1033,6 +1730,8 @@ fn listing_objects_in_different_regions() {
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [0; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [1; 32].into()));
 		assert_ok!(XcavateWhitelist::add_to_whitelist(RuntimeOrigin::root(), [2; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [10; 32].into()));
+		assert_ok!(NftMarketplace::register_lawyer(RuntimeOrigin::root(), [11; 32].into()));
 		assert_ok!(NftMarketplace::list_object(
 			RuntimeOrigin::signed([0; 32].into()),
 			0,
@@ -1058,7 +1757,51 @@ fn listing_objects_in_different_regions() {
 			bvec![22, 22]
 		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([1; 32].into()), 1, 100));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([10; 32].into()),
+			1,
+			crate::LegalProperty::RealEstateDeveloperSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([11; 32].into()),
+			1,
+			crate::LegalProperty::SpvSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([10; 32].into()),
+			1,
+			true,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([11; 32].into()),
+			1,
+			true,
+		));
 		assert_ok!(NftMarketplace::buy_token(RuntimeOrigin::signed([2; 32].into()), 2, 100));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([10; 32].into()),
+			2,
+			crate::LegalProperty::RealEstateDeveloperSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_claim_property(
+			RuntimeOrigin::signed([11; 32].into()),
+			2,
+			crate::LegalProperty::SpvSite,
+			4_000,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([10; 32].into()),
+			2,
+			true,
+		));
+		assert_ok!(NftMarketplace::lawyer_confirm_documents(
+			RuntimeOrigin::signed([11; 32].into()),
+			2,
+			true,
+		));
 		assert_eq!(RegisteredNftDetails::<Test>::get(1, 0).unwrap().spv_created, true);
 		assert_eq!(RegisteredNftDetails::<Test>::get(2, 0).unwrap().spv_created, true);
 		assert_ok!(NftMarketplace::relist_token(
@@ -1077,4 +1820,4 @@ fn listing_objects_in_different_regions() {
 		assert_eq!(Assets::balance(3, &[2; 32].into()), 100);
 	})
 }
- */
+ 
