@@ -490,7 +490,7 @@ impl pallet_property_management::Config for Runtime {
 	#[cfg(feature = "runtime-benchmarks")]
 	type Helper = pallet_property_management::AssetHelper;
 	type AgentOrigin = EnsureRoot<Self::AccountId>;
-	type MinStakingAmount = MinimumStakingAmount;
+	type LettingAgentDeposit = MinimumStakingAmount;
 	type MaxProperties = MaxProperty;
 	type MaxLettingAgents = MaxLettingAgent;
 	type MaxLocations = MaxLocation;
@@ -505,8 +505,8 @@ parameter_types! {
 	pub const MaxVoteForBlock: u32 = 100;
 	pub const MinimumSlashingAmount: Balance = 10 * DOLLARS;
 	pub const MaximumVoter: u32 = 100;
-	pub const VotingThreshold: u8 = 51;
-	pub const HighVotingThreshold: u8 = 67;
+	pub const VotingThreshold: Percent = Percent::from_percent(51);
+	pub const HighVotingThreshold: Percent = Percent::from_percent(67);
 	pub const LowProposal: Balance = 500 * CENTS;
 	pub const HighProposal: Balance = 10_000 * CENTS;
 	pub const PropertyGovernancePalletId: PalletId = PalletId(*b"py/gvrnc");
@@ -1642,6 +1642,24 @@ impl_runtime_apis! {
 
 		fn build_config(config: Vec<u8>) -> sp_genesis_builder::Result {
 			build_config::<RuntimeGenesisConfig>(config)
+		}
+	}
+	
+	impl pallet_nft_marketplace::NftMarketplaceApi<Block, AccountId> for Runtime {
+		fn get_marketplace_account_id() -> AccountId {
+			AccountIdConversion::<AccountId>::into_account_truncating(&NftMarketplacePalletId::get())
+		}
+	}
+
+	impl pallet_property_governance::PropertyGovernanceApi<Block, AccountId> for Runtime {
+		fn get_governance_account_id() -> AccountId {
+			AccountIdConversion::<AccountId>::into_account_truncating(&PropertyGovernancePalletId::get())
+		}
+	}
+
+	impl pallet_property_management::PropertyManagementApi<Block, AccountId> for Runtime {
+		fn get_management_account_id() -> AccountId {
+			AccountIdConversion::<AccountId>::into_account_truncating(&PropertyManagementPalletId::get())
 		}
 	}
 }

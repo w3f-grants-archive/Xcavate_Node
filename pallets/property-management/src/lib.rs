@@ -25,6 +25,8 @@ use frame_support::sp_runtime::{
 
 use pallet_assets::Instance1;
 
+use codec::Codec;
+
 type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
 
 pub type BalanceOf<T> =
@@ -100,7 +102,7 @@ pub mod pallet {
 		type AgentOrigin: EnsureOrigin<Self::RuntimeOrigin>;
 
 		/// The minimum amount of a letting agent that has to be staked.
-		type MinStakingAmount: Get<BalanceOf<Self>>;
+		type LettingAgentDeposit: Get<BalanceOf<Self>>;
 
 		/// The maximum amount of properties that can be assigned to a letting agent.
 		#[pallet::constant]
@@ -138,36 +140,30 @@ pub mod pallet {
 
 	/// Mapping from the real estate object to the letting agent.
 	#[pallet::storage]
-	#[pallet::getter(fn letting_storage)]
 	pub type LettingStorage<T> = StorageMap<_, Blake2_128Concat, u32, AccountIdOf<T>, OptionQuery>;
 
 	/// Mapping from account to currently stored balance.
 	#[pallet::storage]
-	#[pallet::getter(fn stored_funds)]
 	pub type StoredFunds<T> =
 		StorageMap<_, Blake2_128Concat, AccountIdOf<T>, BalanceOf<T>, ValueQuery>;
 
 	/// Mapping of asset id to the stored balance for a property.
 	#[pallet::storage]
-	#[pallet::getter(fn property_reserve)]
-	pub(super) type PropertyReserve<T> =
+	pub type PropertyReserve<T> =
 		StorageMap<_, Blake2_128Concat, u32, BalanceOf<T>, ValueQuery>;
 
 	/// Mapping of asset id to the stored debts of a property.
 	#[pallet::storage]
-	#[pallet::getter(fn property_debts)]
-	pub(super) type PropertyDebts<T> =
+	pub type PropertyDebts<T> =
 		StorageMap<_, Blake2_128Concat, u32, BalanceOf<T>, ValueQuery>;
 
 	/// Mapping from account to letting agent info
 	#[pallet::storage]
-	#[pallet::getter(fn letting_info)]
 	pub type LettingInfo<T: Config> =
 		StorageMap<_, Blake2_128Concat, AccountIdOf<T>, LettingAgentInfo<T>, OptionQuery>;
 
 	/// Mapping from region and location to the letting agents of this location.
 	#[pallet::storage]
-	#[pallet::getter(fn letting_agent_locations)]
 	pub type LettingAgentLocations<T: Config> = StorageDoubleMap<
 		_,
 		Blake2_128Concat,
@@ -241,13 +237,15 @@ pub mod pallet {
 		NotEnoughReserves,
 		/// This asset has no token.
 		AssetNotFound,
+		/// This letting agent has no location.
+		NoLoactions,
 	}
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		/// Adds an account as a letting agent.
 		///
-		/// The origin must be the sudo.
+		/// The origin must be the AgentOrigin.
 		///
 		/// Parameters:
 		/// - `region`: The region number where the letting agent should be added to.
@@ -265,11 +263,11 @@ pub mod pallet {
 		) -> DispatchResult {
 			T::AgentOrigin::ensure_origin(origin)?;
 			ensure!(
-				pallet_nft_marketplace::Pallet::<T>::region_collections(region).is_some(),
+				pallet_nft_marketplace::RegionCollections::<T>::get(region).is_some(),
 				Error::<T>::RegionUnknown
 			);
 			ensure!(
-				pallet_nft_marketplace::Pallet::<T>::location_registration(
+				pallet_nft_marketplace::LocationRegistration::<T>::get(
 					region,
 					location.clone()
 				),
@@ -303,39 +301,41 @@ pub mod pallet {
 		#[pallet::call_index(1)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::letting_agent_deposit())]
 		pub fn letting_agent_deposit(origin: OriginFor<T>) -> DispatchResult {
-			let origin = ensure_signed(origin)?;
-			let mut letting_info =
-				Self::letting_info(origin.clone()).ok_or(Error::<T>::NoPermission)?;
-			ensure!(
-				!Self::letting_agent_locations(
+			let signer = ensure_signed(origin)?;
+			LettingInfo::<T>::try_mutate(signer.clone(), |maybe_letting_info|{
+				let letting_info = maybe_letting_info.as_mut().ok_or(Error::<T>::NoPermission)?;
+				ensure!(!letting_info.deposited, Error::<T>::AlreadyDeposited);
+				ensure!(letting_info.locations.len() > 0, Error::<T>::NoLoactions);
+				ensure!(
+					!LettingAgentLocations::<T>::get(
+						letting_info.region,
+						letting_info.locations[0].clone()
+					)
+					.contains(&signer),
+					Error::<T>::LettingAgentInLocation
+				);
+				<T as pallet::Config>::Currency::reserve(
+					&signer,
+					<T as Config>::LettingAgentDeposit::get(),
+				)?;
+				letting_info.deposited = true;
+				LettingAgentLocations::<T>::try_mutate(
 					letting_info.region,
-					letting_info.locations[0].clone()
-				)
-				.contains(&origin),
-				Error::<T>::LettingAgentInLocation
-			);
-			ensure!(!letting_info.deposited, Error::<T>::AlreadyDeposited);
-			<T as pallet::Config>::Currency::reserve(
-				&origin,
-				<T as Config>::MinStakingAmount::get(),
-			)?;
-			letting_info.deposited = true;
-			LettingAgentLocations::<T>::try_mutate(
-				letting_info.region,
-				letting_info.locations[0].clone(),
-				|keys| {
-					keys.try_push(origin.clone()).map_err(|_| Error::<T>::TooManyLettingAgents)?;
-					Ok::<(), DispatchError>(())
-				},
-			)?;
-			LettingInfo::<T>::insert(origin.clone(), letting_info);
-			Self::deposit_event(Event::<T>::Deposited { who: origin });
+					letting_info.locations[0].clone(),
+					|keys| {
+						keys.try_push(signer.clone()).map_err(|_| Error::<T>::TooManyLettingAgents)?;
+						Ok::<(), DispatchError>(())
+					},
+				)?;
+				Ok::<(), DispatchError>(())
+			})?;
+			Self::deposit_event(Event::<T>::Deposited { who: signer });
 			Ok(())
 		}
 
 		/// Adds a letting agent to a location.
 		///
-		/// The origin must be the sudo.
+		/// The origin must be the AgentOrigin.
 		///
 		/// Parameters:
 		/// - `location`: The location number where the letting agent should be added to.
@@ -350,35 +350,36 @@ pub mod pallet {
 			letting_agent: AccountIdOf<T>,
 		) -> DispatchResult {
 			T::AgentOrigin::ensure_origin(origin)?;
-			let mut letting_info =
-				Self::letting_info(letting_agent.clone()).ok_or(Error::<T>::NoLettingAgentFound)?;
-			ensure!(
-				pallet_nft_marketplace::Pallet::<T>::location_registration(
+			LettingInfo::<T>::try_mutate(letting_agent.clone(), |maybe_letting_info| {
+				let letting_info = maybe_letting_info.as_mut().ok_or(Error::<T>::NoLettingAgentFound)?;
+				ensure!(letting_info.deposited, Error::<T>::NotDeposited);
+				ensure!(
+					pallet_nft_marketplace::LocationRegistration::<T>::get(
+						letting_info.region,
+						location.clone()
+					),
+					Error::<T>::LocationUnknown
+				);
+				ensure!(
+					!LettingAgentLocations::<T>::get(letting_info.region, location.clone())
+						.contains(&letting_agent),
+					Error::<T>::LettingAgentInLocation
+				);
+				LettingAgentLocations::<T>::try_mutate(
 					letting_info.region,
-					location.clone()
-				),
-				Error::<T>::LocationUnknown
-			);
-			ensure!(
-				!Self::letting_agent_locations(letting_info.region, location.clone())
-					.contains(&letting_agent),
-				Error::<T>::LettingAgentInLocation
-			);
-			ensure!(letting_info.deposited, Error::<T>::NotDeposited);
-			LettingAgentLocations::<T>::try_mutate(
-				letting_info.region,
-				location.clone(),
-				|keys| {
-					keys.try_push(letting_agent.clone())
-						.map_err(|_| Error::<T>::TooManyLettingAgents)?;
-					Ok::<(), DispatchError>(())
-				},
-			)?;
-			letting_info
-				.locations
-				.try_push(location.clone())
-				.map_err(|_| Error::<T>::TooManyLocations)?;
-			LettingInfo::<T>::insert(letting_agent.clone(), letting_info);
+					location.clone(),
+					|keys| {
+						keys.try_push(letting_agent.clone())
+							.map_err(|_| Error::<T>::TooManyLettingAgents)?;
+						Ok::<(), DispatchError>(())
+					},
+				)?;
+				letting_info
+					.locations
+					.try_push(location.clone())
+					.map_err(|_| Error::<T>::TooManyLocations)?;
+				Ok::<(), DispatchError>(())
+			})?;
 			Self::deposit_event(Event::<T>::LettingAgentAddedToLocation {
 				who: letting_agent,
 				location,
@@ -397,11 +398,22 @@ pub mod pallet {
 		#[pallet::call_index(3)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::set_letting_agent())]
 		pub fn set_letting_agent(origin: OriginFor<T>, asset_id: u32) -> DispatchResult {
-			let _origin = ensure_signed(origin)?;
-			let asset_details = pallet_nft_marketplace::Pallet::<T>::asset_id_details(asset_id)
-				.ok_or(Error::<T>::NoObjectFound)?;
-			ensure!(Self::letting_storage(asset_id).is_none(), Error::<T>::LettingAgentAlreadySet);
-			Self::selects_letting_agent(asset_details.region, asset_details.location, asset_id)?;
+			let signer = ensure_signed(origin)?;
+			ensure!(pallet_nft_marketplace::AssetIdDetails::<T>::get(asset_id).is_some(), Error::<T>::NoObjectFound);
+			ensure!(LettingStorage::<T>::get(asset_id).is_none(), Error::<T>::LettingAgentAlreadySet);
+			LettingInfo::<T>::try_mutate(signer.clone(), |maybe_letting_info|{
+				let letting_info = maybe_letting_info.as_mut().ok_or(Error::<T>::AgentNotFound)?;
+				LettingStorage::<T>::insert(asset_id, signer.clone());
+				letting_info
+					.assigned_properties
+					.try_push(asset_id)
+					.map_err(|_| Error::<T>::TooManyAssignedProperties)?;
+				Ok::<(), DispatchError>(())
+			})?;
+			Self::deposit_event(Event::<T>::LettingAgentSet {
+				asset_id,
+				who: signer,
+			});
 			Ok(())
 		}
 
@@ -421,16 +433,16 @@ pub mod pallet {
 			asset_id: u32,
 			amount: BalanceOf<T>,
 		) -> DispatchResult {
-			let origin = ensure_signed(origin)?;
-			let letting_agent = Self::letting_storage(asset_id).ok_or(Error::<T>::NoLettingAgentFound)?;
-			ensure!(letting_agent == origin, Error::<T>::NoPermission);
+			let signer = ensure_signed(origin)?;
+			let letting_agent = LettingStorage::<T>::get(asset_id).ok_or(Error::<T>::NoLettingAgentFound)?;
+			ensure!(letting_agent == signer, Error::<T>::NoPermission);
 		
 			let scaled_amount = amount
 				.checked_mul(&Self::u64_to_balance_option(1)?)  // Modify the scale factor if needed
 				.ok_or(Error::<T>::MultiplyError)?;
 		
 			<T as pallet::Config>::Currency::transfer(
-				&origin,
+				&signer,
 				&Self::account_id(),
 				scaled_amount.saturating_mul(
 					<T as Config>::PolkadotJsMultiplier::get(),
@@ -438,10 +450,10 @@ pub mod pallet {
 				KeepAlive,
 			).map_err(|_| Error::<T>::NotEnoughFunds)?;
 		
-			let owner_list = pallet_nft_marketplace::Pallet::<T>::property_owner(asset_id);
+			let owner_list = pallet_nft_marketplace::PropertyOwner::<T>::get(asset_id);
 			let mut governance_amount = BalanceOf::<T>::zero();
-			let property_reserve = Self::property_reserve(asset_id);
-			let property_info = pallet_nft_marketplace::Pallet::<T>::asset_id_details(asset_id)
+			let property_reserve = PropertyReserve::<T>::get(asset_id);
+			let property_info = pallet_nft_marketplace::AssetIdDetails::<T>::get(asset_id)
 				.ok_or(Error::<T>::NoObjectFound)?;
 			let property_price = property_info.price;
 		
@@ -456,7 +468,7 @@ pub mod pallet {
 				.checked_div(&Self::u64_to_balance_option(12)?)
 				.ok_or(Error::<T>::DivisionError)?;
 		
-			let property_debts = Self::property_debts(asset_id);
+			let property_debts = PropertyDebts::<T>::get(asset_id);
 		
 			// Pay property debts first
 			let amount_to_pay_debts = core::cmp::min(amount, property_debts);
@@ -509,7 +521,7 @@ pub mod pallet {
 			let final_remaining_amount = amount.saturating_sub(governance_amount);
 			let total_token = property_info.token_amount;
 			for owner in owner_list {
-				let token_amount = pallet_nft_marketplace::Pallet::<T>::property_owner_token(
+				let token_amount = pallet_nft_marketplace::PropertyOwnerToken::<T>::get(
 					asset_id,
 					owner.clone(),
 				);
@@ -518,11 +530,12 @@ pub mod pallet {
 					.ok_or(Error::<T>::MultiplyError)?
 					.checked_div(&Self::u64_to_balance_option(total_token.into())?)
 					.ok_or(Error::<T>::DivisionError)?;
-				let mut old_funds = Self::stored_funds(owner.clone());
-				old_funds = old_funds
+				StoredFunds::<T>::try_mutate(owner.clone(), |old_funds| {
+					*old_funds = old_funds
 					.checked_add(&amount_for_owner)
 					.ok_or(Error::<T>::ArithmeticOverflow)?;
-				StoredFunds::<T>::insert(owner, old_funds);
+					Ok::<(), DispatchError>(())
+				})?;
 			}
 		
 			Self::deposit_event(Event::<T>::IncomeDistributed {
@@ -540,22 +553,22 @@ pub mod pallet {
 		#[pallet::call_index(5)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::withdraw_funds())]
 		pub fn withdraw_funds(origin: OriginFor<T>) -> DispatchResult {
-			let origin = ensure_signed(origin)?;
-			let amount = StoredFunds::<T>::take(origin.clone());
+			let signer = ensure_signed(origin)?;
+			let amount = StoredFunds::<T>::take(signer.clone());
 			ensure!(
 				!amount.is_zero(),
 				Error::<T>::UserHasNoFundsStored
 			);
 			<T as pallet::Config>::Currency::transfer(
 				&Self::account_id(),
-				&origin,
+				&signer,
 				amount.saturating_mul(
 					<T as Config>::PolkadotJsMultiplier::get(),
 				),
 				KeepAlive,
 			)
 			.map_err(|_| Error::<T>::NotEnoughFunds)?;
-			Self::deposit_event(Event::<T>::WithdrawFunds { who: origin, amount });
+			Self::deposit_event(Event::<T>::WithdrawFunds { who: signer, amount });
 			Ok(())
 		}
 	}
@@ -576,74 +589,39 @@ pub mod pallet {
 			input.try_into().map_err(|_| Error::<T>::ConversionError)
 		}
 
-		/// Chooses the next free letting agent in a location.
-		pub fn selects_letting_agent(
-			region: u32,
-			location: LocationId<T>,
-			asset_id: u32,
-		) -> DispatchResult {
-			let letting_agents = Self::letting_agent_locations(region, location);
-			let letting_agent = letting_agents
-				.iter()
-				.min_by_key(|letting_agent| {
-					Self::letting_info(letting_agent).unwrap().assigned_properties
-				})
-				.ok_or(Error::<T>::NoLettingAgentFound)?;
-			LettingStorage::<T>::insert(asset_id, letting_agent);
-			let mut letting_info =
-				Self::letting_info(letting_agent).ok_or(Error::<T>::AgentNotFound)?;
-			letting_info
-				.assigned_properties
-				.try_push(asset_id)
-				.map_err(|_| Error::<T>::TooManyAssignedProperties)?;
-			LettingInfo::<T>::insert(letting_agent, letting_info);
-			Self::deposit_event(Event::<T>::LettingAgentSet {
-				asset_id,
-				who: letting_agent.clone(),
-			});
-			Ok(())
-		}
-
 		/// Removes bad letting agents.
 		pub fn remove_bad_letting_agent(
-			region: u32,
-			location: LocationId<T>,
-			agent: AccountIdOf<T>,
+			asset_id: u32,
 		) -> DispatchResult {
-			let mut letting_agents = Self::letting_agent_locations(region, location.clone());
-			let index = letting_agents
-				.iter()
-				.position(|x| *x == agent)
-				.ok_or(Error::<T>::AgentNotFound)?;
-			letting_agents.remove(index);
-			let mut letting_info =
-				Self::letting_info(agent.clone()).ok_or(Error::<T>::NoLettingAgentFound)?;
-			let index = letting_info
-				.locations
-				.iter()
-				.position(|x| *x == location)
-				.ok_or(Error::<T>::AgentNotFound)?;
-			letting_info.locations.remove(index);	
-			LettingAgentLocations::<T>::insert(region, location, letting_agents);
-			LettingInfo::<T>::insert(agent, letting_info);
+			LettingStorage::<T>::take(asset_id);
 			Ok(())
 		}
 
 		/// Decreases the reserve of a property.
 		pub fn decrease_reserves(asset_id: u32, amount: BalanceOf<T>) -> DispatchResult {
-			let mut property_reserve = Self::property_reserve(asset_id);
-			ensure!(property_reserve >= amount, Error::<T>::NotEnoughReserves);
-			property_reserve = property_reserve.saturating_sub(amount);
-			PropertyReserve::<T>::insert(asset_id, property_reserve);
-			Ok(())
+			PropertyReserve::<T>::try_mutate(asset_id, |property_reserve| -> Result<(), DispatchError> {
+				ensure!(*property_reserve >= amount, Error::<T>::NotEnoughReserves);
+				*property_reserve = property_reserve.saturating_sub(amount);				
+				Ok(())
+			})
 		}
 
 		/// Increases the debts of a property.
 		pub fn increase_debts(asset_id: u32, amount: BalanceOf<T>) -> DispatchResult {
-			let mut property_debts = Self::property_debts(asset_id);
-			property_debts = property_debts.saturating_add(amount);
-			PropertyDebts::<T>::insert(asset_id, property_debts);
-			Ok(())
+			PropertyDebts::<T>::try_mutate(asset_id, |property_debts| {
+				*property_debts = property_debts.saturating_add(amount);
+				Ok(())
+			})
 		}
 	}
 }
+
+sp_api::decl_runtime_apis! {
+    pub trait PropertyManagementApi<AccountId> 
+	where
+		AccountId: Codec
+	{
+        fn get_management_account_id() -> AccountId;
+    }
+}
+

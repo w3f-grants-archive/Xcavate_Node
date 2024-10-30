@@ -240,7 +240,7 @@ impl pallet_property_management::Config for Test {
 	type Currency = Balances;
 	type PalletId = PropertyManagementPalletId;
 	type AgentOrigin = EnsureRoot<Self::AccountId>;
-	type MinStakingAmount = ConstU32<100>;
+	type LettingAgentDeposit = ConstU32<100>;
 	type MaxProperties = MaxProperty;
 	type MaxLettingAgents = MaxLettingAgent;
 	type MaxLocations = MaxLocation;
@@ -254,8 +254,8 @@ parameter_types! {
 	pub const PropertyVotingTime: BlockNumber = 30;
 	pub const MaxVoteForBlock: u32 = 100;
 	pub const MaximumVoter: u32 = 100;
-	pub const VotingThreshold: u8 = 51;
-	pub const HighVotingThreshold: u8 = 67;
+	pub const VotingThreshold: Percent = Percent::from_percent(51);
+	pub const HighVotingThreshold: Percent = Percent::from_percent(67);
 	pub const PropertyGovernancePalletId: PalletId = PalletId(*b"py/gvrnc");
 }
 
