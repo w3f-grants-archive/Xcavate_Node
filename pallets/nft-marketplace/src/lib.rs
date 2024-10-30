@@ -501,6 +501,12 @@ pub mod pallet {
 		OfferCreated { listing_id: ListingId, price: AssetBalanceOf<T> },
 		/// An offer has been cancelled.
 		OfferCancelled { listing_id: ListingId, account_id: AccountIdOf<T> },
+		/// A lawyer has been registered.
+		LawyerRegistered { lawyer: AccountIdOf<T> },
+		/// A lawyer claimed a property.
+		LawyerClaimedProperty { lawyer: AccountIdOf<T>, listing_id: ListingId, legal_site: LegalProperty},
+		/// A lawyer stepped back from a legal case.
+		LawyerRemovedFromCase { lawyer: AccountIdOf<T>, listing_id: ListingId },
 		/// Documents have been approved or rejected.
 		DocumentsConfirmed { signer: AccountIdOf<T>, listing_id: ListingId, approve: bool },
 		/// The property nft got burned.
@@ -552,6 +558,10 @@ pub mod pallet {
 		LawyerJobTaken,
 		/// A lawyer has not been set.
 		LawyerNotFound,
+		/// The lawyer already submitted his answer.
+		AlreadyConfirmed,
+		/// The costs of the lawyer can't be that high.
+		CostsTooHigh,
 	}
 
 	#[pallet::call]
@@ -1185,8 +1195,16 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Registers a new lawyer.
+		///
+		/// The origin must be the LocationOrigin.
+		///
+		/// Parameters:
+		/// - `lawyer`: The lawyer that should be registered.
+		///
+		/// Emits `LawyerRegistered` event when succesfful.
 		#[pallet::call_index(12)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
 		pub fn register_lawyer(
 			origin: OriginFor<T>,
 			lawyer: AccountIdOf<T>,
@@ -1194,11 +1212,22 @@ pub mod pallet {
 			T::LocationOrigin::ensure_origin(origin)?;
 			ensure!(!RealEstateLawyer::<T>::get(lawyer.clone()), Error::<T>::LawyerAlreadyRegistered);
 			RealEstateLawyer::<T>::insert(lawyer.clone(), true);
+			Self::deposit_event(Event::<T>::LawyerRegistered {lawyer});
 			Ok(())
 		}
 
+		/// Lets a lawyer claim a property to handle the legal work.
+		///
+		/// The origin must be Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `listing_id`: The listing from the property.
+		/// - `legal_site`: The site that the lawyer wants to represent.
+		/// - `costs`: The costs thats the lawyer demands for his work.
+		///
+		/// Emits `LawyerClaimedProperty` event when succesfful.
 		#[pallet::call_index(13)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
 		pub fn lawyer_claim_property(
 			origin: OriginFor<T>,
 			listing_id: ListingId,
@@ -1208,7 +1237,10 @@ pub mod pallet {
 			let signer = ensure_signed(origin)?;
 			ensure!(RealEstateLawyer::<T>::get(signer.clone()), Error::<T>::NoPermission);
 			let mut property_lawyer_details = PropertyLawyer::<T>::get(listing_id).ok_or(Error::<T>::InvalidIndex)?;
-			
+			let nft_details =
+				OngoingObjectListing::<T>::get(listing_id).ok_or(Error::<T>::InvalidIndex)?;
+			ensure!(nft_details.collected_fees >= costs, Error::<T>::CostsTooHigh);
+
 			match legal_site {
 				LegalProperty::RealEstateDeveloperSite => {
 					ensure!(property_lawyer_details.real_estate_developer_lawyer.is_none(), Error::<T>::LawyerJobTaken);
@@ -1225,11 +1257,54 @@ pub mod pallet {
 					PropertyLawyer::<T>::insert(listing_id, property_lawyer_details);
 				}
 			}
+			Self::deposit_event(Event::<T>::LawyerClaimedProperty {lawyer: signer, listing_id, legal_site});
 			Ok(())
 		}
 
+		/// Lets a lawyer step back from a case.
+		///
+		/// The origin must be Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `listing_id`: The listing from the property.
+		///
+		/// Emits `LawyerRemovedFromCase` event when succesfful.
 		#[pallet::call_index(14)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
+		pub fn remove_from_case(
+			origin: OriginFor<T>,
+			listing_id: ListingId,
+		) -> DispatchResult {
+			let signer = ensure_signed(origin)?;
+			ensure!(RealEstateLawyer::<T>::get(signer.clone()), Error::<T>::NoPermission);
+			let mut property_lawyer_details = PropertyLawyer::<T>::get(listing_id).ok_or(Error::<T>::InvalidIndex)?;
+			if property_lawyer_details.real_estate_developer_lawyer == Some(signer.clone()) {
+				ensure!(property_lawyer_details.real_estate_developer_status == DocumentStatus::Pending,
+					Error::<T>::AlreadyConfirmed);
+				property_lawyer_details.real_estate_developer_lawyer = None;
+			} else if property_lawyer_details.spv_lawyer == Some(signer.clone()) {
+				ensure!(property_lawyer_details.spv_status == DocumentStatus::Pending,
+					Error::<T>::AlreadyConfirmed);
+				property_lawyer_details.spv_lawyer = None;
+			} else {
+				return Err(Error::<T>::NoPermission.into());
+			}
+			PropertyLawyer::<T>::insert(listing_id, property_lawyer_details);	
+			Self::deposit_event(Event::<T>::LawyerRemovedFromCase {lawyer: signer, listing_id});	
+			Ok(())
+		}
+
+		/// Lets a lawyer confirm a legal case.
+		///
+		/// The origin must be Signed and the sender must have sufficient funds free.
+		///
+		/// Parameters:
+		/// - `listing_id`: The listing from the property.
+		/// - `approve`: Approves or Rejects the case.
+		///
+		/// Emits `DocumentsConfirmed` event when succesfful.
+		#[pallet::call_index(15)]
+		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
 		pub fn lawyer_confirm_documents(
 			origin: OriginFor<T>,
 			listing_id: ListingId,
@@ -1239,6 +1314,8 @@ pub mod pallet {
 
 			let mut property_lawyer_details = PropertyLawyer::<T>::take(listing_id).ok_or(Error::<T>::InvalidIndex)?;
 			if property_lawyer_details.real_estate_developer_lawyer == Some(signer.clone()) {
+				ensure!(property_lawyer_details.real_estate_developer_status == DocumentStatus::Pending,
+					Error::<T>::AlreadyConfirmed);
 				property_lawyer_details.real_estate_developer_status = if approve {
 					DocumentStatus::Approved
 				} else {
@@ -1246,6 +1323,8 @@ pub mod pallet {
 				};
 				Self::deposit_event(Event::<T>::DocumentsConfirmed { signer, listing_id, approve });
 			} else if property_lawyer_details.spv_lawyer == Some(signer.clone()) {
+				ensure!(property_lawyer_details.spv_status == DocumentStatus::Pending,
+					Error::<T>::AlreadyConfirmed);
 				property_lawyer_details.spv_status = if approve {
 					DocumentStatus::Approved
 				} else {
@@ -1439,7 +1518,7 @@ pub mod pallet {
 				Some(account_id) => account_id,
 				None => return Err(Error::<T>::LawyerNotFound.into()),
 			};
-			Self::transfer_funds(pallet_account.clone(), spv_lawyer_id, property_lawyer_details.spv_lawyer_costs);
+			Self::transfer_funds(pallet_account.clone(), spv_lawyer_id, property_lawyer_details.spv_lawyer_costs)?;
 			for owner in list {
 				let token_details: TokenOwnerDetails<AssetBalanceOf<T>> = TokenOwner::<T>::take(owner.clone(), listing_id);
 				let refund_amount = token_details.paid_funds
@@ -1527,25 +1606,6 @@ pub mod pallet {
 		}
 
 		fn calculate_fees(
-			price: AssetBalanceOf<T>,
-			sender: AccountIdOf<T>,
-			receiver: AccountIdOf<T>,
-		) -> DispatchResult {
-			let fees = price
-				.checked_div(&Self::u64_to_balance_option(100)?)
-				.ok_or(Error::<T>::DivisionError)?;
-			let treasury_id = Self::treasury_account_id();
-			let seller_part = price
-				.checked_mul(&Self::u64_to_balance_option(99)?)
-				.ok_or(Error::<T>::MultiplyError)?
-				.checked_div(&Self::u64_to_balance_option(100)?)
-				.ok_or(Error::<T>::DivisionError)?;
-			Self::transfer_funds(sender.clone(), treasury_id, fees)?;
-			Self::transfer_funds(sender, receiver, seller_part)?;
-			Ok(())
-		}
-
-		fn calculate_property_fees(
 			price: AssetBalanceOf<T>,
 			sender: AccountIdOf<T>,
 			receiver: AccountIdOf<T>,
