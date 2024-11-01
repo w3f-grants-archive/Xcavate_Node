@@ -194,13 +194,13 @@ fn challenge_against_letting_agent_works() {
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([10; 32].into()),
 			0,
-			LegalProperty::RealEstateDeveloperSite,
+			LegalProperty::RealEstateDeveloperSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([11; 32].into()),
 			0,
-			LegalProperty::SpvSite,
+			LegalProperty::SpvSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_confirm_documents(
@@ -255,13 +255,13 @@ fn challenge_against_letting_agent_fails() {
 				assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([10; 32].into()),
 			0,
-			LegalProperty::RealEstateDeveloperSite,
+			LegalProperty::RealEstateDeveloperSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([11; 32].into()),
 			0,
-			LegalProperty::SpvSite,
+			LegalProperty::SpvSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_confirm_documents(
@@ -323,13 +323,13 @@ fn vote_on_proposal_works() {
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([10; 32].into()),
 			0,
-			LegalProperty::RealEstateDeveloperSite,
+			LegalProperty::RealEstateDeveloperSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([11; 32].into()),
 			0,
-			LegalProperty::SpvSite,
+			LegalProperty::SpvSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_confirm_documents(
@@ -411,13 +411,13 @@ fn proposal_pass() {
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([10; 32].into()),
 			0,
-			LegalProperty::RealEstateDeveloperSite,
+			LegalProperty::RealEstateDeveloperSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([11; 32].into()),
 			0,
-			LegalProperty::SpvSite,
+			LegalProperty::SpvSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_confirm_documents(
@@ -492,13 +492,13 @@ fn proposal_pass_2() {
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([10; 32].into()),
 			0,
-			LegalProperty::RealEstateDeveloperSite,
+			LegalProperty::RealEstateDeveloperSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([11; 32].into()),
 			0,
-			LegalProperty::SpvSite,
+			LegalProperty::SpvSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_confirm_documents(
@@ -587,13 +587,13 @@ fn proposal_not_pass() {
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([10; 32].into()),
 			0,
-			LegalProperty::RealEstateDeveloperSite,
+			LegalProperty::RealEstateDeveloperSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([11; 32].into()),
 			0,
-			LegalProperty::SpvSite,
+			LegalProperty::SpvSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_confirm_documents(
@@ -670,13 +670,13 @@ fn proposal_not_pass_2() {
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([10; 32].into()),
 			0,
-			LegalProperty::RealEstateDeveloperSite,
+			LegalProperty::RealEstateDeveloperSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([11; 32].into()),
 			0,
-			LegalProperty::SpvSite,
+			LegalProperty::SpvSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_confirm_documents(
@@ -752,13 +752,13 @@ fn vote_on_proposal_fails() {
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([10; 32].into()),
 			0,
-			LegalProperty::RealEstateDeveloperSite,
+			LegalProperty::RealEstateDeveloperSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([11; 32].into()),
 			0,
-			LegalProperty::SpvSite,
+			LegalProperty::SpvSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_confirm_documents(
@@ -844,13 +844,13 @@ fn vote_on_challenge_works() {
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([10; 32].into()),
 			0,
-			LegalProperty::RealEstateDeveloperSite,
+			LegalProperty::RealEstateDeveloperSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([11; 32].into()),
 			0,
-			LegalProperty::SpvSite,
+			LegalProperty::SpvSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_confirm_documents(
@@ -944,13 +944,13 @@ fn challenge_pass() {
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([10; 32].into()),
 			0,
-			LegalProperty::RealEstateDeveloperSite,
+			LegalProperty::RealEstateDeveloperSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([11; 32].into()),
 			0,
-			LegalProperty::SpvSite,
+			LegalProperty::SpvSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_confirm_documents(
@@ -1095,13 +1095,13 @@ fn challenge_does_not_pass() {
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([10; 32].into()),
 			0,
-			LegalProperty::RealEstateDeveloperSite,
+			LegalProperty::RealEstateDeveloperSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([11; 32].into()),
 			0,
-			LegalProperty::SpvSite,
+			LegalProperty::SpvSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_confirm_documents(
@@ -1201,13 +1201,13 @@ fn challenge_pass_only_one_agent() {
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([10; 32].into()),
 			0,
-			LegalProperty::RealEstateDeveloperSite,
+			LegalProperty::RealEstateDeveloperSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([11; 32].into()),
 			0,
-			LegalProperty::SpvSite,
+			LegalProperty::SpvSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_confirm_documents(
@@ -1311,13 +1311,13 @@ fn challenge_not_pass() {
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([10; 32].into()),
 			0,
-			LegalProperty::RealEstateDeveloperSite,
+			LegalProperty::RealEstateDeveloperSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([11; 32].into()),
 			0,
-			LegalProperty::SpvSite,
+			LegalProperty::SpvSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_confirm_documents(
@@ -1382,13 +1382,13 @@ fn vote_on_challenge_fails() {
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([10; 32].into()),
 			0,
-			LegalProperty::RealEstateDeveloperSite,
+			LegalProperty::RealEstateDeveloperSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([11; 32].into()),
 			0,
-			LegalProperty::SpvSite,
+			LegalProperty::SpvSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_confirm_documents(
@@ -1465,13 +1465,13 @@ fn different_proposals() {
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([10; 32].into()),
 			0,
-			LegalProperty::RealEstateDeveloperSite,
+			LegalProperty::RealEstateDeveloperSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_claim_property(
 			RuntimeOrigin::signed([11; 32].into()),
 			0,
-			LegalProperty::SpvSite,
+			LegalProperty::SpvSide,
 			4_000,
 		));
 		assert_ok!(NftMarketplace::lawyer_confirm_documents(
