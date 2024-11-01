@@ -182,8 +182,8 @@ pub mod pallet {
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
 	pub enum LegalProperty {
-		RealEstateDeveloperSite,
-		SpvSite,
+		RealEstateDeveloperSide,
+		SpvSide,
 	}
 
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
@@ -504,7 +504,7 @@ pub mod pallet {
 		/// A lawyer has been registered.
 		LawyerRegistered { lawyer: AccountIdOf<T> },
 		/// A lawyer claimed a property.
-		LawyerClaimedProperty { lawyer: AccountIdOf<T>, listing_id: ListingId, legal_site: LegalProperty},
+		LawyerClaimedProperty { lawyer: AccountIdOf<T>, listing_id: ListingId, legal_side: LegalProperty},
 		/// A lawyer stepped back from a legal case.
 		LawyerRemovedFromCase { lawyer: AccountIdOf<T>, listing_id: ListingId },
 		/// Documents have been approved or rejected.
@@ -1222,7 +1222,7 @@ pub mod pallet {
 		///
 		/// Parameters:
 		/// - `listing_id`: The listing from the property.
-		/// - `legal_site`: The site that the lawyer wants to represent.
+		/// - `legal_side`: The side that the lawyer wants to represent.
 		/// - `costs`: The costs thats the lawyer demands for his work.
 		///
 		/// Emits `LawyerClaimedProperty` event when succesfful.
@@ -1231,7 +1231,7 @@ pub mod pallet {
 		pub fn lawyer_claim_property(
 			origin: OriginFor<T>,
 			listing_id: ListingId,
-			legal_site: LegalProperty,
+			legal_side: LegalProperty,
 			costs: AssetBalanceOf<T>,
 		) -> DispatchResult {
 			let signer = ensure_signed(origin)?;
@@ -1241,15 +1241,15 @@ pub mod pallet {
 				OngoingObjectListing::<T>::get(listing_id).ok_or(Error::<T>::InvalidIndex)?;
 			ensure!(nft_details.collected_fees >= costs, Error::<T>::CostsTooHigh);
 
-			match legal_site {
-				LegalProperty::RealEstateDeveloperSite => {
+			match legal_side {
+				LegalProperty::RealEstateDeveloperSide => {
 					ensure!(property_lawyer_details.real_estate_developer_lawyer.is_none(), Error::<T>::LawyerJobTaken);
 					ensure!(property_lawyer_details.spv_lawyer != Some(signer.clone()), Error::<T>::NoPermission);
 					property_lawyer_details.real_estate_developer_lawyer = Some(signer.clone());
 					property_lawyer_details.real_estate_developer_lawyer_costs = costs;
 					PropertyLawyer::<T>::insert(listing_id, property_lawyer_details);
 				}
-				LegalProperty::SpvSite => {
+				LegalProperty::SpvSide => {
 					ensure!(property_lawyer_details.spv_lawyer.is_none(), Error::<T>::LawyerJobTaken);
 					ensure!(property_lawyer_details.real_estate_developer_lawyer != Some(signer.clone()), Error::<T>::NoPermission);
 					property_lawyer_details.spv_lawyer = Some(signer.clone());
@@ -1257,7 +1257,7 @@ pub mod pallet {
 					PropertyLawyer::<T>::insert(listing_id, property_lawyer_details);
 				}
 			}
-			Self::deposit_event(Event::<T>::LawyerClaimedProperty {lawyer: signer, listing_id, legal_site});
+			Self::deposit_event(Event::<T>::LawyerClaimedProperty {lawyer: signer, listing_id, legal_side});
 			Ok(())
 		}
 
